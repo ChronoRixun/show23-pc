@@ -1,0 +1,51 @@
+# Nothing from a game, an account or a local install belongs in this repository.
+
+# game packages, dumps and anything unpacked from them
+*.pkg
+*.pfs
+*.bin
+*.elf
+*.self
+*.sprx
+*.prx
+Dump/
+Extracted/
+Prepared/
+data/
+
+# keys and certificates (the server makes its own at first run, per install)
+*.pem
+*.key
+*.crt
+*.pfx
+*.p12
+
+# per-user state, saves, logs, caches
+state.json
+state.*.json
+*.log
+logs/
+user/
+probes/
+snapshots/
+import-cache/
+
+# art and other binary assets
+*.png
+*.jpg
+*.jpeg
+*.webp
+*.tex
+*.dds
+*.zip
+*.7z
+*.rdc
+
+# build output
+__pycache__/
+*.pyc
+build/
+dist/
+*.exe
+*.dll
+*.pdb
