@@ -111,6 +111,12 @@ def resolve_layout(here, root, install):
 
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+VENDOR = os.path.join(HERE, 'vendor')
+if os.path.isdir(VENDOR):
+    if VENDOR in sys.path:
+        sys.path.remove(VENDOR)
+    sys.path.insert(0, VENDOR)
+    sys.dont_write_bytecode = True  # The vendored runtime may be read-only.
 ROOT = os.path.dirname(os.path.dirname(HERE))
 _install, _command_args = install_option(sys.argv[1:] if __name__ == '__main__' else [])
 LAYOUT = globals().get('_INHERITED_LAYOUT') or resolve_layout(HERE, ROOT, _install)
@@ -1443,6 +1449,9 @@ def add_imported_specials(pool):
     _special_art = {card['item_id']: pictures[card['item_id']]
                     for card in imported if card['item_id'] in pictures}
     _import_picture_dir = folder / 'art' / 'img'
+    converted = module.convert_cached_pictures(_import_picture_dir)
+    if converted:
+        print(f'imported card art: converted {converted} cached pictures to WebP')
     pool.extend(imported)
     pool.sort(key=lambda c: (-c['ovr'], c['name'], c['roster_player_id']))
     reasons = ', '.join(f'{count} {reason}' for reason, count in sorted(dropped.items()))
@@ -1570,15 +1579,16 @@ def card_attrs(c, **extra):
     for k in RATINGS:
         a[k] = c[k] if c.get(k) is not None else 0     # always present: the squad screen subtracts them
     # the card picture: the update package's or the website's own art (card_art()), else the disc's action shot
-    overrides = player_art()['override']
+    art = player_art()
     fallback = 'ACTIONGENERIC' if CARD_SOURCE == 'disc' else actionshot_handle(c)
-    a['actionshot_handle'], a['actionshot_id'] = overrides.get(c['item_id'], (fallback, c['item_id']))
+    a['actionshot_handle'], a['actionshot_id'] = art['override'].get(c['item_id'], (fallback, c['item_id']))
     if c.get('imported_special'):
         a['series_texture_name'] = c.get('series_texture_name') or ''
         a['series_year'] = c.get('series_year') or 0
         a['series_name'] = c['series']
         a['set_name'] = c.get('set_name') or ''
     a.update(extra)
+    a['border_style'] = 4 if c['item_id'] in art.get('full_art_ids', ()) else 0
     esc = lambda v: str(v).replace('&', '&amp;').replace('"', '&quot;').replace('<', '&lt;')
     return ' '.join('%s="%s"' % (k, esc(v)) for k, v in a.items())
 
@@ -4345,6 +4355,10 @@ def register_picture(registry, name, art_id, url_id, data, extension='.webp'):
     return True
 
 
+def designed_card_series(card):
+    return card.get('series') not in (None, '', 'Live', 'Live Series', 'Captain')
+
+
 def publish_special_art(registry, card):
     item_id = card['item_id']
     source = _special_art.get(item_id)
@@ -4365,6 +4379,8 @@ def publish_special_art(registry, card):
     name = f'as_{handle}_{item_id}'
     if register_picture(registry, name, item_id, item_id, data):
         registry['override'][item_id] = (handle, item_id)
+        if designed_card_series(card):
+            registry['full_art_ids'].add(item_id)
         return kind
     return None
 
@@ -4428,11 +4444,11 @@ def player_art():
     wants a ZIP holding <name>.webp (0xa87019; md5 = lowercase md5 of the whole ZIP, compared with strcmp). Disc
     action shots are 256 x 256, so the art is padded onto a 256 x 256 canvas. The pictures are the site's `img` of
     the user's special cards (tools\\theshow-cardart.py; downloaded with his approval, 2026-11-19). Returns
-    {'entries': [(name, id, md5, url)], 'files': {web path: zip bytes}}; empty when nothing is downloaded."""
+    the texture entries, ZIP files, card picture overrides and IDs with a complete designed face."""
     global _card_art
     if _card_art is not None:
         return _card_art
-    _card_art = {'entries': [], 'files': {}, 'override': {}}
+    _card_art = {'entries': [], 'files': {}, 'override': {}, 'full_art_ids': set()}
     if CARD_SOURCE == 'disc':
         publish_disc_art(_card_art)
         return _card_art
@@ -4451,18 +4467,26 @@ def player_art():
         name = 'as_%s_%d' % (handle, art_id)
         if register_picture(_card_art, name, art_id, c['item_id'], data, member_ext):
             _card_art['override'][c['item_id']] = (handle, art_id)
+            # Research item IDs are local. The site's UUID identifies the real card.
+            if designed_card_series(c) and (
+                kind == 'site' or (
+                    kind == 'update' and
+                    hashlib.md5(str(art_id).encode('ascii'), usedforsecurity=False).hexdigest() == c['uuid']
+                )
+            ):
+                _card_art['full_art_ids'].add(c['item_id'])
             counts[kind] += 1
     seen = set()
     for c in cards():
         try:
-            # 1. the game's own picture from the update package (exact art; .webp, or a .tex action shot)
+            # 1. A candidate from the update package (a WebP or a plain .tex action shot).
             own = update_art(c)
             if own and (own[0], own[1]) not in seen:
                 seen.add((own[0], own[1]))
                 publish(c, own[0], own[1], '.' + own[3], open(own[2], 'rb').read(), 'update' if own[3] == 'webp' else 'update_tex')
                 continue
             if own:
-                _card_art['override'][c['item_id']] = (own[0], own[1])    # a second copy of the same card: same picture
+                _card_art['override'][c['item_id']] = (own[0], own[1])
                 continue
             # 2. The website's picture of a special card; preserve the whole design.
             src = files.get(c['uuid'])
@@ -5902,7 +5926,7 @@ for _number, _uuid in enumerate(_CHASE_UUIDS, 1):
     )
 for _number, _pair in enumerate(_DUOS_UUIDS, 1):
     SHOP_PACKS[512000 + _number] = ShopPack(
-        f'Diamond Duos {_number:02d}', f'PACK_DIAMONDDUOS_{_number:02d}', 'update', 7500,
+        f'Diamond Duos {_number:02d}', f'PACK_DIAMONDDUOS_{_number:02d}', 'update', 1500,
         (PackDraw(3), PackDraw(1, rarity='Diamond')), _pair, .10,
         description='Three players plus a Diamond. 10% chance the Diamond is {featured}.',
     )

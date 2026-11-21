@@ -2,6 +2,7 @@
 
 import datetime
 import hashlib
+import io
 import json
 import re
 import sys
@@ -438,6 +439,44 @@ def picture_suffix(data):
     return None
 
 
+def convert_cached_pictures(art):
+    """Keep the original and fit PNG/JPEG artwork onto the usual 512px card canvas."""
+    if not art.is_dir():
+        return 0
+    try:
+        from PIL import Image, ImageOps
+    except ImportError:
+        return 0
+    try:
+        sources = sorted(art.iterdir())
+    except OSError:
+        return 0
+    converted = 0
+    for source in sources:
+        if source.suffix.lower() not in ('.png', '.jpg', '.jpeg') or not UUID.fullmatch(source.stem):
+            continue
+        target = source.with_suffix('.webp')
+        if target.is_file():
+            continue
+        try:
+            with Image.open(source, formats=('PNG', 'JPEG')) as picture:
+                if picture.width * picture.height > 4096 * 4096:
+                    continue
+                rgba = ImageOps.exif_transpose(picture).convert('RGBA')
+            canvas = ImageOps.pad(rgba, (512, 512), Image.Resampling.LANCZOS, color=(0, 0, 0, 0))
+            for quality in (90, 75, 60, 45, 30):
+                buffer = io.BytesIO()
+                canvas.save(buffer, format='WEBP', quality=quality)
+                # Allow room for the headers and member name in the stored texture ZIP.
+                if buffer.tell() <= 512 * 1024 - 256:
+                    atomic_write(target, buffer.getvalue())
+                    converted += 1
+                    break
+        except (OSError, ValueError, Image.DecompressionBombError):
+            continue
+    return converted
+
+
 def import_day(root):
     today = datetime.datetime.now(datetime.timezone.utc).date().isoformat()
     if root.is_dir():
@@ -494,6 +533,7 @@ def import_catalogue(root, base, update, pictures=False, *, fetch=None, output=p
             extension = picture_suffix(data)
             if extension:
                 atomic_write(art / (uuid + extension), data)
+        convert_cached_pictures(art)
     write_json(folder / 'items-mlb_card.json', list(cards.values()))
     write_json(folder / 'manifest.json', {
         'complete': True, 'cards': len(cards), 'date': day,
