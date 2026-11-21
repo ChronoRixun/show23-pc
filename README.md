@@ -17,10 +17,10 @@ This repository contains **no game files**: no executables, art, audio, rosters,
 
 | Part | Where | Licence |
 |---|---|---|
-| Launcher and builder: takes your game package, checks it, sets up the install, keeps the parts up to date and starts everything | separate repository, `show23-pc-launcher` (planned; design in `docs/launcher.md` and `builder/`) | GPL-3.0 |
+| Launcher: checks your game, sets up the install, keeps the parts up to date and starts everything | separate repository, [`show23-pc-launcher`](https://github.com/ChronoRixun/show23-pc-launcher) | GPL-3.0 |
 | Local server: plays the part of the game's online service on `127.0.0.1` | `server/` | MIT |
 | Developer tools: read-only helpers for packages and rosters | `tools/` | MIT |
-| Emulator: shadPS4 with the changes this game needs | separate repository, `show23-pc-emulator` | GPL-2.0 (as upstream) |
+| Emulator: shadPS4 with the changes this game needs | separate repository, [`show23-pc-emulator`](https://github.com/ChronoRixun/show23-pc-emulator), branch `release` | GPL-2.0-or-later (as upstream) |
 
 More detail is in [docs/architecture.md](docs/architecture.md). Updates, the Stable and Beta channels and mods are described in [docs/launcher.md](docs/launcher.md).
 
@@ -29,6 +29,15 @@ More detail is in [docs/architecture.md](docs/architecture.md). Updates, the Sta
 Playing against the CPU with your own squad, Mini Seasons, Conquest, Showdown, a pack shop paid for with Stubs earned in games, XP and the reward path, Team Affinity, collections, inventory, team equipment and player exchanges. Each of these is at a different level of polish; the table in [docs/status.md](docs/status.md) says exactly which parts have been seen working in the game and which are still being built.
 
 There is no play between people. The server only ever talks to the game on the same machine.
+
+## Credits
+
+This project builds on the work of others:
+
+- [shadPS4](https://github.com/shadps4-emu/shadPS4): the emulator the game runs on, including its renderer and shader recompiler.
+- [mlb_pc](https://github.com/victorgbd/mlb_pc), the PC port of MLB The Show 24: its notes on this engine's crowd, nets, faces and GPU counters helped find several of the fixes this game needed.
+- The launcher is adapted from [Ultimate Legends](https://github.com/ChronoRixun/ultimate-legends), a fork of the [CB Servers Launcher](https://github.com/CBServers/cb-launcher), whose foundation is the [XLabs Launcher](https://github.com/XLabsProject/launcher) by momo5502 and the XLabs team.
+- The libraries each part bundles are listed with their licences in that part's repository and in the release package.
 
 ## Legal
 
