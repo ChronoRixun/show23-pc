@@ -24,9 +24,9 @@ A missing record, a game folder that has moved, or missing reply files or table 
 
 Without `--install` the file uses the folder layout of the development tree it was written in; that mode is for development only.
 
-## Current limitation
+## Cards
 
-A fresh install signs in but has no cards: the player records, looks and pitch data the card mode needs are still produced by a separate development tool. Building them from the game folder inside the server is the next item in the [roadmap](../docs/roadmap.md).
+In an install the cards come from the game folder: on first start (or with `python olserver.py build-roster --install <install folder>`) the server reads the roster files of the base game and writes the player records, looks, pitch data and one base card per player into the install's server data folder. A new player starts with a full 26-man squad of Common cards; the rest are earned with packs, exchanges and programs. An optional import of the public card catalogue can be placed in `data/import-cache/` and is used instead.
 
 ## What is here
 

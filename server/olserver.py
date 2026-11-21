@@ -32,6 +32,7 @@ class ServerLayout(NamedTuple):
     replies: str
     messages: str
     catalogue: str
+    executables: tuple = ()
 
 
 def install_option(args):
@@ -103,7 +104,9 @@ def resolve_layout(here, root, install):
     work = os.path.join(data, 'profiles', 'default', 'server')
     return ServerLayout(install, base, update, work, os.path.join(work, 'state.json'),
                         os.path.join(data, 'logs'), replies, packaged_table,
-                        os.path.join(data, 'import-cache'))
+                        os.path.join(data, 'import-cache'),
+                        tuple(json.dumps(record.get(kind, {}).get('executable'), sort_keys=True)
+                              for kind in ('base', 'update')))
 
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -1238,6 +1241,7 @@ def arena_state(params):
 # the meaning of team_id, roster_player_id, position and new_position in a card entry is read
 # from the handlers and the front-end script (see HANDOFF) but has not been seen working.
 COLLECTION = 'all'
+CARD_SOURCE = 'disc' if LAYOUT.install else 'site'
 RARITY_ID = {'Common': 0, 'Bronze': 1, 'Silver': 2, 'Gold': 3, 'Diamond': 4}
 FIELD_NUMBER = {'SP': 0, 'RP': 0, 'CP': 0, 'C': 1, '1B': 2, '2B': 3, '3B': 4, 'SS': 5, 'LF': 6, 'CF': 7, 'RF': 8, 'DH': 9}
 RATINGS = ['ovr', 'stamina', 'pitching_clutch', 'hits_per_bf', 'k_per_bf', 'bb_per_bf', 'hr_per_bf', 'pitch_velocity',
@@ -1283,10 +1287,120 @@ def roster_tables():
     return players, teams
 
 
+DISC_ROSTER_FILES = ('disc-cards.json', 'roster-records.json', 'appearance-fields.json', 'pitch-table.json')
+_disc_decoder = None
+
+
+def disc_decoder():
+    global _disc_decoder
+    if _disc_decoder is None:
+        import importlib.util
+        path = os.path.join(HERE, 'roster_decode.py')
+        spec = importlib.util.spec_from_file_location('roster_decode', path)
+        module = importlib.util.module_from_spec(spec)
+        # The release program folder can be read-only.
+        with open(path, 'rb') as file:
+            exec(compile(file.read(), path, 'exec'), module.__dict__)
+        _disc_decoder = module
+    return _disc_decoder
+
+
+def derived_roster_path(name):
+    folder = os.path.join(WORK, 'disc-roster') if CARD_SOURCE == 'disc' and not LAYOUT.install else WORK
+    return os.path.join(folder, name)
+
+
+def prepare_disc_roster(log=None):
+    from pathlib import Path
+    stamp_path = Path(derived_roster_path('disc-roster-stamp.json'))
+    stamp = {'schema': 1, 'base': LAYOUT.base, 'update': LAYOUT.update,
+             'executables': list(LAYOUT.executables), 'roster_source': ROSTER_SOURCE}
+    try:
+        with stamp_path.open(encoding='utf-8') as file:
+            current = json.load(file)
+    except (OSError, ValueError):
+        current = None
+    if current == stamp and all(os.path.isfile(derived_roster_path(name)) for name in DISC_ROSTER_FILES):
+        return
+    decoder = disc_decoder()
+    datasets = decoder.server_roster(Path(ROSTER_DIRS[ROSTER_SOURCE]), [club[0] for club in MLB_TEAMS])
+    for name in DISC_ROSTER_FILES:
+        decoder.write_json(Path(derived_roster_path(name)), datasets[name])
+    decoder.write_json(stamp_path, stamp)
+    if log is not None:
+        log(f'disc roster: built {len(datasets["disc-cards.json"])} cards from {ROSTER_SOURCE}')
+
+
+def choose_disc_starter(pool):
+    """Pick low-rated Commons and assign them to a complete starter squad."""
+    commons = sorted((c for c in pool if c['rarity'] == 'Common'),
+                     key=lambda c: (c['ovr'], c['roster_player_id']))
+    chosen = []
+    names = set()
+
+    def add(card):
+        names.add(card['name'])
+        chosen.append(card['uuid'])
+        return card
+
+    def take(position, count):
+        available = [c for c in commons if c['display_position'] == position]
+        selected = []
+        for card in available:
+            if card['name'] not in names:
+                selected.append(add(card))
+                if len(selected) == count:
+                    return selected
+        raise ValueError(f'disc starter needs {count} Common {position} players')
+
+    fields = ('C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF')
+    lineup = [take(position, 1)[0] for position in fields]
+    bench = take('C', 1)
+    starters = take('SP', 5)
+    relief = take('CP', 1) + take('RP', 7)
+    needed = set(fields) - {'C'}
+
+    def positions(card):
+        return {card['display_position'], *card['display_secondary_positions'].split(',')}
+
+    for _ in range(3):
+        available = [c for c in commons if c['is_hitter'] and c['name'] not in names]
+        if not available:
+            raise ValueError('disc starter needs three flexible Common bench hitters')
+        card = max(available, key=lambda c: len(needed & positions(c)))
+        needed.difference_update(positions(card))
+        bench.append(add(card))
+    if needed:
+        raise ValueError('disc starter lacks Common backups for ' + ', '.join(sorted(needed)))
+    dh = next((c for c in commons if c['is_hitter'] and c['name'] not in names), None)
+    if dh is None:
+        raise ValueError('disc starter needs a Common designated hitter')
+    lineup.append(add(dh))
+    lineup.sort(key=lambda c: -(c['contact_right'] + c['power_right']))
+    squad = {'lineup': [[c['item_id'], 9 if c is dh else FIELD_NUMBER[c['display_position']]] for c in lineup],
+             'bench': [c['item_id'] for c in bench],
+             'starters': [c['item_id'] for c in starters], 'relief': [c['item_id'] for c in relief]}
+    return chosen, squad
+
+
+def load_disc_cards():
+    prepare_disc_roster()
+    with open(derived_roster_path('disc-cards.json'), encoding='utf-8') as file:
+        pool = sorted(json.load(file), key=lambda c: (-c['ovr'], c['name'], c['roster_player_id']))
+    starter = load_state().get('disc_starter')
+    if starter is None:
+        starter, _ = choose_disc_starter(pool)
+    starter = set(starter)
+    return [c for c in pool if c['uuid'] in starter], pool
+
+
 def base_cards():
     """The read-only snapshot collection, best overall first."""
     global _cards, _all_cards
     if _cards is not None:
+        return _cards
+    if CARD_SOURCE == 'disc':
+        _cards, _all_cards = load_disc_cards()
         return _cards
     _cards, _all_cards = [], []
     snap = CATALOGUE_DIR
@@ -2749,7 +2863,7 @@ def inventory_data():
                     inv['stems'].add(f.read(0xa0).split(b'\0', 1)[0].decode('ascii', 'replace').upper())
     except Exception as e:
         print('inventory: disc indexes incomplete (%r)' % (e,))
-    if LAYOUT.install and not os.path.isdir(CATALOGUE_DIR):
+    if CARD_SOURCE == 'disc' or (LAYOUT.install and not os.path.isdir(CATALOGUE_DIR)):
         _inventory = inv
         return inv
     try:
@@ -3819,17 +3933,17 @@ def roster_record(c):
     global _roster_records
     if _roster_records is None:
         try:
-            _roster_records = json.load(open(os.path.join(WORK, 'roster-records.json'), encoding='utf-8'))
+            _roster_records = json.load(open(derived_roster_path('roster-records.json'), encoding='utf-8'))
         except (OSError, ValueError):
             _roster_records = {}
-    return _roster_records.get(c['name'].strip())
+    return _roster_records.get(c.get('roster_record_key', c['name'].strip()))
 
 
 def looks_fields():
     global _looks_fields
     if _looks_fields is None:
         try:
-            fields = json.load(open(os.path.join(WORK, 'appearance-fields.json'), encoding='utf-8'))
+            fields = json.load(open(derived_roster_path('appearance-fields.json'), encoding='utf-8'))
             _looks_fields = sorted((f for f in fields if f.get('offset') is not None), key=lambda f: f['offset'])
         except (OSError, ValueError):
             _looks_fields = []
@@ -3919,7 +4033,7 @@ def pitch_table():
     global _pitch_table
     if _pitch_table is None:
         try:
-            _pitch_table = json.load(open(os.path.join(WORK, 'pitch-table.json'), encoding='utf-8'))
+            _pitch_table = json.load(open(derived_roster_path('pitch-table.json'), encoding='utf-8'))
         except (OSError, ValueError):       # without the table: the common pitches by their codes, flat velocity
             _pitch_table = {'types': {'4-Seam Fastball': 0, 'Sinker': 1, 'Curveball': 2, 'Slider': 3, 'Changeup': 6,
                                       '2-Seam Fastball': 8, 'Cutter': 9, 'Circle Change': 10}, 'velocity': {}}
@@ -3930,7 +4044,12 @@ def player_ratings(c):
     """The value text for RATING_NAMES."""
     byte = lambda v: max(0, min(255, int(v or 0)))
     get = lambda k: (c.get('hitting_durability') or c.get('fielding_durability')) if k == 'durability' else c.get(k)
-    main = ','.join(str(byte(get(k))) for k in PLR_ATTRIBUTES)
+    ratings = [byte(get(k)) for k in PLR_ATTRIBUTES]
+    native = c.get('disc_pitch')
+    if native is not None:
+        ratings[10] = byte(c.get('potential', c['ovr']))
+        return '|'.join(','.join(map(str, group)) for group in (ratings, native[:6], native[6:30]))
+    main = ','.join(map(str, ratings))
     table = pitch_table()
     pitches = [x for x in (c.get('pitches') or []) if x.get('name') in table['types']][:6] if not c.get('is_hitter') else []
     if not pitches:                         # what the game's own roster holds for a position player
@@ -4177,12 +4296,13 @@ def player_art():
     _card_art = {'entries': [], 'files': {}, 'override': {}}
     import io
     files = {}
-    try:
-        snap = CATALOGUE_DIR
-        folder = os.path.join(snap, sorted(os.listdir(snap))[-1], 'art', 'img')
-        files = {f.split('.')[0]: os.path.join(folder, f) for f in os.listdir(folder) if not f.endswith(('.json', '.part'))}
-    except Exception:
-        pass
+    if CARD_SOURCE == 'site':
+        try:
+            snap = CATALOGUE_DIR
+            folder = os.path.join(snap, sorted(os.listdir(snap))[-1], 'art', 'img')
+            files = {f.split('.')[0]: os.path.join(folder, f) for f in os.listdir(folder) if not f.endswith(('.json', '.part'))}
+        except Exception:
+            pass
     counts = {'update': 0, 'update_tex': 0, 'site': 0}
 
     def publish(c, handle, art_id, member_ext, data, kind):
@@ -5460,6 +5580,9 @@ def live_module():
             module._INHERITED_LAYOUT = LAYOUT
             spec.loader.exec_module(module)
             module.COLLECTION, module.ROSTER_SOURCE = COLLECTION, ROSTER_SOURCE
+            module.CARD_SOURCE = CARD_SOURCE
+            if LAYOUT.install or CARD_SOURCE == 'disc':
+                module.STATE_FILE = STATE_FILE
             if LAYOUT.install:
                 module._content_info = _content_info
             _reload['module'], _reload['note'] = module, 'reply code reloaded'
@@ -7310,12 +7433,17 @@ def log_missing_derived(log):
 
 
 def main():
-    global ROSTER_SOURCE
+    global CARD_SOURCE, ROSTER_SOURCE, STATE_FILE
     args = _command_args if __name__ == '__main__' else sys.argv[1:]
     cmd = args[0] if args else 'run'
     options = args[1:]
     roster_option = None
-    if LAYOUT.install:
+    for option in options:
+        if option.startswith('--cards='):
+            CARD_SOURCE = option.split('=', 1)[1]
+            if CARD_SOURCE not in ('disc', 'site'):
+                sys.exit('--cards must be disc or site')
+    if LAYOUT.install or cmd == 'build-roster':
         for arg in options:
             if arg.startswith('--rosters='):
                 roster_option = arg.split('=', 1)[1]
@@ -7325,7 +7453,14 @@ def main():
             if roster_option not in ROSTER_DIRS:
                 sys.exit(f'--rosters must be one of {", ".join(ROSTER_DIRS)}')
             ROSTER_SOURCE = roster_option
-    if cmd == 'gen-certs':
+    if cmd == 'build-roster':
+        if not LAYOUT.install:
+            CARD_SOURCE = 'disc'
+        try:
+            prepare_disc_roster(print)
+        except (OSError, ValueError, KeyError, struct.error) as error:
+            sys.exit(f'cannot build disc roster: {error}')
+    elif cmd == 'gen-certs':
         gen_certs()
     elif cmd == 'build-content':
         sources = (roster_option,) if roster_option is not None else ROSTER_DIRS
@@ -7368,10 +7503,21 @@ def main():
             opts['log'] = os.path.join(LOGDIR, opts['log'])
             os.makedirs(os.path.dirname(os.path.abspath(opts['log'])), exist_ok=True)
         log = Log(opts['log'])
-        if LAYOUT.install:
-            if not os.path.exists(STATE_FILE):
-                save_state({})
-            log_missing_derived(log)
+        if LAYOUT.install or CARD_SOURCE == 'disc':
+            if not LAYOUT.install:
+                STATE_FILE = derived_roster_path('state.json')
+            try:
+                prepare_disc_roster(log)
+                state = load_state()
+                if CARD_SOURCE == 'disc' and 'disc_starter' not in state:
+                    state['disc_starter'], squad = choose_disc_starter(all_cards())
+                    if not state.get('squad'):
+                        state['squad'] = squad
+                    save_state(state)
+                elif not os.path.exists(STATE_FILE):
+                    save_state(state)
+            except (OSError, ValueError, KeyError, struct.error) as error:
+                sys.exit(f'cannot prepare disc roster: {error}')
         build_content(log)
         try:
             log(f'cards: collection "{COLLECTION}", {len(cards())} cards with a roster player')
