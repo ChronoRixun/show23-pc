@@ -1,7 +1,7 @@
 # A local stand-in for the online servers of MLB The Show 23, first stage: it accepts the game's
 # connections, answers the sign-in exchange and the keep-alive, logs every message, and answers
 # every "x.y" service request with a canned XML body (replies\<name>.xml next to this file if it
-# exists, otherwise an empty document). It talks to nothing but the game on this machine.
+# exists, otherwise an empty document). The running game service uses only the local machine.
 #
 #   python tools\olserver\olserver.py gen-certs     make our own authority and server certificate
 #   python tools\olserver\olserver.py selftest      codec and TLS round trip against itself
@@ -13,6 +13,7 @@
 # bytes is a u32 length and the bytes. Type IDs come from the packaged message table or the research table.
 #
 # Installed run: python server\olserver.py run --install <folder>
+# Optional public catalogue: python server\olserver.py import-cards --install <folder> [--pictures]
 # The install launcher passes --show23-local-ca with the ca.pem from data\profiles\default\server.
 # Development uses probes\olserver and the research launcher settings.
 import asyncio, base64, csv, datetime, hashlib, json, math, os, random, re, secrets, ssl, struct, sys, tempfile, time, zipfile
@@ -1293,18 +1294,32 @@ DISC_ROSTER_FILES = ('disc-cards.json', 'roster-records.json', 'appearance-field
 _disc_decoder = None
 
 
+def load_adjacent(module_name):
+    import importlib.util
+    path = os.path.join(HERE, module_name + '.py')
+    spec = importlib.util.spec_from_file_location(module_name, path)
+    module = importlib.util.module_from_spec(spec)
+    # The release program folder can be read-only.
+    with open(path, 'rb') as file:
+        exec(compile(file.read(), path, 'exec'), module.__dict__)
+    return module
+
+
 def disc_decoder():
     global _disc_decoder
     if _disc_decoder is None:
-        import importlib.util
-        path = os.path.join(HERE, 'roster_decode.py')
-        spec = importlib.util.spec_from_file_location('roster_decode', path)
-        module = importlib.util.module_from_spec(spec)
-        # The release program folder can be read-only.
-        with open(path, 'rb') as file:
-            exec(compile(file.read(), path, 'exec'), module.__dict__)
-        _disc_decoder = module
+        _disc_decoder = load_adjacent('roster_decode')
     return _disc_decoder
+
+
+_imported_cards_module = None
+
+
+def imported_cards_module():
+    global _imported_cards_module
+    if _imported_cards_module is None:
+        _imported_cards_module = load_adjacent('card_import')
+    return _imported_cards_module
 
 
 def derived_roster_path(name):
@@ -1403,7 +1418,36 @@ def load_disc_cards():
     if starter is None:
         starter, _ = choose_disc_starter(pool)
     starter = set(starter)
-    return [c for c in pool if c['uuid'] in starter], pool
+    owned = [c for c in pool if c['uuid'] in starter]
+    if LAYOUT.install and os.path.isdir(CATALOGUE_DIR):
+        add_imported_specials(pool)
+    return owned, pool
+
+
+_special_records = {}
+_special_art = {}
+_import_picture_dir = None
+
+
+def add_imported_specials(pool):
+    global _special_records, _special_art, _import_picture_dir
+    module = imported_cards_module()
+    catalogue = module.complete_catalogue(CATALOGUE_DIR)
+    if catalogue is None:
+        return
+    folder, site = catalogue
+    pictures = module.disc_pictures(LAYOUT.base, LAYOUT.update)
+    imported, _special_records, dropped = module.special_cards(
+        site, pictures, disc_decoder(), ROSTER_DIRS[ROSTER_SOURCE], LAYOUT.base, LAYOUT.update,
+        [team[0] for team in MLB_TEAMS], pool, FIELD_NUMBER, RARITY_ID)
+    _special_art = {card['item_id']: pictures[card['item_id']]
+                    for card in imported if card['item_id'] in pictures}
+    _import_picture_dir = folder / 'art' / 'img'
+    pool.extend(imported)
+    pool.sort(key=lambda c: (-c['ovr'], c['name'], c['roster_player_id']))
+    reasons = ', '.join(f'{count} {reason}' for reason, count in sorted(dropped.items()))
+    print(f'imported cards: {len(imported)} matched, {sum(dropped.values())} dropped'
+          + (f' ({reasons})' if reasons else ''))
 
 
 def base_cards():
@@ -1529,6 +1573,11 @@ def card_attrs(c, **extra):
     overrides = player_art()['override']
     fallback = 'ACTIONGENERIC' if CARD_SOURCE == 'disc' else actionshot_handle(c)
     a['actionshot_handle'], a['actionshot_id'] = overrides.get(c['item_id'], (fallback, c['item_id']))
+    if c.get('imported_special'):
+        a['series_texture_name'] = c.get('series_texture_name') or ''
+        a['series_year'] = c.get('series_year') or 0
+        a['series_name'] = c['series']
+        a['set_name'] = c.get('set_name') or ''
     a.update(extra)
     esc = lambda v: str(v).replace('&', '&amp;').replace('"', '&quot;').replace('<', '&lt;')
     return ' '.join('%s="%s"' % (k, esc(v)) for k, v in a.items())
@@ -3945,6 +3994,8 @@ _looks_fields = None
 
 def roster_record(c):
     global _roster_records
+    if c.get('imported_special'):
+        return _special_records.get(c['roster_player_id'])
     if _roster_records is None:
         try:
             _roster_records = json.load(open(derived_roster_path('roster-records.json'), encoding='utf-8'))
@@ -4294,13 +4345,39 @@ def register_picture(registry, name, art_id, url_id, data, extension='.webp'):
     return True
 
 
+def publish_special_art(registry, card):
+    item_id = card['item_id']
+    source = _special_art.get(item_id)
+    if source:
+        handle, path = source
+        kind = 'disc'
+    else:
+        handle = 'SITE'
+        path = _import_picture_dir / (card['uuid'] + '.webp')
+        kind = 'site'
+    try:
+        with path.open('rb') as file:
+            data = file.read(512 * 1024 + 1)
+    except OSError:
+        return None
+    if imported_cards_module().picture_suffix(data) != '.webp':
+        return None
+    name = f'as_{handle}_{item_id}'
+    if register_picture(registry, name, item_id, item_id, data):
+        registry['override'][item_id] = (handle, item_id)
+        return kind
+    return None
+
+
 def publish_disc_art(registry):
     pool = all_cards()
     if not pool:
         return
     with open(derived_roster_path('disc-art.json'), encoding='utf-8') as file:
         index = json.load(file)
-    for card in pool:
+    plain = [card for card in pool if not card.get('imported_special')]
+    special = [card for card in pool if card.get('imported_special')]
+    for card in plain:
         source = index.get(str(card['roster_player_id']))
         if not source:
             continue
@@ -4324,6 +4401,22 @@ def publish_disc_art(registry):
         if register_picture(registry, 'as_%s_%d' % (handle, art_id), art_id, item_id, data, extension):
             registry['override'][item_id] = (handle, art_id)
     print('disc card art: %d matches, %d downloads' % (len(registry['override']), len(registry['entries'])))
+    if special:
+        counts = Counter()
+        plain_by_player = {card['roster_player_id']: registry['override'][card['item_id']]
+                           for card in plain if card['item_id'] in registry['override']}
+        for card in special:
+            # The on-disk cache holds 4,000 entries; leave room for stock
+            # content and other downloads. Decoded pictures are evicted separately.
+            kind = publish_special_art(registry, card) if len(registry['entries']) < 3500 else None
+            if kind is None:
+                fallback = plain_by_player.get(card['roster_player_id'])
+                if fallback:
+                    registry['override'][card['item_id']] = fallback
+                kind = 'photo' if fallback else 'generic'
+            counts[kind] += 1
+        print('imported card art: %d disc, %d site, %d plain photo, %d generic'
+              % tuple(counts[kind] for kind in ('disc', 'site', 'photo', 'generic')))
 
 
 def player_art():
@@ -4371,16 +4464,13 @@ def player_art():
             if own:
                 _card_art['override'][c['item_id']] = (own[0], own[1])    # a second copy of the same card: same picture
                 continue
-            # 2. the website's picture of a special card (the user's own download; whole card, cropped)
+            # 2. The website's picture of a special card; preserve the whole design.
             src = files.get(c['uuid'])
             if not src or c.get('series') == 'Live':
                 continue
             from PIL import Image, ImageOps
             with Image.open(src) as pic:
                 rgba = ImageOps.exif_transpose(pic).convert('RGBA')
-            w, h = rgba.size
-            if h > w:
-                rgba = rgba.crop((0, 0, w, w))                # keep the player photo, drop the name banner
             canvas = ImageOps.pad(rgba, (256, 256), Image.Resampling.LANCZOS, color=(0, 0, 0, 0))
             webp = io.BytesIO()
             canvas.save(webp, 'WEBP', quality=90, method=4)
@@ -5665,6 +5755,8 @@ class PackDraw(NamedTuple):
     rarity: str = ''
     teams: tuple = ()
     kind: str = 'Player'
+    item_id: int = 0
+    minimum_rarity: str = ''
 
 
 class ShopPack(NamedTuple):
@@ -5673,7 +5765,11 @@ class ShopPack(NamedTuple):
     source: str
     cost: int
     draws: tuple
-    chase: str = ''
+    featured_uuids: tuple = ()
+    featured_chance: float = 0
+    featured_slot: int = -1
+    description: str = ''
+    legacy_chase: bool = False
 
 
 # Names, prices and contents are local inventions except where the disc supplies a label.
@@ -5709,28 +5805,154 @@ SHOP_PACKS = {
     510030: ShopPack('Kaiju Pack', 'PACK_THESHOW_KAIJUTAKEOVER', 'update', 450, (PackDraw(2, ('Kaiju',)),)),
     510031: ShopPack('Home Run Derby Pack', 'PACK_BALLINCONTROL', 'base', 450, (PackDraw(2, ('Home Run Derby', '2023 Home Run Derby')),)),
     510040: ShopPack('Diamond Duos Pack', 'PACK_DIAMONDDUOS_01', 'update', 1200, (PackDraw(2, rarity='Diamond'),)),
-    510041: ShopPack('Chase Pack', 'PACK_CHASE07', 'update', 450, (PackDraw(4),), 'Shohei Ohtani'),
+    510041: ShopPack('Chase Pack', 'PACK_CHASE01', 'base', 450, (PackDraw(4),),
+                     featured_chance=.05, legacy_chase=True),
     510042: ShopPack('Equipment Pack', 'PACK_EQUIPMENT', 'base', 200, (PackDraw(2, kind='Equipment'),)),
     510043: ShopPack('Unlockables Pack', 'PACK_UNLOCKABLE', 'base', 200, (PackDraw(2, kind='Unlockable'),)),
     510044: ShopPack('Jumbo Player Bundle', 'PACK_THESHOW_JUMBO', 'update', 500, (PackDraw(12),)),
 }
+
+# Featured UUIDs and pack art are from the event-pack study. The odds and
+# quantities below are the local shop rules.
+_CHASE_UUIDS = (
+    '198271ab5e4be000a01629484af17363',
+    '2eca337b20ca8d8a80df64d82747d7fb',
+    'b426c5f3840b91f8672101501fbe3d37',
+    '5fd56c1fa3e5c045ac028e4eab875eb0',
+    '67d6e2e2005aba18289fbf1680da1c53',
+    '647a924986a26860d4813818f03672f5',
+    'd1f1195d8fcaeb9d00b328f9adb46fdf',
+    '155dd30defc13bf436cfbb1b274b6ed2',
+    '6708d004c4cc52b1a3f1947c75b76395',
+    'b2433c612c78aa10cd60cb777b144b7f',
+)
+_DUOS_UUIDS = (
+    ('f4206cef9f9d1e29b398f6c7609e4554', '00595c0d01d488a33a068852a0c6b2b8'),
+    ('31d08e66ac5b3a4f66a9f76a340169b8', '20107e53de721e12455287303a3e30ec'),
+    ('a4713247c553519f3d5df34d190cd021', '06829d625cc05b1654af8bcd004469aa'),
+    ('aa91f2906006ff1a8c611fa382ff3a57', 'c88094947db574f3615db340e88ae839'),
+    ('85661ed56b052a83a3f03ed7844be0bc', 'b47922d24ff79d93ab05c564dd032604'),
+    ('b846c46807b0807662828f26b4671bab', '1e84b99d808422f0b2db6d84ee7fe24f'),
+    ('4eef81afcca65a2bec89409a35bc237d', 'ae0e61a84d697474e48f631ccb0cfc97'),
+    ('fc1f2fc90d6a8d4da9d43ddb9a1c67e8', 'aa4d2cc997ef93ea84cd37bebe087dd8'),
+    ('817c46f0490bf236f3c30f7fdd6e5df3', 'a325bb461e4691cc10f03b999efbab24'),
+    ('3f8b41ca55adc5ad0b56522aed203f7f', '6b7171488140901d29a8139235d430b8'),
+    ('f43886c531b689e61b79974a4bed99b0', 'a3afb61ac96b7786cfd31e7db5900307'),
+    ('76400c750e76ddba4118ee7c6eeefb99', '7344044c1efdb52cf7f286dd8e3abaab'),
+    ('533e37db0ee49552dd0717509513d61a', 'f6f0bb7deeb1f63423324e2d462f710e'),
+    ('54896249c59acd568ee071229d0883c9', '4ecbcd40187fe5abe6ab91aeb1a53205'),
+    ('0ca7431c23779c0d3af61359b69ba86d', '5aad2871f5c1d9f44b8ba2bc3e480b7c'),
+    ('802d6a1fb8903d131d0771140f5e6225', 'c22cceb041eb7130216c3870cec9a3dd'),
+    ('dbfb50185782142df7a88143aebb8bf3', '67154ec1f669ac6533e2d145c6420ed9'),
+    ('ae4ca10cb9d1368a32a2355376dac75a', '89d29b60192d1138df19ad3521fe5a29'),
+    ('942713fd837ce3fad7c9439c61faf89c', 'd918bcf224a77f0ee73952e03283cdbd'),
+    ('710c4bc13d50ebdc72c005ec9a78ef9a', '60f84107a8b3ddfdf8c67365b18e7c5e'),
+    ('ebf76e113d5506e0b532903328160b3a', 'eae273cfbc56e933377183feacf616f2'),
+    ('04beb026201ce4b3261d8d6f182e1e9a', '7f74350fdf72467eab97e3fbf19d849c'),
+    ('7c7b7bb2543be27ea5152979a9fbe9d5', '6dc1db86de91d7b72dd07106bf78a073'),
+    ('af9ce95313c86da5870c00e2bf90a39c', 'e30589c912b2b6539832534734f766a3'),
+    ('542219354765613eb520924f6a7527cc', '0d3ab194e0a62a333949db2b544cd1da'),
+    ('bbe700a29f7d4a49b6f06eaf059bdf5d', '3b113a77cbe79d8428a27a2cf66cfa13'),
+    ('08b0ad8c2bba3a3b53abe73c7d5a797a', '3348719c1f28a34c5d7b201bd0d07662'),
+    ('62ead42398363f326ebad6142bf4cfd6', 'ee9af505f187a867352db5787c4689d1'),
+    ('7faa7ab718e8975c774d43ef3a2f047e', '14529fad4175c31fdadb320e8fcd5c83'),
+    ('d93b3d7650696d5b93f3da79f57afe5f', 'eb6fa05facc89d3a26ec8698ca58a1ae'),
+    ('1effd2a7004fba1258c87c7b3aee3513', '3d9ca21c6f428bafd84442926c4f7e9c'),
+    ('20f9389d9d20f60602788f9d1238b253', '0278edddd8a644613430170b1e9ad893'),
+    ('829553a543bd6c9dd8e4e2b0ea16e9be', '0c2dff1526d796ce7c01c4aa836222d3'),
+    ('cd8719a80f2e8f78c3cd052feee7abe7', '8fd5c456b112ba4623f5add706d799c2'),
+    ('5bc77550bd2d3265945662749b9a144b', 'c06047423e2b2352c776abe49c5b8fee'),
+    ('91ab82a786bdbccd20aa63772937bfc0', 'bb729a240f58ad88d4e91fad8a78226c'),
+    ('1e1b9769dc6e463eb0b4fcc1bd5c7274', 'caa79d56bc14b4991f2958bc5561c49c'),
+    ('e5f15cc640c8a7408103dd190ced966c', 'f00dad3140cc39380413ec130bab9a6f'),
+    ('a222168483af36c9ad47e59b0370953c', 'e28d769e2c0bb6971976edb08af27812'),
+    ('eaaa7e83b88d2f65720030da315db525', '16b04751929f5cdd7c6d96751d0c525c'),
+)
+_KAIJU_UUIDS = (
+    'b7c32810c4b4ae54b11da418e4932bc6',
+    'c4c6a5e8daae7e254e5e76c8b7317ac7',
+    'ab5287fbe0de1b6305981037a40fe221',
+    '93c699d6bce54df63333db97f881844e',
+    '2f7d1ea39ab845adeb9b283ce20faed7',
+    'c1e0628c9308cd5456ad679ec647ed70',
+    'd07f3d227bb2eaeaa9575eef6ea74931',
+    'd571a56e0ed10b01d720ea67e9de7bea',
+    'b7b832a91ff6acb7171f8319febe11aa',
+    '3c89308f7c344de64ddbf085405a0192',
+    '83daf814c3f89387be1f449166d6f38f',
+    'c79064de09fa06c44fd35fd23fd1bcb8',
+    'c117284e1408d0f1065bf45d3882de8e',
+)
+_PENNANT_UUIDS = (
+    'dc6bc5e7146357185ee1ac6b5933ff28',
+    'a88fed17c7e74dc17e021116d25a50a2',
+    'ac3e5ff830f0473531f8d849251da188',
+    '19918b29fe1c625ce856529cf8c33735',
+    '770aab654c3e3ba01b062bb49c223c1a',
+)
+
+for _number, _uuid in enumerate(_CHASE_UUIDS, 1):
+    _minimum = 'Gold' if _number == 2 else 'Diamond'
+    SHOP_PACKS[511000 + _number] = ShopPack(
+        f'Chase Pack {_number}', f'PACK_CHASE{_number:02d}', 'base' if _number <= 6 else 'update', 1000,
+        (PackDraw(2), PackDraw(1, minimum_rarity=_minimum), PackDraw(1)),
+        (_uuid,), .05,
+        description=f'Four players, including a guaranteed {_minimum} or better. '
+                    '5% chance the last player is {featured}.',
+    )
+for _number, _pair in enumerate(_DUOS_UUIDS, 1):
+    SHOP_PACKS[512000 + _number] = ShopPack(
+        f'Diamond Duos {_number:02d}', f'PACK_DIAMONDDUOS_{_number:02d}', 'update', 7500,
+        (PackDraw(3), PackDraw(1, rarity='Diamond')), _pair, .10,
+        description='Three players plus a Diamond. 10% chance the Diamond is {featured}.',
+    )
+SHOP_PACKS.update({
+    513001: ShopPack('Kaiju Takeover Show Pack', 'PACK_THESHOW_KAIJUTAKEOVER', 'update', 450,
+                     (PackDraw(4), PackDraw(1, kind='Equipment')), _KAIJU_UUIDS, .01, -2,
+                     'Four players and one equipment item. 1% chance the last player is a featured Kaiju card.'),
+    513002: ShopPack('Jumbo Kaiju Takeover Pack', 'PACK_JUMBO_THESHOW_KAIJUTAKEOVER', 'update', 1250,
+                     (PackDraw(40), PackDraw(1, minimum_rarity='Gold')), _KAIJU_UUIDS, 1/6,
+                     description='Forty players plus a Gold or better. One in six chance the last player is a featured Kaiju card.'),
+    513003: ShopPack('Pennant Chase Pack', 'PACK_PENNANTCHASE', 'update', 450,
+                     (PackDraw(1),), _PENNANT_UUIDS, 1/6,
+                     description='One player. One in six chance of a featured Awards card.'),
+    513004: ShopPack('Lou Gehrig Day Pack', 'PACK_GEHRIG', 'update', 450,
+                     (PackDraw(1),), ('b6bffc020e2140d7ea2a41cb95f6f195',), 1,
+                     description='One guaranteed Incognito Lou Gehrig (The Iron Horse).'),
+})
+
 PACK_WEIGHTS = {'Common': 45, 'Bronze': 32, 'Silver': 16, 'Gold': 6, 'Diamond': 1}
 PACK_RANDOM = random.SystemRandom()  # tests replace this with a seeded random.Random
 SHOP_RECEIPT_WINDOW = 32
-CHASE_CHANCE = .05
+LEGACY_EVENT_PRODUCTS = {510040, 510041}
+LIVE_OHTANI_UUIDS = {'disc-player-16578', 'f1105c2f23b2c673114e6c8a16b135b2'}
+
+
+def imported_pack_cards():
+    if not LAYOUT.install or CARD_SOURCE != 'disc':
+        return {}
+    return {card['uuid']: card for card in all_cards() if card.get('imported_special')}
+
+
+def pack_featured_cards(pack, imported):
+    return tuple(imported[uuid] for uuid in pack.featured_uuids if uuid in imported)
 
 
 @lru_cache(maxsize=2)
 def shop_pack_art(update_dir):
     registry = {'entries': [], 'files': {}, 'names': set()}
-    if update_dir is None:
-        return registry
-    directory = os.path.join(update_dir, 'CROSS', 'LIVE')
+    imported = imported_pack_cards()
     for pid, pack in SHOP_PACKS.items():
-        if pack.source != 'update' or pack.texture in registry['names']:
+        if pack.featured_uuids:
+            if len(pack_featured_cards(pack, imported)) != len(pack.featured_uuids):
+                continue
+        elif pack.source != 'update':
+            continue  # ordinary base pictures are already mounted by the client
+        source_root = update_dir if pack.source == 'update' else LAYOUT.base
+        if source_root is None or pack.texture in registry['names']:
             continue
         try:
-            with open(os.path.join(directory, pack.texture + '.WEBP'), 'rb') as source:
+            with open(os.path.join(source_root, 'CROSS', 'LIVE', pack.texture + '.WEBP'), 'rb') as source:
                 data = source.read(512 * 1024 + 1)
         except OSError:
             continue
@@ -5752,6 +5974,10 @@ def shop_number(query, key):
 
 
 def shop_description(pack, rewards):
+    if pack.description:
+        featured = rewards[1] if rewards else ()
+        label = ' or '.join(card['name'].strip() for card in featured) or 'a featured player'
+        return pack.description.format(featured=label)
     first = pack.draws[0]
     count = sum(draw.count for draw in pack.draws)
     if first.kind != 'Player':
@@ -5766,8 +5992,8 @@ def shop_description(pack, rewards):
             distinct = ' distinct' if draw.count > 1 else ''
             players = 'player' if draw.count == 1 else 'players'
             description += f' Includes {draw.count}{distinct} guaranteed {draw.rarity} {players}.'
-    if pack.chase:
-        return description + f' {CHASE_CHANCE:.0%} chance to pull Live Series {pack.chase}.'
+    if pack.legacy_chase:
+        return description + ' 5% chance to pull Live Series Shohei Ohtani.'
     if rewards and not first.rarity:
         tiers = {card['rarity'] for card in rewards[0][0]}
         if tiers == {'Diamond'}:
@@ -5779,7 +6005,7 @@ def shop_description(pack, rewards):
 
 
 def shop_picture_available(pack):
-    if pack.source == 'update':
+    if pack.source == 'update' or pack.featured_uuids:
         return pack.texture in shop_pack_art(UPDATE_DIR)['names']
     return os.path.isfile(os.path.join(LAYOUT.base, 'CROSS', 'LIVE', pack.texture + '.WEBP'))
 
@@ -5787,12 +6013,15 @@ def shop_picture_available(pack):
 def shop_shelf(product_id=0):
     response = ET.Element('response')
     products = ET.SubElement(response, 'products')
+    imported = imported_pack_cards()
     for pid, pack in SHOP_PACKS.items():
         if pack.cost <= 0 or (product_id and pid != product_id):
             continue
+        if imported and pid in LEGACY_EVENT_PRODUCTS:
+            continue
         if not shop_picture_available(pack):
             continue
-        rewards = shop_reward_pools(pack)
+        rewards = shop_reward_pools(pack, imported)
         if rewards is None:
             continue
         cost = str(pack.cost)
@@ -5817,7 +6046,7 @@ def shop_owned_packs(shop):
             descriptions[product_id] = shop_description(pack, shop_reward_pools(pack))
         item = ET.SubElement(
             items, 'item', id=item_id, item_id=item_id, type_id='4', quantity='1',
-            rarity_id=str(max(RARITY_ID.get(draw.rarity, 0) for draw in pack.draws)),
+            rarity_id=str(max(RARITY_ID.get(draw.rarity or draw.minimum_rarity, 0) for draw in pack.draws)),
             anim_index='0', item_draft_pack_id='0', name=pack.name,
             texture_name=pack.texture if shop_picture_available(pack) else 'PACK_THESHOW',
             description=descriptions[product_id], odds_valid='0', no_sell='1', quantity_tab_index='0',
@@ -5827,9 +6056,13 @@ def shop_owned_packs(shop):
     return ET.tostring(response, encoding='unicode')
 
 
-def shop_reward_pools(pack):
+def shop_reward_pools(pack, imported=None):
     pools = []
-    chase = None
+    featured = ()
+    if pack.featured_uuids:
+        featured = pack_featured_cards(pack, imported_pack_cards() if imported is None else imported)
+        if len(featured) != len(pack.featured_uuids):
+            return None
     aliases = {'CWS': 'CHW', 'WSH': 'WAS'}
     for draw in pack.draws:
         if draw.kind == 'Player':
@@ -5838,13 +6071,15 @@ def shop_reward_pools(pack):
                 if card.get('series') in draw.series and card['rarity'] in PACK_WEIGHTS
                 and card['roster_player_id'] > 0 and card['team_id'] >= 0 and card['display_position'] in FIELD_NUMBER
                 and (not draw.rarity or card['rarity'] == draw.rarity)
+                and (not draw.minimum_rarity or RARITY_ID[card['rarity']] >= RARITY_ID[draw.minimum_rarity])
+                and (not draw.item_id or card['item_id'] == draw.item_id)
                 and (not draw.teams or aliases.get(card.get('team_short_name'), card.get('team_short_name')) in draw.teams)
             ]
-            if pack.chase:
-                chase = next((c for c in pool if c['name'].strip() == pack.chase and c['rarity'] == 'Diamond'), None)
-                if chase is None:
+            if pack.legacy_chase:
+                featured = tuple(c for c in pool if c['uuid'] in LIVE_OHTANI_UUIDS and c['rarity'] == 'Diamond')
+                if not featured:
                     return None
-                pool = [c for c in pool if c['name'].strip() != pack.chase]
+                pool = [c for c in pool if c['uuid'] not in LIVE_OHTANI_UUIDS]
         else:
             inv = inventory_data()
             pool = []
@@ -5860,10 +6095,10 @@ def shop_reward_pools(pack):
         if len(pool) < (draw.count if draw.rarity else 1):
             return None
         pools.append(pool)
-    return pools, chase
+    return pools, featured
 
 
-def shop_draw_rewards(pack, pools, chase):
+def shop_draw_rewards(pack, pools, featured):
     rewards = []
     for draw, pool in zip(pack.draws, pools):
         if draw.rarity:
@@ -5877,8 +6112,9 @@ def shop_draw_rewards(pack, pools, chase):
         else:
             selection = PACK_RANDOM.choices(pool, k=draw.count)
         rewards.extend((draw.kind, item) for item in selection)
-    if chase and PACK_RANDOM.random() < CHASE_CHANCE:
-        rewards[-1] = ('Player', chase)
+    if featured and (pack.featured_chance == 1 or PACK_RANDOM.random() < pack.featured_chance):
+        card = featured[0] if len(featured) == 1 else PACK_RANDOM.choice(featured)
+        rewards[pack.featured_slot] = ('Player', card)
     return rewards
 
 
@@ -5905,7 +6141,8 @@ def grant_owned_pack(shop, product_id):
 
 def shop_buy(state, shop, query):
     pid = shop_number(query, 'product_id')
-    if pid not in SHOP_PACKS or SHOP_PACKS[pid].cost <= 0:
+    if (pid not in SHOP_PACKS or SHOP_PACKS[pid].cost <= 0
+            or (pid in LEGACY_EVENT_PRODUCTS and imported_pack_cards())):
         raise ShopRefusal('That pack is unavailable on the local server.')
     if shop_number(query, 'quantity') != 1:
         raise ShopRefusal('Buy one pack at a time.')
@@ -5926,14 +6163,18 @@ def shop_buy(state, shop, query):
 
 def shop_revealed_card(card, quantity, *, is_new):
     pos = FIELD_NUMBER[card['display_position']]
+    special = card if card.get('imported_special') else {}
     return '<item %s/>' % card_attrs(
         card, type_id=0, quantity=quantity, is_new=int(is_new), position=pos,
         anim_index=0, no_sell=1, quick_sell_value=0, marketplace_best_buy=0, quantity_tab_index=0,
-        legend=0, series_year=2023, series_name='Live Series' if card['series'] == 'Live' else card['series'],
+        legend=0, series_year=special.get('series_year') or 2023,
+        series_name='Live Series' if card['series'] == 'Live' else card['series'],
         long_position=card['display_position'],
-        league_logo='', series_texture_name='', has_augment=0, has_matchup=0, has_rank_change=0,
+        league_logo='', series_texture_name=special.get('series_texture_name') or '',
+        has_augment=0, has_matchup=0, has_rank_change=0,
         sequence=0, seq_level=0, stars=0, new_rank=card['ovr'], in_squad=0,
-        captain=0, captained=0, is_live_set=0, set_name='', **compare_attrs(card, pos), **squad_card_text(card, pos),
+        captain=0, captained=0, is_live_set=0, set_name=special.get('set_name') or '',
+        **compare_attrs(card, pos), **squad_card_text(card, pos),
     )
 
 
@@ -7660,7 +7901,12 @@ def main():
             if roster_option not in ROSTER_DIRS:
                 sys.exit(f'--rosters must be one of {", ".join(ROSTER_DIRS)}')
             ROSTER_SOURCE = roster_option
-    if cmd == 'build-roster':
+    if cmd == 'import-cards':
+        if not LAYOUT.install or any(option != '--pictures' for option in options):
+            sys.exit('usage: import-cards --install <folder> [--pictures]')
+        sys.exit(imported_cards_module().cli_import(
+            CATALOGUE_DIR, LAYOUT.base, LAYOUT.update, '--pictures' in options))
+    elif cmd == 'build-roster':
         if not LAYOUT.install:
             CARD_SOURCE = 'disc'
         try:
