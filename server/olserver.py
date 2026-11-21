@@ -110,15 +110,36 @@ def resolve_layout(here, root, install):
                               for kind in ('base', 'update')))
 
 
+def load_adjacent(module_name):
+    import importlib.util
+    path = os.path.join(HERE, module_name + '.py')
+    spec = importlib.util.spec_from_file_location(module_name, path)
+    module = importlib.util.module_from_spec(spec)
+    # The release program folder can be read-only.
+    with open(path, 'rb') as file:
+        exec(compile(file.read(), path, 'exec'), module.__dict__)
+    return module
+
+
+def use_vendor(vendor):
+    # The portable archive ships a Windows wheel. Other interpreters can
+    # still use Pillow from their own environment.
+    if sys.platform != 'win32' or not os.path.isdir(vendor):
+        return
+    from importlib.machinery import EXTENSION_SUFFIXES
+    if any(os.path.isfile(os.path.join(vendor, 'PIL', '_imaging' + suffix)) for suffix in EXTENSION_SUFFIXES):
+        if vendor in sys.path:
+            sys.path.remove(vendor)
+        sys.path.insert(0, vendor)
+        sys.dont_write_bytecode = True
+
+
 HERE = os.path.dirname(os.path.abspath(__file__))
-VENDOR = os.path.join(HERE, 'vendor')
-if os.path.isdir(VENDOR):
-    if VENDOR in sys.path:
-        sys.path.remove(VENDOR)
-    sys.path.insert(0, VENDOR)
-    sys.dont_write_bytecode = True  # The vendored runtime may be read-only.
 ROOT = os.path.dirname(os.path.dirname(HERE))
 _install, _command_args = install_option(sys.argv[1:] if __name__ == '__main__' else [])
+if _command_args[:1] == ['setup']:
+    sys.exit(load_adjacent('manual_mode').setup_cli(_install, _command_args[1:]))
+use_vendor(os.path.join(HERE, 'vendor'))
 LAYOUT = globals().get('_INHERITED_LAYOUT') or resolve_layout(HERE, ROOT, _install)
 WORK = LAYOUT.work
 REPLIES_DIR = LAYOUT.replies
@@ -1300,17 +1321,6 @@ DISC_ROSTER_FILES = ('disc-cards.json', 'roster-records.json', 'appearance-field
 _disc_decoder = None
 
 
-def load_adjacent(module_name):
-    import importlib.util
-    path = os.path.join(HERE, module_name + '.py')
-    spec = importlib.util.spec_from_file_location(module_name, path)
-    module = importlib.util.module_from_spec(spec)
-    # The release program folder can be read-only.
-    with open(path, 'rb') as file:
-        exec(compile(file.read(), path, 'exec'), module.__dict__)
-    return module
-
-
 def disc_decoder():
     global _disc_decoder
     if _disc_decoder is None:
@@ -1338,6 +1348,8 @@ def prepare_disc_roster(log=None):
     stamp_path = Path(derived_roster_path('disc-roster-stamp.json'))
     stamp = {'schema': 2, 'base': LAYOUT.base, 'update': LAYOUT.update,
              'executables': list(LAYOUT.executables), 'roster_source': ROSTER_SOURCE}
+    if UPDATE_DIR != LAYOUT.update:
+        stamp['update_art'] = False
     try:
         with stamp_path.open(encoding='utf-8') as file:
             current = json.load(file)
@@ -1348,7 +1360,7 @@ def prepare_disc_roster(log=None):
     decoder = disc_decoder()
     datasets = decoder.server_roster(Path(ROSTER_DIRS[ROSTER_SOURCE]), [club[0] for club in MLB_TEAMS])
     datasets['disc-art.json'] = decoder.disc_art_index(
-        datasets['disc-cards.json'], LAYOUT.base, LAYOUT.update)
+        datasets['disc-cards.json'], LAYOUT.base, UPDATE_DIR)
     for name in DISC_ROSTER_FILES:
         decoder.write_json(Path(derived_roster_path(name)), datasets[name])
     decoder.write_json(stamp_path, stamp)
@@ -1446,8 +1458,10 @@ def add_imported_specials(pool):
     imported, _special_records, dropped = module.special_cards(
         site, pictures, disc_decoder(), ROSTER_DIRS[ROSTER_SOURCE], LAYOUT.base, LAYOUT.update,
         [team[0] for team in MLB_TEAMS], pool, FIELD_NUMBER, RARITY_ID)
-    _special_art = {card['item_id']: pictures[card['item_id']]
-                    for card in imported if card['item_id'] in pictures}
+    # Update filenames can identify players even when their images are suppressed.
+    available = pictures if UPDATE_DIR == LAYOUT.update else module.disc_pictures(LAYOUT.base, UPDATE_DIR)
+    _special_art = {card['item_id']: available[card['item_id']]
+                    for card in imported if card['item_id'] in available}
     _import_picture_dir = folder / 'art' / 'img'
     converted = module.convert_cached_pictures(_import_picture_dir)
     if converted:
@@ -4286,7 +4300,7 @@ _card_art = None
 # 457 more action shots under PS4\UI\ART\ACTIONSHOTS. The v1.00 game does not see that folder, so the server
 # hands the files over through the same download route as the website art. <handle> is [series code]_[team]_
 # LAST_FIRST; the series codes below are the dominant code among each series' cards (counted 2026-11-19).
-UPDATE_DIR = LAYOUT.update
+UPDATE_DIR = None if LAYOUT.install and os.environ.get('SHOW23_NO_UPDATE_ART') == '1' else LAYOUT.update
 SERIES_ART = {'Captain': 'CPT', 'Topps Now': 'TN', '2023 Finest': 'F23', 'Monthly Awards': 'MA', 'Kaiju': 'KAI',
               'World Baseball Classic': 'WBC', 'Future Stars': 'FS', 'Finest': 'F', 'Charisma': 'CAR', 'Snapshot': 'SNP',
               '2023 All-Star': 'AS23', '2023 Postseason': 'P23', 'Awards': 'AW', 'Milestone': 'MS', 'All-Star Game': 'ASG',
@@ -4404,7 +4418,9 @@ def publish_disc_art(registry):
             # The base bank and its plain WebPs are mounted by the client.
             registry['override'][item_id] = (handle, art_id)
             continue
-        root = LAYOUT.base if source['edition'] == 'base' else LAYOUT.update
+        root = LAYOUT.base if source['edition'] == 'base' else UPDATE_DIR
+        if root is None:
+            continue
         path = os.path.abspath(os.path.join(root, source['path']))
         if os.path.commonpath((root, path)) != root:
             continue
@@ -7925,7 +7941,9 @@ def main():
             if roster_option not in ROSTER_DIRS:
                 sys.exit(f'--rosters must be one of {", ".join(ROSTER_DIRS)}')
             ROSTER_SOURCE = roster_option
-    if cmd == 'import-cards':
+    if cmd == 'play':
+        sys.exit(load_adjacent('manual_mode').play_cli(LAYOUT, __file__, options, (PORT, WEB_PORT)))
+    elif cmd == 'import-cards':
         if not LAYOUT.install or any(option != '--pictures' for option in options):
             sys.exit('usage: import-cards --install <folder> [--pictures]')
         sys.exit(imported_cards_module().cli_import(
@@ -8015,7 +8033,7 @@ def main():
         except KeyboardInterrupt:
             pass
     else:
-        sys.exit(__doc__ or 'usage: gen-certs | selftest | run')
+        sys.exit(__doc__ or 'usage: setup | play | gen-certs | selftest | run')
 
 
 if __name__ == '__main__':

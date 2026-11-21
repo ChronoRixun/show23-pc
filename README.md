@@ -34,6 +34,10 @@ More detail is in [docs/architecture.md](docs/architecture.md). Updates, the Sta
 
 The Community Market and buying Stubs are deliberately switched off. There is no play between people: the server only ever talks to the game on the same machine.
 
+## Manual mode (no launcher)
+
+Extract the portable release and follow `manual/README.txt`. On Windows, run `manual\setup.cmd <install> <base> [update]` and `manual\play.cmd <install> [--fullscreen]`. On Linux, use the `setup.sh` and `play.sh` wrappers with Python 3.10 or later and your own Linux emulator build from the `release` branch. Manual setup takes unpacked game folders and creates the same install record the Windows launcher reads.
+
 ## Known limits
 
 - Frame rate: small stutters, and a played game does not hold a steady 60 frames a second.
@@ -42,7 +46,7 @@ The Community Market and buying Stubs are deliberately switched off. There is no
 - About 211 special cards are left out of the import because they could not be matched to a player in the game's roster.
 - Choice packs are not supported.
 - The launcher's self-update has not been exercised against a real release yet.
-- Only game version 1.00 is played; Windows only.
+- Play uses game version 1.00. The portable release bundles a Windows emulator.
 
 The card import is optional and uses the publisher's public website from the player's own PC. Players should be aware of that site's terms before using it.
 

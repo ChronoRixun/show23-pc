@@ -445,7 +445,7 @@ def convert_cached_pictures(art):
         return 0
     try:
         from PIL import Image, ImageOps
-    except ImportError:
+    except (ImportError, OSError):
         return 0
     try:
         sources = sorted(art.iterdir())

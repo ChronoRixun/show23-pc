@@ -1,6 +1,6 @@
 # Local server
 
-`olserver.py` is the whole server: Python using only the standard library (Pillow is used if it is installed; the release bundles it), with `roster_decode.py` and `card_import.py` beside it. It makes its own certificate authority and server certificate on first use; no other program is needed.
+`olserver.py` runs the local server with `roster_decode.py`, `card_import.py`, and `manual_mode.py` beside it. Only the standard library is required. Pillow can convert imported pictures when available. The server makes its own certificate authority and server certificate on first use.
 
 ```text
 python olserver.py run --install <install folder>         listen on 127.0.0.1:10000 and 10080
@@ -9,6 +9,18 @@ python olserver.py gen-certs --install <install folder>   make this install's ce
 python olserver.py build-roster --install <install folder>  build the card pool and roster data from the game folder
 python olserver.py import-cards --install <install folder> --pictures   optional special-card import
 ```
+
+## Manual mode (no launcher)
+
+Run these commands from the packaged server folder. Use `python3` on Linux and the bundled interpreter on Windows.
+
+```text
+python olserver.py setup --install <install> --base <unpacked 1.00 folder> [--update <unpacked 1.21 folder>]
+python olserver.py import-cards --install <install> --pictures
+python olserver.py play --install <install> --emulator <path to shadPS4> [--fullscreen] [--no-update-art]
+```
+
+Importing cards is optional. Setup verifies the executables and writes a launcher-compatible install record. Play starts the server, then the emulator, and shuts down the session on emulator exit or Ctrl+C. Saves and logs stay in the install. Linux users supply a build from the emulator repository's `release` branch.
 
 ## Running it for an install
 
