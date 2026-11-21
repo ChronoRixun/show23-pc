@@ -38,6 +38,18 @@ Last updated 2026-11-20. "Seen in the game" means a person played it in the emul
 | Custom team logo | Not working |
 | Playing against other people | Out of scope |
 
+## The launcher (`show23-pc-launcher`)
+
+| Part | State |
+|---|---|
+| Window, sidebar, Home, Settings, Mods, Support | Built. Only Home has been looked at in the running window. |
+| Set up: checking the chosen package or folder | Works; tested on a real package and real unpacked folders |
+| Set up: an unpacked game folder, used where it is | Works: verified, its location recorded, nothing written inside it |
+| Set up: a package file | Identified only. The launcher does not unpack packages. |
+| Installing the emulator build and the server | Not built |
+| Play | Not built |
+| Self-update, Stable and Beta channels | Built, untested against a real release |
+
 ## Where the cards come from
 
 Today the development setup builds the card list from two sources on the developer's machine: the roster files of the game copy, and a saved copy of the public card catalogue from the game's website. A release must work from the game copy alone, with the website import as an optional extra. That work is the first item in [roadmap.md](roadmap.md).

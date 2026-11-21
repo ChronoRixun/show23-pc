@@ -1,6 +1,6 @@
-# Builder and launcher (planned)
+# Builder and launcher
 
-Nothing is implemented here yet. This file records the design so that the pieces written elsewhere fit it.
+The launcher lives in its own repository. This file records the design so that the pieces written elsewhere fit it. Where the launcher has since settled a point differently, the note at the end says so.
 
 The builder will be the first-run flow of the launcher, which lives in its own repository and is based on an existing launcher; see [`docs/launcher.md`](../docs/launcher.md) for that, for update channels and for mods. This page covers what the builder does with the player's game.
 
@@ -41,3 +41,9 @@ The builder will be the first-run flow of the launcher, which lives in its own r
 
 - Which package unpacker to use, and whether it can be shipped or must be fetched by the player.
 - Whether the launcher is a small windowed program or a console program for the first release.
+
+## Settled since
+
+- The launcher ships no package unpacker and runs none. The first release takes an unpacked game folder; a package file is identified and the player is asked to unpack it with their own tool.
+- An unpacked folder is used where it is. The launcher verifies it and records its location in `data/games/CUSA35521/game.json`; it does not copy the game into `data/games/` and never writes inside the game folder.
+- The launcher is a windowed program.
