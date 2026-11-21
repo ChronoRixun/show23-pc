@@ -6140,10 +6140,16 @@ def exchange_protected_cards(state):
     return protected
 
 
+def exchange_spare(card):
+    # The research collection keeps one copy of every card; with cards from the game folder a
+    # player can trade any card that is not in a squad, as in the original game.
+    return card['quantity'] - (0 if CARD_SOURCE == 'disc' else 1)
+
+
 def exchange_eligible(state, rule):
     protected = exchange_protected_cards(state)
     return {card['item_id']: card for card in cards(state)
-            if card['rarity'] == rule.rarity and card['quantity'] > 1
+            if card['rarity'] == rule.rarity and exchange_spare(card) > 0
             and card['item_id'] not in protected and card['display_position'] in FIELD_NUMBER}
 
 
@@ -6159,7 +6165,7 @@ def exchange_feed(state, mission_id, page):
     target = rule.target if rule else 1
     items = []
     for card in visible:
-        row = ET.fromstring(shop_revealed_card(card, card['quantity'] - 1, is_new=False))
+        row = ET.fromstring(shop_revealed_card(card, exchange_spare(card), is_new=False))
         row.set('feed_value', str(rule.points))
         row.set(EXCHANGE_SHOW_POINTS, '1')
         row.set('is_feed', '0')
@@ -6213,7 +6219,7 @@ def exchange_advance(state, mission_id, query):
     if not rule.target <= points < rule.target + rule.points:
         return False
     eligible = exchange_eligible(state, rule)
-    if any(i not in eligible or qty >= eligible[i]['quantity'] for i, qty in selection):
+    if any(i not in eligible or qty > exchange_spare(eligible[i]) for i, qty in selection):
         return False
     spent = exchange.setdefault('spent_cards', {})
     for i, qty in selection:
