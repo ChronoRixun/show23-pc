@@ -1288,7 +1288,8 @@ def roster_tables():
     return players, teams
 
 
-DISC_ROSTER_FILES = ('disc-cards.json', 'roster-records.json', 'appearance-fields.json', 'pitch-table.json')
+DISC_ROSTER_FILES = ('disc-cards.json', 'roster-records.json', 'appearance-fields.json',
+                     'pitch-table.json', 'disc-art.json')
 _disc_decoder = None
 
 
@@ -1314,7 +1315,7 @@ def derived_roster_path(name):
 def prepare_disc_roster(log=None):
     from pathlib import Path
     stamp_path = Path(derived_roster_path('disc-roster-stamp.json'))
-    stamp = {'schema': 1, 'base': LAYOUT.base, 'update': LAYOUT.update,
+    stamp = {'schema': 2, 'base': LAYOUT.base, 'update': LAYOUT.update,
              'executables': list(LAYOUT.executables), 'roster_source': ROSTER_SOURCE}
     try:
         with stamp_path.open(encoding='utf-8') as file:
@@ -1325,6 +1326,8 @@ def prepare_disc_roster(log=None):
         return
     decoder = disc_decoder()
     datasets = decoder.server_roster(Path(ROSTER_DIRS[ROSTER_SOURCE]), [club[0] for club in MLB_TEAMS])
+    datasets['disc-art.json'] = decoder.disc_art_index(
+        datasets['disc-cards.json'], LAYOUT.base, LAYOUT.update)
     for name in DISC_ROSTER_FILES:
         decoder.write_json(Path(derived_roster_path(name)), datasets[name])
     decoder.write_json(stamp_path, stamp)
@@ -1523,7 +1526,9 @@ def card_attrs(c, **extra):
     for k in RATINGS:
         a[k] = c[k] if c.get(k) is not None else 0     # always present: the squad screen subtracts them
     # the card picture: the update package's or the website's own art (card_art()), else the disc's action shot
-    a['actionshot_handle'], a['actionshot_id'] = player_art()['override'].get(c['item_id'], (actionshot_handle(c), c['item_id']))
+    overrides = player_art()['override']
+    fallback = 'ACTIONGENERIC' if CARD_SOURCE == 'disc' else actionshot_handle(c)
+    a['actionshot_handle'], a['actionshot_id'] = overrides.get(c['item_id'], (fallback, c['item_id']))
     a.update(extra)
     esc = lambda v: str(v).replace('&', '&amp;').replace('"', '&quot;').replace('<', '&lt;')
     return ' '.join('%s="%s"' % (k, esc(v)) for k, v in a.items())
@@ -4289,6 +4294,38 @@ def register_picture(registry, name, art_id, url_id, data, extension='.webp'):
     return True
 
 
+def publish_disc_art(registry):
+    pool = all_cards()
+    if not pool:
+        return
+    with open(derived_roster_path('disc-art.json'), encoding='utf-8') as file:
+        index = json.load(file)
+    for card in pool:
+        source = index.get(str(card['roster_player_id']))
+        if not source:
+            continue
+        handle = source['handle']
+        item_id = card['item_id']
+        art_id = source['art_id'] or item_id
+        if source['edition'] == 'base' and source['kind'] != 'mug':
+            # The base bank and its plain WebPs are mounted by the client.
+            registry['override'][item_id] = (handle, art_id)
+            continue
+        root = LAYOUT.base if source['edition'] == 'base' else LAYOUT.update
+        path = os.path.abspath(os.path.join(root, source['path']))
+        if os.path.commonpath((root, path)) != root:
+            continue
+        try:
+            with open(path, 'rb') as file:
+                data = file.read(512 * 1024 + 1)
+        except OSError:
+            continue
+        extension = '.webp' if source['kind'] == 'webp' else '.tex'
+        if register_picture(registry, 'as_%s_%d' % (handle, art_id), art_id, item_id, data, extension):
+            registry['override'][item_id] = (handle, art_id)
+    print('disc card art: %d matches, %d downloads' % (len(registry['override']), len(registry['entries'])))
+
+
 def player_art():
     """Special cards' own art, served as downloads (study: reports\\online\\proposals\\card-art-download.md).
 
@@ -4303,6 +4340,9 @@ def player_art():
     if _card_art is not None:
         return _card_art
     _card_art = {'entries': [], 'files': {}, 'override': {}}
+    if CARD_SOURCE == 'disc':
+        publish_disc_art(_card_art)
+        return _card_art
     import io
     files = {}
     if CARD_SOURCE == 'site':

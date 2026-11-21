@@ -6,13 +6,16 @@ See reports/release/roster-decoding.md for runtime defaults and evidence.
 """
 import argparse
 import base64
+import csv
 from collections import Counter, defaultdict
 import json
 import math
 import os
+import re
 from pathlib import Path
 import struct
 import tempfile
+import unicodedata
 
 ATTRIBUTES = ("overall contact_left contact_right power_left power_right batting_clutch "
               "bunting_ability drag_bunting_ability plate_vision plate_discipline potential "
@@ -530,6 +533,9 @@ def server_roster(stats, team_short_names):
         inches = stock["height_inches"]
         cards.append(dict(attrs, item_id=1000000+pid, roster_player_id=pid,
                           uuid=f"disc-player-{pid}", roster_record_key=key, name=stock["name"],
+                          online_id=stock["online_id"],
+                          picture_stem=picture_stem(string(blocks["record"][112:128]),
+                                                    string(blocks["record"][128:144])),
                           team_id=team, team_short_name=team_short_names[team], quantity=1,
                           series="Live", ovr=ovr, rarity=rarity(ovr), display_position=position,
                           age=stock["age"], jersey_number=stock["jersey_number"],
@@ -546,3 +552,133 @@ def server_roster(stats, team_short_names):
         "pitch-table.json": {"types": {PITCH_NAMES.get(c, f"Pitch code {c}"): c for c in sorted(codes)},
                              "velocity": {}},
     }
+
+
+
+def picture_stem(first, last):
+    def part(value):
+        ascii_name = unicodedata.normalize("NFKD", value).encode("ascii", "ignore").decode()
+        return re.sub(r"[^A-Z0-9]", "", ascii_name.upper())
+    return part(last) + "_" + part(first)
+
+
+def edition_picture_names(root):
+    """Asset aliases and full roster identities for one installed edition."""
+    try:
+        with (root / "PS4/CHARACTERS/ASSETNAMES.CSV").open(encoding="utf-8-sig", newline="") as file:
+            aliases = {int(row["player_id"]): row["playername"].strip().upper()
+                       for row in csv.DictReader(line for line in file if line.strip() and not line.startswith("#"))}
+    except FileNotFoundError:
+        aliases = {}
+    found = set()
+    for source in ("base", "live"):
+        try:
+            raw, _, _ = source_tables(root / "FRONTEND/STATS", source, False)
+        except FileNotFoundError:
+            continue
+        start, count = section(raw, "PLR_PROFS")
+        for i in range(count):
+            offset = start + i*299
+            player_id = uint(raw, offset+32, 2)
+            online_id = uint(raw, offset+80, 4)
+            first = string(raw[offset+36:offset+52])
+            last = string(raw[offset+52:offset+68])
+            if player_id and first and last:
+                stem = picture_stem(first, last)
+                found.add((player_id, online_id, stem, aliases.get(player_id) or stem))
+    return found
+
+
+def edition_pictures(root):
+    def textures(paths):
+        result = {}
+        for path in sorted(paths):
+            if path.is_file():
+                result.setdefault(path.stem.upper(), (path.relative_to(root).as_posix(), 0))
+        return result
+
+    art = root / "PS4/UI/ART"
+    live = {}
+    for file in (root / "CROSS/LIVE").glob("*.WEBP"):
+        hit = re.fullmatch(r"AS_(.+)_([0-9]+)", file.stem.upper())
+        if not hit or not file.is_file():
+            continue
+        handle, value = hit[1], int(hit[2])
+        path = file.relative_to(root).as_posix()
+        if (value, path) > (live.get(handle, ("", 0))[1], live.get(handle, ("", 0))[0]):
+            live[handle] = (path, value)
+    return {
+        "action": textures((art / "ACTIONSHOTS").glob("*.TEX")),
+        "webp": live,
+        "mug": textures((art / "MUGS").glob("*/*.TEX")),
+    }
+
+
+def disc_art_index(cards, base, update=None):
+    """Select one unambiguous plain source per player. Only paths and IDs are cached."""
+    editions = [(name, Path(root)) for name, root in (("base", base), ("update", update)) if root]
+    rows = {name: edition_picture_names(root) for name, root in editions}
+    pictures = {name: edition_pictures(root) for name, root in editions}
+    known_ids = defaultdict(set)
+    for players in rows.values():
+        for pid, online, stem, _ in players:
+            if online:
+                known_ids[pid, stem].add(online)
+
+    def person(pid, online, stem):
+        others = known_ids.get((pid, stem), ())
+        online = online or (next(iter(others)) if len(others) == 1 else 0)
+        return ("online", online) if online else ("roster", pid, stem)
+
+    stems = {}
+    alias_owners = {}
+    roster_owners = {}
+    all_stems = defaultdict(set)
+    for name, players in rows.items():
+        stems[name] = defaultdict(set)
+        alias_owners[name] = defaultdict(set)
+        roster_owners[name] = defaultdict(set)
+        for pid, online, stem, alias in players:
+            key = person(pid, online, stem)
+            stems[name][key].add((stem, alias))
+            all_stems[key].add((stem, alias))
+            alias_owners[name][alias].add(key)
+            roster_owners[name][stem].add(key)
+
+    # These bare stems cannot be assigned to a single identity in the
+    # installed editions. Keep their regular client fallback.
+    unresolved = {"GONZALEZ_JACOB", "CABALLERO_JOSE", "RODRIGUEZ_GABRIEL", "RAMOS_JOSE"}
+
+    def owned_by(owners, edition, handle, key):
+        local = owners[edition].get(handle)
+        if local:
+            return local == {key}
+        return set().union(*(owners[name].get(handle, ()) for name, _ in editions)) == {key}
+
+    result = {}
+    for card in cards:
+        if card["picture_stem"] in unresolved:
+            continue
+        pid = card["roster_player_id"]
+        key = person(pid, card["online_id"], card["picture_stem"])
+        selected = None
+        for kind in ("action", "webp", "mug"):
+            for edition, _ in editions:
+                # A loose TEX uses its edition's effective asset name. A
+                # plain WebP may use an older spelling, and a player absent
+                # from the edition can still have a unique loose file.
+                variants = stems[edition].get(key) if kind != "webp" else all_stems[key]
+                variants = variants or all_stems[key]
+                handles = {alias for _, alias in variants if owned_by(alias_owners, edition, alias, key)}
+                if kind == "webp":
+                    handles.update(stem for stem, _ in variants if owned_by(roster_owners, edition, stem, key))
+                bank = pictures[edition][kind]
+                matches = [(bank[h][1], h, bank[h][0]) for h in handles if h in bank]
+                if matches:
+                    art_id, handle, path = max(matches)
+                    selected = dict(edition=edition, kind=kind, handle=handle, path=path, art_id=art_id)
+                    break
+            if selected:
+                result[str(pid)] = selected
+                break
+    return result
