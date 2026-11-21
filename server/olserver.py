@@ -366,6 +366,7 @@ STATE_FILE = os.path.join(HERE if HERE in (os.path.join(ROOT, 'probes', 'equip-f
                                          os.path.join(ROOT, 'probes', 'affinity-divisions'),
                                          os.path.join(ROOT, 'probes', 'affinity-repeatable'),
                                          os.path.join(ROOT, 'probes', 'affinity-open'),
+                                         os.path.join(ROOT, 'probes', 'affinity-open2'),
                                          os.path.join(ROOT, 'probes', 'showdown-work'),
                                          os.path.join(ROOT, 'probes', 'showdown-stage3')) else WORK, 'state.json')
 DD_TEAM_ID = 10001       # custom logo and uniform branches (0x9e7885, 0x199723a)
@@ -854,7 +855,9 @@ def affinity_list(divisions):
     first = rows[0][1]
     mini_node(response, 'active_program', id=first['id'], name_short=first['name_short'],
               texture_name=first['texture_name'])
-    programs = mini_node(response, 'programs', display_mode='list')
+    # FRONTEND 0x7410a8 BranchValue selects TeamProgramList with decimal mode 0.
+    # The literal "list" is a separate argument to the tile selection command.
+    programs = mini_node(response, 'programs', display_mode=0)
     # ol_ProgramGroups reads only row identity, the tile labels, art and progress.
     # Keep the Program detail attributes on program.view.
     list_fields = ('id', 'name', 'name_short', 'subtitle', 'texture_name', 'percent_complete',
@@ -1707,6 +1710,7 @@ class ShowdownMoment(NamedTuple):
     xp: int = 0
     batter_upgrade: bool = False
     perk_rarity: str | None = None
+    second_base: int | None = None
 
 
 # Locally authored score chases. Types 3 and 4 use the native Showdown outs
@@ -1722,14 +1726,19 @@ SHOWDOWN_LEGACY_MOMENTS = (
     ShowdownMoment(7104, 4, 'Final Showdown', 'BKG_SHOWDOWN_BOSS', 0, 4, 9, 0,
                    difficulty='Rookie', ends_run_on_loss=True, stubs=300, xp=500),
 )
-SHOWDOWN_MOMENTS = (
+SHOWDOWN_NINTH_INNING_MOMENTS = (
     SHOWDOWN_LEGACY_MOMENTS[0]._replace(stubs=100, batter_upgrade=True, perk_rarity='Diamond'),
     SHOWDOWN_LEGACY_MOMENTS[1]._replace(stubs=75, batter_upgrade=True, perk_rarity='Gold'),
     SHOWDOWN_LEGACY_MOMENTS[3],
 )
+SHOWDOWN_MOMENTS = (
+    SHOWDOWN_NINTH_INNING_MOMENTS[0]._replace(second_base=8),
+    SHOWDOWN_NINTH_INNING_MOMENTS[1]._replace(second_base=8),
+    SHOWDOWN_NINTH_INNING_MOMENTS[-1],
+)
 # The client recap asks for the previous tile after a nonterminal attempt.
 # Keep that position backed by a valid, settled mission on every diagnostic.
-SHOWDOWN_BLUE_RECAP = SHOWDOWN_MOMENTS[0]._replace(
+SHOWDOWN_BLUE_RECAP = SHOWDOWN_NINTH_INNING_MOMENTS[0]._replace(
     identifier=7190, name='Recap marker', stubs=0, banked_runs=0,
     batter_upgrade=False, perk_rarity=None, ends_run_on_loss=False)
 SHOWDOWN_BLUE_CASES = (
@@ -1745,6 +1754,10 @@ SHOWDOWN_BLUE_MOMENTS = tuple(
              + (' (leadoff)' if actor == 'leadoff' else ''))
     for i, (kind, field, actor) in enumerate(SHOWDOWN_BLUE_CASES)
 )
+# CRaidProgressView_StashRaidData (0xc83e6f) requires a type-4
+# mission to populate the final panel even when the run is diagnostic.
+SHOWDOWN_BLUE_FINAL = SHOWDOWN_MOMENTS[-1]._replace(
+    identifier=7195, name='Final panel reference (locked)', stubs=0, xp=0)
 # Local XML name with the exact hash the native Rewards reader compares
 # at 0xa60952. The client sums it for completed moments at 0xa65faf.
 SHOWDOWN_RUNS_ATTR = 'boss_runs3_mdORt'
@@ -1765,7 +1778,7 @@ def showdown_is_blue(run):
 
 def showdown_blue_order(candidate):
     others = SHOWDOWN_BLUE_MOMENTS[candidate:] + SHOWDOWN_BLUE_MOMENTS[:candidate]
-    return (SHOWDOWN_BLUE_RECAP,) + others
+    return (SHOWDOWN_BLUE_RECAP,) + others + (SHOWDOWN_BLUE_FINAL,)
 
 
 def showdown_raid_id(run):
@@ -1775,9 +1788,12 @@ def showdown_raid_id(run):
 def showdown_moments(run=None):
     if showdown_is_blue(run):
         return showdown_blue_order(run['candidate'])
-    if run and run.get('track') != 'starter':
-        return SHOWDOWN_LEGACY_MOMENTS
-    return SHOWDOWN_MOMENTS
+    track = run.get('track') if run else 'starter_runner'
+    if track == 'starter_runner':
+        return SHOWDOWN_MOMENTS
+    if track == 'starter':
+        return SHOWDOWN_NINTH_INNING_MOMENTS
+    return SHOWDOWN_LEGACY_MOMENTS
 
 
 def showdown_initial_rounds(run):
@@ -1842,16 +1858,18 @@ def showdown_catalogue(run=None, diagnostic=None):
         entries.append((diagnostic.get('run'), SHOWDOWN_BLUE_RAID_ID, label, description,
                         lambda run: showdown_blue_order(case)))
     for run, raid_id, label, description, moments in entries:
-        resumable = run is not None and run['paid'] and showdown_terminal(run) is None
-        shown_run = run if resumable else None
-        if showdown_is_blue(shown_run):
-            label = SHOWDOWN_BLUE_MOMENTS[shown_run['candidate']].name
-        showdown_catalogue_raid(in_progress if resumable else available, shown_run, raid_id,
-                               label, description, moments(shown_run))
+        active_run = run if showdown_terminal(run) is None else None
+        # Continue is the progress screen. The available entry's Start Draft
+        # flow can recover the saved offers and initial draft counter.
+        resumable = showdown_ready(active_run)
+        if showdown_is_blue(active_run):
+            label = SHOWDOWN_BLUE_MOMENTS[active_run['candidate']].name
+        showdown_catalogue_raid(in_progress if resumable else available, active_run, raid_id,
+                               label, description, moments(active_run), include_progress=resumable)
     return mini_xml(response)
 
 
-def showdown_catalogue_raid(parent, run, raid_id, label, description, moments):
+def showdown_catalogue_raid(parent, run, raid_id, label, description, moments, *, include_progress):
     raid = mini_node(parent, 'Raid', Id=raid_id, Name=label, Description=description,
                      CoverTexture='SHOWDOWN_STARTER', Timed='false', TimeText='', IsCoop='false',
                      EntryPrice=SHOWDOWN_FEE, DraftData='{}')
@@ -1864,7 +1882,7 @@ def showdown_catalogue_raid(parent, run, raid_id, label, description, moments):
         upgrades = ET.SubElement(rewards, 'RaidItems')
         for entry in showdown_upgrade_options(run, index, moment):
             mini_node(upgrades, 'item', **entry['reward'])
-    if run:
+    if include_progress:
         showdown_progress(raid, run)
 
 
@@ -2058,7 +2076,7 @@ def showdown_create(state, account, query):
         used.update(draw)
         slot = next(i for i, (_, pos) in enumerate(squad['lineup']) if pos == FIELD_NUMBER[positions[0]]) if group == 'lineup' else 0
         draft.append({'group': group, 'slot': slot, 'offers': [choices[i] for i in draw]})
-    run = {'id': str(uuid4()), 'track': 'starter', 'fee': SHOWDOWN_FEE, 'paid': True, 'squad': squad,
+    run = {'id': str(uuid4()), 'track': 'starter_runner', 'fee': SHOWDOWN_FEE, 'paid': True, 'squad': squad,
            'draft': draft, 'initial_rounds': len(draft), 'picks': [], 'perk': None, 'equipped_perks': []}
     if blue:
         run.update(track='blue_test', candidate=account.get('next', 0), moment_results=[False])
@@ -2172,6 +2190,8 @@ def showdown_options(moment):
                                              userCurrentPitcher=0, cpuCurrentPitcherIsStarter=True,
                                              userCurrentPitcherIsStarter=True),
                   DurationData=dict(Type='outs', Value=moment.outs))
+    if moment.second_base is not None:
+        option['StartingSituationData'].update(firstBase=-1, secondBase=moment.second_base, thirdBase=-1)
     return json.dumps({'OptionsList': [option]})
 
 
@@ -2206,6 +2226,10 @@ def showdown_mission_definitions(ids, run=None, *, blue=False):
                 name = f'Next - {name}'
             user_score = banked if moment.kind == 4 else 0
             desc = f'Start {user_score}-{moment.cpu_score}. Take the lead before making {moment.outs} outs.'
+            if moment.second_base is not None:
+                goal = 'Take the lead' if moment.cpu_score else 'Score'
+                desc = (f'Start 0-{moment.cpu_score}. Top of the 10th, runner on second. '
+                        f'{goal} before making three outs.')
             win = json.dumps({'outs_remaining': moment.outs})
             lose = '{"stat_conditions":[]}'
             raid_id = SHOWDOWN_BLUE_RAID_ID if blue else SHOWDOWN_RAID_ID
@@ -2235,10 +2259,11 @@ def showdown_situations(run):
     response = ET.Element('response')
     for moment in showdown_moments(run):
         # The final boss adds the accrued runs locally at 0x124b66f/0x124b739.
-        top = showdown_is_blue(run) and moment.kind < 3
+        runner_on_second = moment.second_base is not None
+        top = runner_on_second or (showdown_is_blue(run) and moment.kind < 3)
         situation = dict(version=1, name=moment.name, inning=10 if top else 9, inningIsTop=top,
                          scoreCPU=moment.cpu_score, scoreUser=0, userIsHome=not top, balls=0, strikes=0, outs=0,
-                         runnerOnFirst=False, runnerOnSecond=False, runnerOnThird=False)
+                         runnerOnFirst=False, runnerOnSecond=runner_on_second, runnerOnThird=False)
         mini_node(response, 'Situation', id=moment.identifier, data=json.dumps(situation))
     return mini_xml(response)
 
@@ -2352,7 +2377,7 @@ def showdown_shared(name, params):
         return None
     if name == 'singles_mission.view_missions_by_ids':
         ids = {showdown_number(part.strip()) for part in str(query.get('moment_ids', '')).split(',')}
-        blue = SHOWDOWN_BLUE_TEST and ids <= {m.identifier for m in (SHOWDOWN_BLUE_RECAP,) + SHOWDOWN_BLUE_MOMENTS}
+        blue = SHOWDOWN_BLUE_TEST and ids <= {moment.identifier for moment in showdown_blue_order(0)}
         if blue or ids <= {moment.identifier for moment in SHOWDOWN_LEGACY_MOMENTS}:
             try:
                 account = load_state().get('showdown', {})
