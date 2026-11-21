@@ -39,11 +39,11 @@ The builder will be the first-run flow of the launcher, which lives in its own r
 
 ## Open points
 
-- Which package unpacker to use, and whether it can be shipped or must be fetched by the player.
+- Whether a release should bundle a package unpacker (0.1.0 does not).
 - Whether the launcher is a small windowed program or a console program for the first release.
 
 ## Settled since
 
-- The launcher ships no package unpacker and runs none. The first release takes an unpacked game folder; a package file is identified and the player is asked to unpack it with their own tool.
+- The launcher ships no package unpacker and embeds no unpacking code or keys. It takes an unpacked game folder, or a package file together with an unpacker program the player supplies (`orbis-unpkg.exe` or `ps4-pkg-tool.exe`), which it runs after showing its path and asking once. A package is unpacked into a staging folder, verified, and moved into `data/games/CUSA35521/base` and `update`.
 - An unpacked folder is used where it is. The launcher verifies it and records its location in `data/games/CUSA35521/game.json`; it does not copy the game into `data/games/` and never writes inside the game folder.
 - The launcher is a windowed program.

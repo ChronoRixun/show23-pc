@@ -7,7 +7,7 @@
 #   python tools\olserver\olserver.py selftest      codec and TLS round trip against itself
 #   python tools\olserver\olserver.py run           listen on 127.0.0.1:10000 (auth and session)
 #
-# Protocol facts (HANDOFF "Later, after the main work"): a frame is
+# Protocol facts: a frame is
 # [u32 total length incl. these 8 bytes][u32 type id][body], little-endian. A string is a u32
 # length and, if not empty, the length again as a base-128 varint and then the bytes. A block of
 # bytes is a u32 length and the bytes. Type IDs come from the packaged message table or the research table.
@@ -15,7 +15,7 @@
 # Installed run: python server\olserver.py run --install <folder>
 # Optional public catalogue: python server\olserver.py import-cards --install <folder> [--pictures]
 # The install launcher passes --show23-local-ca with the ca.pem from data\profiles\default\server.
-# Development uses probes\olserver and the research launcher settings.
+# Development runs keep their own working folder outside the install layout.
 import asyncio, base64, csv, datetime, hashlib, json, math, os, random, re, secrets, ssl, struct, sys, tempfile, time, zipfile
 import xml.etree.ElementTree as ET
 from collections import ChainMap, Counter
