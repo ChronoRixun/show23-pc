@@ -15,7 +15,7 @@
 # Installed run: python server\olserver.py run --install <folder>
 # The install launcher passes --show23-local-ca with the ca.pem from data\profiles\default\server.
 # Development uses probes\olserver and the research launcher settings.
-import asyncio, csv, datetime, hashlib, json, os, random, re, shutil, ssl, struct, subprocess, sys, time, zipfile
+import asyncio, base64, csv, datetime, hashlib, json, math, os, random, re, secrets, ssl, struct, sys, tempfile, time, zipfile
 import xml.etree.ElementTree as ET
 from collections import ChainMap, Counter
 from functools import lru_cache
@@ -3687,7 +3687,7 @@ def equip_owned(state):
     reg = equip_registry()['equipment']
     rows = [(r, reg[r['uuid']]) for r in equip_owned_rows('Equipment', state)
             if r['quantity'] > 0 and r['uuid'] in reg]
-    if os.environ.get('SHAD_SCOUT_EQUIP_ONE_BAT') == '1':
+    if not LAYOUT.install and os.environ.get('SHAD_SCOUT_EQUIP_ONE_BAT') == '1':
         bats = [pair for pair in rows if pair[1].slot == 0]
         return sorted(bats, key=lambda p: (not p[1].matched, p[0]['item_id']))[:1]
     return rows
@@ -3724,7 +3724,7 @@ def equip_picker(query):
         slot = inv['slots'].get(_item_key(special))
         owned = equip_owned(state)
         selection = {row['uuid']:row for row, _ in owned}
-        if os.environ.get('SHAD_SCOUT_EQUIP_ONE_BAT') != '1':
+        if LAYOUT.install or os.environ.get('SHAD_SCOUT_EQUIP_ONE_BAT') != '1':
             for record in inv.get('catalogue', {}).get(kind, []):
                 if record['uuid'] not in selection:
                     selection[record['uuid']] = dict(record, quantity=0)
@@ -7308,44 +7308,191 @@ async def handle_web(reader, writer, log):
 
 
 # ---------------------------------------------------------------- certificates
-def openssl():
-    exe = shutil.which('openssl')
-    for cand in (r'C:\Program Files\Git\usr\bin\openssl.exe', r'C:\Program Files\Git\mingw64\bin\openssl.exe'):
-        if not exe and os.path.exists(cand):
-            exe = cand
-    if not exe:
-        sys.exit('openssl not found (Git for Windows brings one)')
-    return exe
+RSA_BITS = 2048
+RSA_EXPONENT = 65537
+RSA_PRIME_ROUNDS = 64
+
+
+@lru_cache(maxsize=1)
+def small_primes():
+    primes = []
+    for candidate in range(2, 2000):
+        if all(candidate % p for p in primes if p * p <= candidate):
+            primes.append(candidate)
+    return tuple(primes)
+
+
+def probable_prime(candidate):
+    if any(candidate % p == 0 for p in small_primes()):
+        return False
+    odd = candidate - 1
+    shifts = (odd & -odd).bit_length() - 1
+    odd >>= shifts
+    for _ in range(RSA_PRIME_ROUNDS):
+        witness = secrets.randbelow(candidate - 3) + 2
+        value = pow(witness, odd, candidate)
+        if value in (1, candidate - 1):
+            continue
+        for _ in range(shifts - 1):
+            value = value * value % candidate
+            if value == candidate - 1:
+                break
+        else:
+            return False
+    return True
+
+
+def rsa_prime():
+    bits = RSA_BITS // 2
+    while True:
+        # The high two bits guarantee a full-width modulus.
+        candidate = secrets.randbits(bits) | (3 << (bits - 2)) | 1
+        if math.gcd(candidate - 1, RSA_EXPONENT) == 1 and probable_prime(candidate):
+            return candidate
+
+
+def der(tag, payload):
+    size = len(payload)
+    if size < 128:
+        length = bytes([size])
+    else:
+        raw = size.to_bytes((size.bit_length() + 7) // 8, 'big')
+        length = bytes([128 | len(raw)]) + raw
+    return bytes([tag]) + length + payload
+
+
+def der_seq(*fields):
+    return der(0x30, b''.join(fields))
+
+
+def der_int(number):
+    raw = number.to_bytes(max(1, (number.bit_length() + 7) // 8), 'big')
+    return der(2, b'\0' + raw if raw[0] & 128 else raw)
+
+
+def der_oid(*arcs):
+    body = bytearray()
+    for arc in (40 * arcs[0] + arcs[1], *arcs[2:]):
+        groups = [arc & 127]
+        arc >>= 7
+        while arc:
+            groups.append((arc & 127) | 128)
+            arc >>= 7
+        body.extend(reversed(groups))
+    return der(6, bytes(body))
+
+
+RSA_ALGORITHM = der_seq(der_oid(1, 2, 840, 113549, 1, 1, 1), der(5, b''))
+CERT_SIGNATURE = der_seq(der_oid(1, 2, 840, 113549, 1, 1, 11), der(5, b''))
+SHA256_ALGORITHM = der_seq(der_oid(2, 16, 840, 1, 101, 3, 4, 2, 1), der(5, b''))
+
+
+class RsaKey(NamedTuple):
+    modulus: int
+    private: int
+    p: int
+    q: int
+
+    def public_der(self):
+        return der_seq(der_int(self.modulus), der_int(RSA_EXPONENT))
+
+    def private_der(self):
+        return der_seq(*(der_int(n) for n in (0, self.modulus, RSA_EXPONENT, self.private, self.p, self.q,
+                                             self.private % (self.p - 1), self.private % (self.q - 1),
+                                             pow(self.q, -1, self.p))))
+
+    def sign(self, data):
+        info = der_seq(SHA256_ALGORITHM, der(4, hashlib.sha256(data).digest()))
+        width = (self.modulus.bit_length() + 7) // 8
+        block = b'\x00\x01' + b'\xff' * (width - len(info) - 3) + b'\0' + info
+        return pow(int.from_bytes(block, 'big'), self.private, self.modulus).to_bytes(width, 'big')
+
+
+def rsa_key():
+    p, q = rsa_prime(), rsa_prime()
+    while p == q:
+        q = rsa_prime()
+    private = pow(RSA_EXPONENT, -1, math.lcm(p - 1, q - 1))
+    return RsaKey(p * q, private, p, q)
+
+
+def certificate_name(common_name):
+    return der_seq(der(0x31, der_seq(der_oid(2, 5, 4, 3), der(0x0c, common_name.encode('utf-8')))))
+
+
+def certificate_time(value):
+    if 1950 <= value.year < 2050:
+        return der(0x17, value.strftime('%y%m%d%H%M%SZ').encode('ascii'))
+    return der(0x18, value.strftime('%Y%m%d%H%M%SZ').encode('ascii'))
+
+
+def certificate_expiry(now, years):
+    try:
+        return now.replace(year=now.year + years)
+    except ValueError:   # February 29 in a non-leap expiry year
+        return now.replace(year=now.year + years, day=28)
+
+
+def certificate_extension(oid, value, *, critical=False):
+    flag = der(1, b'\xff') if critical else b''
+    return der_seq(oid, flag, der(4, value))
+
+
+def certificate(subject, issuer, key, signing_key, start, end, *, ca):
+    ski = hashlib.sha1(key.public_der()).digest()
+    aki = hashlib.sha1(signing_key.public_der()).digest()
+    ext = [
+        certificate_extension(der_oid(2, 5, 29, 19), der_seq(der(1, b'\xff') if ca else b''), critical=ca),
+        certificate_extension(der_oid(2, 5, 29, 15), der(3, b'\x01\x06' if ca else b'\x05\xa0'), critical=ca),
+        certificate_extension(der_oid(2, 5, 29, 14), der(4, ski)),
+        certificate_extension(der_oid(2, 5, 29, 35), der_seq(der(0x80, aki))),
+    ]
+    if not ca:
+        hosts = [der(0x82, h.encode('ascii')) for h in HOSTS + ['localhost']]
+        hosts.append(der(0x87, bytes([127, 0, 0, 1])))
+        ext.extend((
+            certificate_extension(der_oid(2, 5, 29, 37), der_seq(der_oid(1, 3, 6, 1, 5, 5, 7, 3, 1))),
+            certificate_extension(der_oid(2, 5, 29, 17), der_seq(*hosts)),
+        ))
+    serial = secrets.randbits(159) | (1 << 158)
+    public = der_seq(RSA_ALGORITHM, der(3, b'\0' + key.public_der()))
+    tbs = der_seq(der(0xa0, der_int(2)), der_int(serial), CERT_SIGNATURE, issuer,
+                  der_seq(certificate_time(start), certificate_time(end)), subject,
+                  public, der(0xa3, der_seq(*ext)))
+    return der_seq(tbs, CERT_SIGNATURE, der(3, b'\0' + signing_key.sign(tbs)))
+
+
+def pem(label, payload):
+    text = base64.b64encode(payload)
+    lines = b'\n'.join(text[i:i + 64] for i in range(0, len(text), 64))
+    return b'-----BEGIN ' + label + b'-----\n' + lines + b'\n-----END ' + label + b'-----\n'
 
 
 def gen_certs():
+    ca_key, server_key = rsa_key(), rsa_key()
+    now = datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)
+    start = now - datetime.timedelta(days=1)
+    issuer = certificate_name('Scout local online authority')
+    ca = certificate(issuer, issuer, ca_key, ca_key, start, certificate_expiry(now, 10), ca=True)
+    server = certificate(certificate_name(HOSTS[1]), issuer, server_key, ca_key,
+                         start, certificate_expiry(now, 2), ca=False)
+    files = {'ca.pem': pem(b'CERTIFICATE', ca), 'ca.key': pem(b'RSA PRIVATE KEY', ca_key.private_der()),
+             'server.pem': pem(b'CERTIFICATE', server), 'server.key': pem(b'RSA PRIVATE KEY', server_key.private_der())}
     os.makedirs(WORK, exist_ok=True)
-    o = openssl()
-    env = dict(os.environ, MSYS_NO_PATHCONV='1', MSYS2_ARG_CONV_EXCL='*')
-    p = lambda n: os.path.join(WORK, n)
-    cfg = p('server.cnf')
-    open(cfg, 'w').write(
-        '[req]\ndistinguished_name=dn\nprompt=no\n[dn]\nCN=' + HOSTS[1] + '\n[v3]\n'
-        'basicConstraints=CA:FALSE\nkeyUsage=digitalSignature,keyEncipherment\nextendedKeyUsage=serverAuth\n'
-        'subjectAltName=' + ','.join(f'DNS:{h}' for h in HOSTS + ['localhost']) + ',IP:127.0.0.1\n')
-    cacfg = p('ca.cnf')
-    open(cacfg, 'w').write(
-        '[req]\ndistinguished_name=dn\nprompt=no\nx509_extensions=v3\n[dn]\nCN=Scout local online authority\n'
-        '[v3]\nbasicConstraints=critical,CA:TRUE\nkeyUsage=critical,keyCertSign,cRLSign\n'
-        'subjectKeyIdentifier=hash\n')
-
-    def run(*a):
-        r = subprocess.run([o] + list(a), capture_output=True, text=True, env=env)
-        if r.returncode != 0:
-            sys.exit('openssl failed: ' + ' '.join(a[:3]) + '\n' + r.stderr[-800:])
-
-    run('req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-sha256', '-days', '3650', '-keyout', p('ca.key'),
-        '-out', p('ca.pem'), '-config', cacfg)
-    run('req', '-new', '-newkey', 'rsa:2048', '-nodes', '-keyout', p('server.key'), '-out', p('server.csr'), '-config', cfg)
-    run('x509', '-req', '-in', p('server.csr'), '-CA', p('ca.pem'), '-CAkey', p('ca.key'), '-CAcreateserial',
-        '-out', p('server.pem'), '-days', '3650', '-sha256', '-extfile', cfg, '-extensions', 'v3')
-    size = os.path.getsize(p('ca.pem'))
-    print(f'made {p("ca.pem")} ({size} bytes; the embedded text it replaces is 6863 bytes) and server.pem/server.key')
+    staged = {}
+    try:
+        for name, payload in files.items():
+            fd, path = tempfile.mkstemp(prefix='.local-tls-', dir=WORK)
+            staged[name] = path
+            with os.fdopen(fd, 'wb') as file:
+                file.write(payload)
+        for name, path in staged.items():
+            os.replace(path, os.path.join(WORK, name))
+    finally:
+        for path in staged.values():
+            if os.path.exists(path):
+                os.unlink(path)
+    print('Generated local CA and server certificates in ' + WORK)
 
 
 # ---------------------------------------------------------------- self-test
@@ -7438,11 +7585,16 @@ def main():
     cmd = args[0] if args else 'run'
     options = args[1:]
     roster_option = None
+    if LAYOUT.install and '--collection=mine' in options:
+        sys.exit('--collection=mine is development-only')
     for option in options:
         if option.startswith('--cards='):
-            CARD_SOURCE = option.split('=', 1)[1]
-            if CARD_SOURCE not in ('disc', 'site'):
+            source = option.split('=', 1)[1]
+            if source not in ('disc', 'site'):
                 sys.exit('--cards must be disc or site')
+            if LAYOUT.install and source == 'site':
+                sys.exit('--cards=site is development-only')
+            CARD_SOURCE = source
     if LAYOUT.install or cmd == 'build-roster':
         for arg in options:
             if arg.startswith('--rosters='):

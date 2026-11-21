@@ -1,6 +1,6 @@
 # Local server
 
-`olserver.py` is the whole server: one Python file using the standard library. Pillow is used if it is installed, and `gen-certs` calls an OpenSSL program.
+`olserver.py` is the whole server: Python using only the standard library (Pillow is used if it is installed), with `roster_decode.py` beside it. It makes its own certificate authority and server certificate on first use; no other program is needed.
 
 ```text
 python olserver.py run --install <install folder>         listen on 127.0.0.1:10000 and 10080
