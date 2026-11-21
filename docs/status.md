@@ -11,6 +11,7 @@ Last updated 2026-11-20. "Seen in the game" means a person played it in the emul
 | Version 1.21 with the local server | Not working yet: the sign-in changes are written for the 1.00 executable only. |
 | Player models, crowd, lighting, uniforms | Correct, with one known exception: a team's custom-designed uniform does not draw, so a created team plays in a stock uniform. |
 | Platforms | Windows only so far. |
+| Release build of the emulator | A clean branch without the development diagnostics builds, boots, signs in to the local server and has been played briefly. Not yet played through. |
 
 ## Diamond Dynasty with the local server (version 1.00)
 
