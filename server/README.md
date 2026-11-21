@@ -3,14 +3,30 @@
 `olserver.py` is the whole server: one Python file using the standard library. Pillow is used if it is installed, and `gen-certs` calls an OpenSSL program.
 
 ```text
-python olserver.py gen-certs     make this install's certificate authority and server certificate
-python olserver.py selftest      codec and TLS round trip against itself
-python olserver.py run           listen on 127.0.0.1:10000
+python olserver.py run --install <install folder>         listen on 127.0.0.1:10000 and 10080
+python olserver.py selftest --install <install folder>    codec and TLS round trip against itself
+python olserver.py gen-certs --install <install folder>   make this install's certificate authority and server certificate
 ```
+
+## Running it for an install
+
+With `--install` the server uses the layout the launcher creates and nothing else:
+
+| What | Where |
+|---|---|
+| The game folders | read from `data/games/CUSA35521/game.json`, the record the launcher writes at setup |
+| State, certificates and keys, content cache | `data/profiles/default/server/` |
+| Optional website catalogue import | `data/import-cache/` |
+| Logs | `data/logs/` |
+| Reply files and the message table | `replies/` and `tables/` beside `olserver.py` |
+
+A missing record, a game folder that has moved, or missing reply files or table stop it with a one-line message. `run` creates the certificates on first use. The emulator is then started with `--show23-local-ca` pointing at `ca.pem` in the server data folder.
+
+Without `--install` the file uses the folder layout of the development tree it was written in; that mode is for development only.
 
 ## Current limitation
 
-The file is the working copy from the development tree and still expects that tree's folder layout: it looks for its tables, reply files, state and the unpacked game relative to a project root two levels above itself. It does not run from this folder as laid out here. Moving it to the install layout in [`builder/README.md`](../builder/README.md) is item 4 of the [roadmap](../docs/roadmap.md).
+A fresh install signs in but has no cards: the player records, looks and pitch data the card mode needs are still produced by a separate development tool. Building them from the game folder inside the server is the next item in the [roadmap](../docs/roadmap.md).
 
 ## What is here
 

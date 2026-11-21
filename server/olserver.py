@@ -10,10 +10,11 @@
 # Protocol facts (HANDOFF "Later, after the main work"): a frame is
 # [u32 total length incl. these 8 bytes][u32 type id][body], little-endian. A string is a u32
 # length and, if not empty, the length again as a base-128 varint and then the bytes. A block of
-# bytes is a u32 length and the bytes. Type ids come from reports\online\ol-messages.csv.
+# bytes is a u32 length and the bytes. Type IDs come from the packaged message table or the research table.
 #
-# Our keys and certificates live in probes\olserver (local only). The emulator is started with
-# SHAD_SCOUT_NET_HOSTS, SHAD_SCOUT_TRUST_PEM and SHAD_SCOUT_LOCAL_PSN (launcher switch -LocalOnline).
+# Installed run: python server\olserver.py run --install <folder>
+# The install launcher passes --show23-local-ca with the ca.pem from data\profiles\default\server.
+# Development uses probes\olserver and the research launcher settings.
 import asyncio, csv, datetime, hashlib, json, os, random, re, shutil, ssl, struct, subprocess, sys, time, zipfile
 import xml.etree.ElementTree as ET
 from collections import ChainMap, Counter
@@ -21,11 +22,98 @@ from functools import lru_cache
 from typing import NamedTuple
 from uuid import uuid4
 
+class ServerLayout(NamedTuple):
+    install: str | None
+    base: str
+    update: str | None
+    work: str
+    state: str
+    logs: str
+    replies: str
+    messages: str
+    catalogue: str
+
+
+def install_option(args):
+    install = None
+    command = []
+    it = iter(args)
+    for arg in it:
+        if arg == '--install' or arg.startswith('--install='):
+            value = next(it, '') if arg == '--install' else arg.split('=', 1)[1]
+            if not value or value.startswith('--') or install is not None:
+                sys.exit('install layout: give one folder with --install')
+            install = os.path.abspath(value)
+        else:
+            command.append(arg)
+    return install, command
+
+
+def resolve_layout(here, root, install):
+    packaged_table = os.path.join(here, 'tables', 'ol-messages.csv')
+    if install is None:
+        work = os.path.join(root, 'probes', 'olserver')
+        local_state = os.path.dirname(here) == os.path.join(root, 'probes') and (
+            os.path.basename(here).startswith('conquest-') or os.path.basename(here) in {
+            'equip-faces', 'equip-work', 'exchange-work', 'exchange-repeatable',
+            'exchange-carousel', 'shop-work', 'shop-polish', 'programs-work',
+            'affinity-work', 'affinity-divisions', 'affinity-repeatable', 'affinity-open',
+            'affinity-open2', 'showdown-work', 'showdown-stage3',
+        })
+        return ServerLayout(None, os.path.join(root, 'Extracted', 'CUSA35521'),
+                            os.path.join(root, 'Extracted', 'patch-0121', 'CUSA35521-patch'),
+                            work, os.path.join(here if local_state else work, 'state.json'),
+                            os.path.join(root, 'logs', 'olserver'), os.path.join(root, 'tools', 'olserver', 'replies'),
+                            packaged_table if os.path.isfile(packaged_table) else
+                            os.path.join(root, 'reports', 'online', 'ol-messages.csv'),
+                            os.path.join(root, 'snapshots', 'theshow23-site'))
+
+    data = os.path.join(install, 'data')
+    record_path = os.path.join(data, 'games', 'CUSA35521', 'game.json')
+    try:
+        with open(record_path, encoding='utf-8') as f:
+            record = json.load(f)
+    except FileNotFoundError:
+        sys.exit('install layout: game.json not found under data/games/CUSA35521')
+    except (OSError, ValueError):
+        sys.exit('install layout: cannot read a valid game.json')
+    if not isinstance(record, dict) or type(record.get('schema')) is not int or record['schema'] != 1:
+        sys.exit('install layout: game.json schema must be 1')
+    if record.get('title_id') != 'CUSA35521':
+        sys.exit('install layout: game.json title_id must be CUSA35521')
+
+    def game_folder(kind):
+        entry = record.get(kind)
+        path = entry.get('path') if isinstance(entry, dict) else None
+        if not isinstance(path, str) or not os.path.isabs(path):
+            sys.exit(f'install layout: game.json {kind}.path must be an absolute folder')
+        if not isinstance(entry.get('version'), str) or not entry['version'].strip():
+            sys.exit(f'install layout: game.json {kind}.version must be a string')
+        if not os.path.isdir(path):
+            sys.exit(f'install layout: game.json {kind} folder does not exist')
+        return os.path.abspath(path)
+
+    base = game_folder('base')
+    update = game_folder('update') if 'update' in record else None
+    replies = os.path.join(here, 'replies')
+    if not os.path.isdir(replies):
+        sys.exit('install layout: packaged replies folder is missing beside olserver.py')
+    if not os.path.isfile(packaged_table):
+        sys.exit('install layout: packaged tables/ol-messages.csv is missing beside olserver.py')
+    work = os.path.join(data, 'profiles', 'default', 'server')
+    return ServerLayout(install, base, update, work, os.path.join(work, 'state.json'),
+                        os.path.join(data, 'logs'), replies, packaged_table,
+                        os.path.join(data, 'import-cache'))
+
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
-WORK = os.path.join(ROOT, 'probes', 'olserver')
-REPLIES_DIR = os.path.join(ROOT, 'tools', 'olserver', 'replies')
-LOGDIR = os.path.join(ROOT, 'logs', 'olserver')
+_install, _command_args = install_option(sys.argv[1:] if __name__ == '__main__' else [])
+LAYOUT = globals().get('_INHERITED_LAYOUT') or resolve_layout(HERE, ROOT, _install)
+WORK = LAYOUT.work
+REPLIES_DIR = LAYOUT.replies
+LOGDIR = LAYOUT.logs
+CATALOGUE_DIR = LAYOUT.catalogue
 HOSTS = ['production.mlb.mlbtheshow.net', 'production.mlb23.mlbtheshow.net']
 PORT = 10000
 ACCOUNT_ID = 0x0123456789abcdef  # the emulator's local account id (scout_online.h)
@@ -33,7 +121,7 @@ USER_NAME = 'ScoutLocal'
 
 NAMES = {}
 IDS = {}
-with open(os.path.join(ROOT, 'reports', 'online', 'ol-messages.csv')) as f:
+with open(LAYOUT.messages) as f:
     for row in csv.DictReader(f):
         if row['type_id']:
             NAMES[int(row['type_id'], 16)] = row['name']
@@ -305,10 +393,9 @@ CONTENT_URL = 'https://s3.amazonaws.com/mlb23-production-2023/scout-content/'
 # v1.21 update unpacked into Extracted\\patch-0121 (rosters of October 2023; same size, same
 # format version 59). The default stays "base" until the patch rosters have been tried in the
 # v1.00 game.
-ROSTER_DIRS = {
-    'base': os.path.join(ROOT, 'Extracted', 'CUSA35521', 'FRONTEND', 'STATS'),
-    'patch': os.path.join(ROOT, 'Extracted', 'patch-0121', 'CUSA35521-patch', 'FRONTEND', 'STATS'),
-}
+ROSTER_DIRS = {'base': os.path.join(LAYOUT.base, 'FRONTEND', 'STATS')}
+if LAYOUT.update is not None:
+    ROSTER_DIRS['patch'] = os.path.join(LAYOUT.update, 'FRONTEND', 'STATS')
 ROSTER_SOURCE = 'base'
 CONTENT = {  # type: (file name inside the zip, file on the disc)
     'LIVE_ROSTERS': ('roster_LIVE.dat', 'ROSTER_LIVE.DAT'),
@@ -354,21 +441,7 @@ def content_update_reply(params):
 # ---------------------------------------------------------------- what the server remembers
 # One JSON file for the local player (probes\\olserver\\state.json, local only). So far: the
 # Diamond Dynasty team made with arena_team.create.
-STATE_FILE = os.path.join(HERE if HERE in (os.path.join(ROOT, 'probes', 'equip-faces'),
-                                         os.path.join(ROOT, 'probes', 'equip-work'),
-                                         os.path.join(ROOT, 'probes', 'exchange-work'),
-                                         os.path.join(ROOT, 'probes', 'exchange-repeatable'),
-                                         os.path.join(ROOT, 'probes', 'exchange-carousel'),
-                                         os.path.join(ROOT, 'probes', 'shop-work'),
-                                         os.path.join(ROOT, 'probes', 'shop-polish'),
-                                         os.path.join(ROOT, 'probes', 'programs-work'),
-                                         os.path.join(ROOT, 'probes', 'affinity-work'),
-                                         os.path.join(ROOT, 'probes', 'affinity-divisions'),
-                                         os.path.join(ROOT, 'probes', 'affinity-repeatable'),
-                                         os.path.join(ROOT, 'probes', 'affinity-open'),
-                                         os.path.join(ROOT, 'probes', 'affinity-open2'),
-                                         os.path.join(ROOT, 'probes', 'showdown-work'),
-                                         os.path.join(ROOT, 'probes', 'showdown-stage3')) else WORK, 'state.json')
+STATE_FILE = LAYOUT.state
 DD_TEAM_ID = 10001       # custom logo and uniform branches (0x9e7885, 0x199723a)
 LEGACY_DD_TEAM_ID = 1
 
@@ -720,6 +793,8 @@ def affinity_art_name(division, season):
 def affinity_tile_art(update_dir):
     """Register the six stock division tiles without creating files."""
     registry = {'entries': [], 'files': {}, 'names': set()}
+    if update_dir is None:
+        return registry
     directory = os.path.join(update_dir, 'CROSS', 'LIVE')
     for division in range(len(AFFINITY_DIVISIONS)):
         name = affinity_art_name(division, AFFINITY_SEASON)
@@ -1214,7 +1289,7 @@ def base_cards():
     if _cards is not None:
         return _cards
     _cards, _all_cards = [], []
-    snap = os.path.join(ROOT, 'snapshots', 'theshow23-site')
+    snap = CATALOGUE_DIR
     days = sorted(os.listdir(snap)) if os.path.isdir(snap) else []
     if not days:
         return _cards
@@ -1270,7 +1345,7 @@ def all_cards():
     return _all_cards
 
 
-ACTIONSHOT_DIR = os.path.join(ROOT, 'Extracted', 'CUSA35521', 'PS4', 'UI', 'ART', 'ACTIONSHOTS')
+ACTIONSHOT_DIR = os.path.join(LAYOUT.base, 'PS4', 'UI', 'ART', 'ACTIONSHOTS')
 # Programme pictures on the disc are <prefix>_<TEAM>_[n_]LAST_FIRST (GUESS from the badge names)
 SERIES_SHOT = {'All-Star': 'AS', 'Rookie': 'RC', 'Veteran': 'V', 'Breakout': 'B', '2nd Half Heroes': '2H', 'Postseason': 'P'}
 SHOT_TEAM = {'WAS': 'WSH', 'CHW': 'CWS'}
@@ -1870,8 +1945,11 @@ def showdown_catalogue(run=None, diagnostic=None):
 
 
 def showdown_catalogue_raid(parent, run, raid_id, label, description, moments, *, include_progress):
+    # The diagnostic entry gets another stock cover: with the Starter's it was
+    # taken for a duplicate on the select screen (run 114).
+    cover = 'SHOWDOWN_TA1_EAST' if raid_id == SHOWDOWN_BLUE_RAID_ID else 'SHOWDOWN_STARTER'
     raid = mini_node(parent, 'Raid', Id=raid_id, Name=label, Description=description,
-                     CoverTexture='SHOWDOWN_STARTER', Timed='false', TimeText='', IsCoop='false',
+                     CoverTexture=cover, Timed='false', TimeText='', IsCoop='false',
                      EntryPrice=SHOWDOWN_FEE, DraftData='{}')
     for index, moment in enumerate(moments):
         node = mini_node(raid, 'Node', type=moment.kind,
@@ -2647,7 +2725,7 @@ def inventory_data():
         return _inventory
     import ast
     import xml.etree.ElementTree as _ET
-    disc = os.path.join(ROOT, 'Extracted', 'CUSA35521')
+    disc = LAYOUT.base
     inv = {'brands': {}, 'slots': {}, 'stems': set(), 'perks': {}, 'records': {}, 'catalogue': {}}
     try:
         defs = _ET.parse(os.path.join(disc, 'FRONTEND', 'RTTS', 'INVENTORYDATA.XML'))
@@ -2671,8 +2749,11 @@ def inventory_data():
                     inv['stems'].add(f.read(0xa0).split(b'\0', 1)[0].decode('ascii', 'replace').upper())
     except Exception as e:
         print('inventory: disc indexes incomplete (%r)' % (e,))
+    if LAYOUT.install and not os.path.isdir(CATALOGUE_DIR):
+        _inventory = inv
+        return inv
     try:
-        snap = os.path.join(ROOT, 'snapshots', 'theshow23-site')
+        snap = CATALOGUE_DIR
         day = os.path.join(snap, sorted(os.listdir(snap))[-1])
         owned = {}
         ownfile = os.path.join(day, 'inventory-owned.json')
@@ -2828,7 +2909,7 @@ def owned_inventory_rows(kind, state=None):
 # Definition-backed equipment. These are JSON model types, not inventory slot IDs.
 EQUIP_MODEL_TYPE = (0, 1, 3, 2, 10, 11, 15, 9, 12, 14, 13, 8, 7, None, None)
 EQUIP_ALLOW_NEUTRAL = True
-EQUIP_STOCK = os.path.join(ROOT, 'Extracted', 'CUSA35521', 'FRONTEND')
+EQUIP_STOCK = os.path.join(LAYOUT.base, 'FRONTEND')
 
 
 class Wearable(NamedTuple):
@@ -3028,6 +3109,8 @@ def equipment_face_index(disc, update):
     # Sources are discovered under fixed package paths. The request never supplies a path.
     editions = []
     for is_update, root in ((False,disc),(True,update)):
+        if root is None:
+            continue
         folder = os.path.join(root,'CROSS','LIVE')
         try:
             filenames = sorted(os.listdir(folder))
@@ -3875,7 +3958,7 @@ MLB_TEAMS = [('BAL', 'Baltimore', 'Orioles'), ('BOS', 'Boston', 'Red Sox'), ('NY
              ('STL', 'St. Louis', 'Cardinals'), ('ARI', 'Arizona', 'Diamondbacks'), ('COL', 'Colorado', 'Rockies'), ('LAD', 'Los Angeles', 'Dodgers'),
              ('SD', 'San Diego', 'Padres'), ('SF', 'San Francisco', 'Giants')]       # the roster's team order (D_TEAM_PROF 0-29)
 LEGACY_CPU_TEAM_BASE = 101    # older captures and any in-flight requests can carry index + 101
-MLB_UNIS = os.path.join(ROOT, 'Extracted', 'CUSA35521', 'FRONTEND', 'UNIFORMS', 'MLBUNIS.JSON')
+MLB_UNIS = os.path.join(LAYOUT.base, 'FRONTEND', 'UNIFORMS', 'MLBUNIS.JSON')
 _mlb_uniforms = None
 
 
@@ -4009,7 +4092,7 @@ _card_art = None
 # 457 more action shots under PS4\UI\ART\ACTIONSHOTS. The v1.00 game does not see that folder, so the server
 # hands the files over through the same download route as the website art. <handle> is [series code]_[team]_
 # LAST_FIRST; the series codes below are the dominant code among each series' cards (counted 2026-11-19).
-UPDATE_DIR = os.path.join(ROOT, 'Extracted', 'patch-0121', 'CUSA35521-patch')
+UPDATE_DIR = LAYOUT.update
 SERIES_ART = {'Captain': 'CPT', 'Topps Now': 'TN', '2023 Finest': 'F23', 'Monthly Awards': 'MA', 'Kaiju': 'KAI',
               'World Baseball Classic': 'WBC', 'Future Stars': 'FS', 'Finest': 'F', 'Charisma': 'CAR', 'Snapshot': 'SNP',
               '2023 All-Star': 'AS23', '2023 Postseason': 'P23', 'Awards': 'AW', 'Milestone': 'MS', 'All-Star Game': 'ASG',
@@ -4023,6 +4106,8 @@ _update_art = None
 def update_art(c):
     """(handle, id, file path, 'webp' | 'tex') of a card's own picture in the update package, or None."""
     global _update_art
+    if UPDATE_DIR is None:
+        return None
     if _update_art is None:
         import re as _re
         _update_art = {'live': {}, 'tex': {}}
@@ -4093,7 +4178,7 @@ def player_art():
     import io
     files = {}
     try:
-        snap = os.path.join(ROOT, 'snapshots', 'theshow23-site')
+        snap = CATALOGUE_DIR
         folder = os.path.join(snap, sorted(os.listdir(snap))[-1], 'art', 'img')
         files = {f.split('.')[0]: os.path.join(folder, f) for f in os.listdir(folder) if not f.endswith(('.json', '.part'))}
     except Exception:
@@ -5372,8 +5457,11 @@ def live_module():
             spec = importlib.util.spec_from_file_location('olserver_live', os.path.abspath(__file__))
             module = importlib.util.module_from_spec(spec)
             module._IS_RELOAD = True
+            module._INHERITED_LAYOUT = LAYOUT
             spec.loader.exec_module(module)
             module.COLLECTION, module.ROSTER_SOURCE = COLLECTION, ROSTER_SOURCE
+            if LAYOUT.install:
+                module._content_info = _content_info
             _reload['module'], _reload['note'] = module, 'reply code reloaded'
         except Exception as e:                      # a broken edit keeps the last good copy
             _reload['note'] = 'reply code NOT reloaded: %r' % (e,)
@@ -5463,6 +5551,8 @@ CHASE_CHANCE = .05
 @lru_cache(maxsize=2)
 def shop_pack_art(update_dir):
     registry = {'entries': [], 'files': {}, 'names': set()}
+    if update_dir is None:
+        return registry
     directory = os.path.join(update_dir, 'CROSS', 'LIVE')
     for pid, pack in SHOP_PACKS.items():
         if pack.source != 'update' or pack.texture in registry['names']:
@@ -5519,7 +5609,7 @@ def shop_description(pack, rewards):
 def shop_picture_available(pack):
     if pack.source == 'update':
         return pack.texture in shop_pack_art(UPDATE_DIR)['names']
-    return os.path.isfile(os.path.join(ROOT, 'Extracted', 'CUSA35521', 'CROSS', 'LIVE', pack.texture + '.WEBP'))
+    return os.path.isfile(os.path.join(LAYOUT.base, 'CROSS', 'LIVE', pack.texture + '.WEBP'))
 
 
 def shop_shelf(product_id=0):
@@ -6017,11 +6107,6 @@ CQ_GOALS = (
     ConquestGoal(3, 'Build your fan base to 9M.', 9, 0, 100, 0),
     ConquestGoal(1, 'Capture every stronghold. Reward: one Standard Player Pack.', len(CQ_STRONGHOLDS), 0, 0, 510001),
 )
-
-# Never let a direct import of the isolated work copy default to the live state.
-if os.path.dirname(HERE) == os.path.join(ROOT, 'probes') and os.path.basename(HERE).startswith('conquest-'):
-    STATE_FILE = os.path.join(HERE, 'state.json')
-
 
 class ConquestRefusal(ValueError):
     pass
@@ -6843,7 +6928,7 @@ def reply_body(name, mode, params='', game_data=None):
         return showdown
     if name == 'arena_squad.get_loading_screen':
         remember_summary_setup(params)
-        if os.environ.get('SHAD_SCOUT_CAPTURE_ARM'):
+        if not LAYOUT.install and os.environ.get('SHAD_SCOUT_CAPTURE_ARM'):
             # a match is about to load: let the emulator's marker capture go (launcher -CaptureMarker)
             try:
                 open(os.environ['SHAD_SCOUT_CAPTURE_ARM'], 'a').close()
@@ -7213,19 +7298,48 @@ async def selftest():
     print('\n'.join(lines))
 
 
+def log_missing_derived(log):
+    limits = {
+        'roster-records.json': 'using fallback player metadata, stances and appearances',
+        'appearance-fields.json': 'real player appearance fields are unavailable',
+        'pitch-table.json': 'using common pitch codes and fallback velocity',
+    }
+    for name, limitation in limits.items():
+        if not os.path.isfile(os.path.join(WORK, name)):
+            log(f'install: {name} missing. {limitation.capitalize()}.')
+
+
 def main():
-    cmd = sys.argv[1] if len(sys.argv) > 1 else 'run'
+    global ROSTER_SOURCE
+    args = _command_args if __name__ == '__main__' else sys.argv[1:]
+    cmd = args[0] if args else 'run'
+    options = args[1:]
+    roster_option = None
+    if LAYOUT.install:
+        for arg in options:
+            if arg.startswith('--rosters='):
+                roster_option = arg.split('=', 1)[1]
+        if roster_option is not None:
+            if roster_option == 'patch' and LAYOUT.update is None:
+                sys.exit('install layout: --rosters=patch requires an update; game.json has no update')
+            if roster_option not in ROSTER_DIRS:
+                sys.exit(f'--rosters must be one of {", ".join(ROSTER_DIRS)}')
+            ROSTER_SOURCE = roster_option
     if cmd == 'gen-certs':
         gen_certs()
     elif cmd == 'build-content':
-        for source in ROSTER_DIRS:
-            globals()['ROSTER_SOURCE'] = source
+        sources = (roster_option,) if roster_option is not None else ROSTER_DIRS
+        for source in sources:
+            ROSTER_SOURCE = source
             build_content()
     elif cmd == 'selftest':
+        if LAYOUT.install:
+            log_missing_derived(print)
         asyncio.run(selftest())
     elif cmd == 'run':
         opts = {'ping': 20.0, 'reply': 'empty'}
-        for a in sys.argv[2:]:
+        option_iter = iter(options)
+        for a in option_iter:
             if a.startswith('--ping='):
                 opts['ping'] = float(a.split('=')[1])
             elif a.startswith('--reply='):
@@ -7240,12 +7354,24 @@ def main():
                     sys.exit('--collection must be all or mine')
             elif a.startswith('--log='):
                 opts['log'] = a.split('=', 1)[1].strip('"')
+            elif LAYOUT.install and a == '--log':
+                opts['log'] = next(option_iter, '')
+                if not opts['log'] or opts['log'].startswith('--'):
+                    sys.exit('install layout: --log requires a path')
         if not os.path.exists(os.path.join(WORK, 'server.pem')):
             gen_certs()
         if 'log' not in opts:
             os.makedirs(LOGDIR, exist_ok=True)
-            opts['log'] = os.path.join(LOGDIR, time.strftime('olserver-%Y%m%d-%H%M%S.log'))
+            pattern = 'server-%Y%m%d-%H%M%S.log' if LAYOUT.install else 'olserver-%Y%m%d-%H%M%S.log'
+            opts['log'] = os.path.join(LOGDIR, time.strftime(pattern))
+        elif LAYOUT.install and not os.path.isabs(opts['log']):
+            opts['log'] = os.path.join(LOGDIR, opts['log'])
+            os.makedirs(os.path.dirname(os.path.abspath(opts['log'])), exist_ok=True)
         log = Log(opts['log'])
+        if LAYOUT.install:
+            if not os.path.exists(STATE_FILE):
+                save_state({})
+            log_missing_derived(log)
         build_content(log)
         try:
             log(f'cards: collection "{COLLECTION}", {len(cards())} cards with a roster player')
