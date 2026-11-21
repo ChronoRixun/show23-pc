@@ -15,7 +15,7 @@ There are three parts in three repositories: the local server and its tools here
                                           └──────────────┘
 ```
 
-## Launcher and builder (separate repository, planned)
+## Launcher and builder (`show23-pc-launcher`, separate repository)
 
 Takes the player's own game package or unpacked folder, verifies it is the supported title and version, unpacks it into an install folder the player chooses, writes emulator settings, and from then on starts the emulator and the local server together and stops them together. It accepts the base game (version 1.00) and, optionally, the 1.21 update package.
 
