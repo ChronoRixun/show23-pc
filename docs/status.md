@@ -6,7 +6,7 @@ Last updated 2026-11-20. "Seen in the game" means a person played it in the emul
 
 | Area | State |
 |---|---|
-| Version 1.00, offline modes | Playable. Full exhibition games have been played. Menus run at 60 frames a second; busy in-game views run at about 30. |
+| Version 1.00, offline modes | Playable. Full exhibition games have been played. Menus run at 60 frames a second; a played game averages about 35, lower in busy views. Raising this is the current priority. |
 | Version 1.21 (update applied), offline | Starts, reaches the main menu and draws an exhibition game. Not yet played through. |
 | Version 1.21 with the local server | Not working yet: the sign-in changes are written for the 1.00 executable only. |
 | Player models, crowd, lighting, uniforms | Correct, with one known exception: a team's custom-designed uniform does not draw, so a created team plays in a stock uniform. |
@@ -21,19 +21,19 @@ Last updated 2026-11-20. "Seen in the game" means a person played it in the emul
 | Play vs. CPU, with the result, XP and Stubs kept | Seen in the game |
 | Mini Seasons: schedule, games, standings, goals | Seen in the game. Playoff games are not built. |
 | Conquest, first tutorial map: capturing, reinforcing, attacking by simulation or by playing | Seen in the game |
-| Conquest: Steal Fans game, moving fans | Built |
+| Conquest: Steal Fans game, moving fans | Seen in the game |
 | Conquest: other maps | Not built |
-| Showdown, starter entry: free entry, draft, a moment, defeat | Seen in the game |
-| Showdown: winning a moment, upgrade picks, ten-round draft | Built |
+| Showdown, starter entry: free entry, ten-round draft, a moment, defeat | Seen in the game |
+| Showdown: winning a moment, upgrade picks, rallies that start with a runner on second | Built |
 | Showdown: moments that can be retried after a loss | Not built |
 | Pack shop: buying with Stubs, opening, the card reveal | Seen in the game |
 | XP reward path | Seen in the game |
-| Team Affinity: six division programs with repeatable club tasks | Built; the list screen does not open in the game yet (known issue) |
+| Team Affinity: six division programs with repeatable club tasks | The list and a division page open in the game; earning and rewards are built |
 | Other Programs | Not built |
 | Collections | Seen in the game (viewing) |
 | My Inventory: cards, stadiums, equipment, sponsorships, unlockables, perks | Seen in the game (viewing) |
-| Team Equipment: bats and socks | The screen opens in the game; card pictures and equipping are built |
-| Exchanges: trading spare player cards for packs | The lists open in the game; completing a trade is built |
+| Team Equipment: bats and socks | Seen in the game (pictures, equipping a bat); whether the bat shows on the field is unchecked |
+| Exchanges: trading spare player cards for packs | Seen in the game |
 | Community Market, buying Stubs | Deliberately disabled |
 | Custom team logo | Not working |
 | Playing against other people | Out of scope |

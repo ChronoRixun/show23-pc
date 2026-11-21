@@ -1,6 +1,6 @@
 # How the project is put together
 
-There are three parts. Two live in this repository; the emulator lives in its own.
+There are three parts in three repositories: the local server and its tools here, the emulator in its own, and the launcher in its own.
 
 ```text
  your game package(s)                     this repository                 show23-pc-emulator
@@ -15,11 +15,11 @@ There are three parts. Two live in this repository; the emulator lives in its ow
                                           └──────────────┘
 ```
 
-## Builder and launcher (`builder/`, planned)
+## Launcher and builder (separate repository, planned)
 
 Takes the player's own game package or unpacked folder, verifies it is the supported title and version, unpacks it into an install folder the player chooses, writes emulator settings, and from then on starts the emulator and the local server together and stops them together. It accepts the base game (version 1.00) and, optionally, the 1.21 update package.
 
-The install layout the builder creates is described in [builder/README.md](../builder/README.md). All game data, saves and per-player state live under the install's `data/` folder and never in a source tree.
+It also keeps the parts up to date through Stable and Beta channels and manages mods; see [launcher.md](launcher.md). The install layout the builder creates is described in [builder/README.md](../builder/README.md). All game data, saves and per-player state live under the install's `data/` folder and never in a source tree.
 
 ## Local server (`server/`)
 

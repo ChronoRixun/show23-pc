@@ -17,12 +17,12 @@ This repository contains **no game files**: no executables, art, audio, rosters,
 
 | Part | Where | Licence |
 |---|---|---|
-| Builder and launcher: takes your game package, checks it, sets up the install and starts everything | `builder/` (planned) | MIT |
+| Launcher and builder: takes your game package, checks it, sets up the install, keeps the parts up to date and starts everything | separate repository, `show23-pc-launcher` (planned; design in `docs/launcher.md` and `builder/`) | GPL-3.0 |
 | Local server: plays the part of the game's online service on `127.0.0.1` | `server/` | MIT |
 | Developer tools: read-only helpers for packages and rosters | `tools/` | MIT |
 | Emulator: shadPS4 with the changes this game needs | separate repository, `show23-pc-emulator` | GPL-2.0 (as upstream) |
 
-More detail is in [docs/architecture.md](docs/architecture.md).
+More detail is in [docs/architecture.md](docs/architecture.md). Updates, the Stable and Beta channels and mods are described in [docs/launcher.md](docs/launcher.md).
 
 ## What works in the card mode today
 
@@ -36,4 +36,4 @@ This is an unofficial fan project. It is not affiliated with, endorsed by or con
 
 You must own the game. Do not ask for, and do not post, game files, keys or accounts in this repository's issues or discussions. See [docs/publishing-rules.md](docs/publishing-rules.md) for what is never accepted into the source tree.
 
-The code in this repository is released under the [MIT licence](LICENSE). The emulator is a separate work under its own licence.
+The code in this repository is released under the [MIT licence](LICENSE). The emulator and the launcher are separate works under their own licences.

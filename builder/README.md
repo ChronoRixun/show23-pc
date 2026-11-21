@@ -2,6 +2,8 @@
 
 Nothing is implemented here yet. This file records the design so that the pieces written elsewhere fit it.
 
+The builder will be the first-run flow of the launcher, which lives in its own repository and is based on an existing launcher; see [`docs/launcher.md`](../docs/launcher.md) for that, for update channels and for mods. This page covers what the builder does with the player's game.
+
 ## What the player does
 
 1. Unzip the release, start the launcher, choose an install folder.
