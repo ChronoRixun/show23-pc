@@ -498,6 +498,7 @@ PATH_STEP = 2500                          # invented tickets per tier
 PATH_TOTAL = (PATH_LEVELS - 1) * PATH_STEP
 BONUS_STEP = 25000                        # shown by the game's Unlimited Bonus Rewards text
 STUBS_PER_GAME = 200                      # invented flat amount until win/loss is known
+STARTING_STUBS = 5000                     # a new install's opening balance, enough for a few packs
 PROGRAM_ID = 1                            # local reward path
 PROGRAM_NAME = 'Season 1 XP Reward Path'
 PROGRAM_DESCRIPTION = 'Earn XP by playing games.'
@@ -1381,6 +1382,14 @@ def choose_disc_starter(pool):
              'bench': [c['item_id'] for c in bench],
              'starters': [c['item_id'] for c in starters], 'relief': [c['item_id'] for c in relief]}
     return chosen, squad
+
+
+def grant_starting_stubs(state):
+    """Give a new player their opening Stubs once, with the starter squad."""
+    profile = state.setdefault('profile', {})
+    if not profile.get('starting_stubs_granted'):
+        profile['stubs'] = profile.get('stubs', 0) + STARTING_STUBS
+        profile['starting_stubs_granted'] = True
 
 
 def load_disc_cards():
@@ -7650,7 +7659,8 @@ def main():
         if 'log' not in opts:
             os.makedirs(LOGDIR, exist_ok=True)
             pattern = 'server-%Y%m%d-%H%M%S.log' if LAYOUT.install else 'olserver-%Y%m%d-%H%M%S.log'
-            opts['log'] = os.path.join(LOGDIR, time.strftime(pattern))
+            # An install names its logs in UTC, like the launcher's own logs beside them.
+            opts['log'] = os.path.join(LOGDIR, time.strftime(pattern, time.gmtime() if LAYOUT.install else time.localtime()))
         elif LAYOUT.install and not os.path.isabs(opts['log']):
             opts['log'] = os.path.join(LOGDIR, opts['log'])
             os.makedirs(os.path.dirname(os.path.abspath(opts['log'])), exist_ok=True)
@@ -7665,6 +7675,7 @@ def main():
                     state['disc_starter'], squad = choose_disc_starter(all_cards())
                     if not state.get('squad'):
                         state['squad'] = squad
+                    grant_starting_stubs(state)
                     save_state(state)
                 elif not os.path.exists(STATE_FILE):
                     save_state(state)
