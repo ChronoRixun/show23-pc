@@ -17,10 +17,12 @@ Run these commands from the packaged server folder. Use `python3` on Linux and t
 ```text
 python olserver.py setup --install <install> --base <unpacked 1.00 folder> [--update <unpacked 1.21 folder>]
 python olserver.py import-cards --install <install> --pictures
-python olserver.py play --install <install> --emulator <path to shadPS4> [--fullscreen] [--no-update-art]
+python olserver.py play --install <install> --emulator <path to shadPS4> [--fullscreen] [--no-update-art] [--resolution 720|1080] [--name <player name>]
 ```
 
 Importing cards is optional. Setup verifies the executables and writes a launcher-compatible install record. Play starts the server, then the emulator, and shuts down the session on emulator exit or Ctrl+C. Saves and logs stay in the install. Linux users supply a build from the emulator repository's `release` branch.
+
+Play defaults to 1080p. `--resolution 720` or `--resolution 1080` sets both internal and window dimensions. `--name "Player One"` updates the primary local player's name. Omit it to preserve the current name.
 
 ## Running it for an install
 

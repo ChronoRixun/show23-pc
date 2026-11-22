@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import signal
 import socket
 import stat
@@ -23,6 +24,7 @@ EXECUTABLES = {
     '1.21': (39247689, 'ceb28e9b8e96e582214e785682f2d4f27dea0746edb4b4c6a36df62dc2bd9bec'),
 }
 DIRECTORIES = ('PS4', 'CROSS', 'FLUX', 'FRONTEND')
+RESOLUTION_WIDTH = {720: 1280, 1080: 1920}
 
 
 def directory_bytes(directory):
@@ -77,6 +79,84 @@ def write_metadata(path, content):
         os.replace(temporary, path)
     finally:
         Path(temporary).unlink(missing_ok=True)
+
+
+def read_profile_json(path):
+    def unique_object(pairs):
+        result = dict(pairs)
+        if len(result) != len(pairs):
+            raise ValueError('duplicate keys')
+        return result
+
+    def invalid_constant(value):
+        raise ValueError(f'invalid JSON constant: {value}')
+
+    try:
+        return json.loads(path.read_text(encoding='utf-8-sig'), object_pairs_hook=unique_object,
+                          parse_constant=invalid_constant)
+    except FileNotFoundError:
+        return {}
+    except (ValueError, RecursionError):
+        raise ValueError(f'{path.name} is corrupt. Repair it before playing.') from None
+
+
+def new_users(name):
+    return {'Users': {'commit_hash': '', 'user': [
+        {
+            'np_age': 30, 'np_country': 'us', 'np_date_of_birth': '1994-01-01',
+            'np_language': 'en', 'player_index': slot, 'shadnet_email': '',
+            'shadnet_enabled': False, 'shadnet_npid': '', 'shadnet_password': '',
+            'shadnet_token': '', 'user_color': slot, 'user_id': 999 + slot,
+            'user_name': name if slot == 1 else f'Player {slot}',
+        }
+        for slot in range(1, 5)
+    ]}}
+
+
+def update_user_name(path, name):
+    name = name.strip(' ')
+    if not re.fullmatch(r'[A-Za-z0-9 _-]{3,16}', name):
+        raise ValueError('Player name must be 3–16 letters, digits, spaces, hyphens or underscores.')
+    if not path.exists():
+        return new_users(name)
+    data = read_profile_json(path)
+    group = data.get('Users') if isinstance(data, dict) else None
+    users = group.get('user') if isinstance(group, dict) else None
+    error = 'users.json has an invalid player profile. Repair it before playing.'
+    if not isinstance(users, list) or any(not isinstance(row, dict) or type(row.get('user_id')) is not int
+                                          for row in users):
+        raise ValueError(error)
+    primary = [row for row in users if row['user_id'] == 1000]
+    if len(primary) != 1:
+        raise ValueError(error)
+    row, = primary
+    if type(row.get('player_index')) is not int or row['player_index'] != 1 or not isinstance(row.get('user_name'), str):
+        raise ValueError(error)
+    if row['user_name'] == name:
+        return None
+    row['user_name'] = name
+    return data
+
+
+def write_play_settings(user, resolution, name):
+    config_path = user / 'config.json'
+    config = read_profile_json(config_path)
+    groups = ('General', 'Network', 'Log', 'Debug', 'Input', 'Audio', 'GPU', 'Vulkan')
+    if not isinstance(config, dict) or any(key in config and not isinstance(config[key], dict) for key in groups):
+        raise ValueError('config.json is corrupt. Repair it before playing.')
+    width = RESOLUTION_WIDTH[resolution]
+    config.setdefault('GPU', {}).update(internal_screen_width=width, internal_screen_height=resolution,
+                                       window_width=width, window_height=resolution)
+    user_path = user / 'users.json'
+    users = update_user_name(user_path, name) if name is not None else None
+    # Validate both files before replacing either.
+    updates = [(config_path, config)]
+    if users is not None:
+        updates.append((user_path, users))
+    encoded = [(path, (json.dumps(value, ensure_ascii=False, indent=2, allow_nan=False) + '\n').encode('utf-8'))
+               for path, value in updates]
+    for path, content in encoded:
+        write_metadata(path, content)
 
 
 def setup_install(install, base, update):
@@ -187,7 +267,7 @@ def wait_for_server(child, log, prefix, timeout=60):
     raise ValueError(f'The server did not start within {timeout} seconds. See {log}.')
 
 
-def play_install(layout, script, emulator, fullscreen, no_update_art, ports):
+def play_install(layout, script, emulator, fullscreen, no_update_art, ports, resolution=1080, name=None):
     emulator = emulator.resolve()
     boot = Path(layout.base) / 'eboot.bin'
     if not emulator.is_file():
@@ -195,10 +275,12 @@ def play_install(layout, script, emulator, fullscreen, no_update_art, ports):
     if not boot.is_file():
         raise ValueError(f'The base game is missing eboot.bin: {boot.parent}')
     require_free_ports(ports)
+    profile = Path(layout.work).parent
+    user = profile / 'user'
+    user.mkdir(parents=True, exist_ok=True)
+    write_play_settings(user, resolution, name)
     logs = Path(layout.logs)
     logs.mkdir(parents=True, exist_ok=True)
-    profile = Path(layout.work).parent
-    (profile / 'user').mkdir(parents=True, exist_ok=True)
     ca = Path(layout.work) / 'ca.pem'
     suffix = datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%d-%H%M%S') + '-' + uuid4().hex[:8]
     server_log = logs / f'server-console-{suffix}.log'
@@ -235,12 +317,14 @@ def play_cli(layout, script, args, ports):
     parser.add_argument('--emulator', type=Path, required=True)
     parser.add_argument('--fullscreen', action='store_true')
     parser.add_argument('--no-update-art', action='store_true')
+    parser.add_argument('--resolution', type=int, choices=RESOLUTION_WIDTH, default=1080)
+    parser.add_argument('--name', help='player name for the primary local profile')
     options = parser.parse_args(args)
     if layout.install is None:
         parser.error('give an install folder with --install')
     try:
         return play_install(layout, Path(script).resolve(), options.emulator, options.fullscreen,
-                            options.no_update_art, ports)
+                            options.no_update_art, ports, resolution=options.resolution, name=options.name)
     except KeyboardInterrupt:
         return 130
     except (OSError, ValueError) as error:
