@@ -4,7 +4,7 @@ MLB The Show 23 on PC, with a local stand-in for the online card mode.
 
 This project runs your own copy of the PlayStation 4 game *MLB The Show 23* (`CUSA35521`) on a Windows PC through a game-specific build of the [shadPS4](https://github.com/shadps4-emu/shadPS4) emulator. It also includes a small server that runs on your own machine and answers the game where the publisher's servers used to, so that Diamond Dynasty and its single-player modes keep working now those servers are gone.
 
-**Status: 0.1.0, the first release.** Players: download the release from the [launcher repository](https://github.com/ChronoRixun/show23-pc-launcher/releases) and follow its [README](https://github.com/ChronoRixun/show23-pc-launcher#for-players). This repository holds the server, the developer tools and the design notes. See [docs/status.md](docs/status.md) for what has been seen working in the game and [docs/roadmap.md](docs/roadmap.md) for what comes next.
+**Status: 0.1.1.** Players: download the release from the [launcher repository](https://github.com/ChronoRixun/show23-pc-launcher/releases) and follow its [README](https://github.com/ChronoRixun/show23-pc-launcher#for-players). This repository holds the server, the developer tools and the design notes. See [docs/status.md](docs/status.md) for what has been seen working in the game and [docs/roadmap.md](docs/roadmap.md) for what comes next.
 
 ## What you will need
 
