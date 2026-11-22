@@ -1805,7 +1805,7 @@ def filter_inventory(params, squad=None):
     eligible = 'false' if squad is None else '0'
     items = ''.join('<arena_card %s/>' % card_attrs(c, position=code_of(c), new_position=max(pos, 0), type_id=0, out_of_season=eligible,
                                                     order=page * per_page + i + 1, display_order=page * per_page + i + 1,
-                                                    **compare_attrs(c, pos), **squad_card_text(c, pos))
+                                                    **compare_attrs(c, pos), **squad_card_text(c, pos), **captain_flags(c))
                     for i, c in enumerate(chosen))
     return ('<response><arena_cards count="%d" total="%d">%s</arena_cards><page_stats cur_page="%d" max_page="%d" total="%d" per_page="%d"/></response>'
             % (len(chosen), len(pool), items, page + 1, pages, len(pool), per_page))
@@ -1913,10 +1913,11 @@ def squad_stats(hitters, pitchers):
 
 
 def view_lineup(params):
-    return lineup_reply(current_squad(), load_state().get('arena_team', {}))
+    squad = current_squad()
+    return lineup_reply(squad, load_state().get('arena_team', {}), captains=captain_report(squad))
 
 
-def lineup_reply(squad, team, *, mini=False):
+def lineup_reply(squad, team, *, mini=False, captains=None):
     lineup, dh, bench, starters, relief = squad
     if not lineup:
         return None
@@ -1927,20 +1928,268 @@ def lineup_reply(squad, team, *, mini=False):
                                       new_position=c.get('lineup_pos', 0),
                                       order=i + 1, display_order=i + 1, group=group,
                                       **compare_attrs(c, c.get('lineup_pos', FIELD_NUMBER.get(c['display_position'], 0))),
-                                      **squad_card_text(c, c.get('lineup_pos', 0)))
+                                      **squad_card_text(c, c.get('lineup_pos', 0)), **captain_flags(c, captains))
         for i, c in enumerate(cs))
     everyone = lineup + dh + bench + starters + relief
+    picked = captain_ids(captains)
     ovr = sum(c['ovr'] for c in everyone) // max(1, len(everyone))
     # curr_season_eligible picks the gold "Eligible" label instead of the red "Season ^d0^ Ineligible"; both print
     # season.short_name (run 90 showed "Season 925261104" without it). Study: proposals\home-screen.md section 5.
-    inner = ('<arena_lineups name="%s" is_dd="1" is_season_squad="0" has_ineligible_set="0" has_dh="1" capt_pos="0" capt_pit="0" curr_season_eligible="1">'
+    inner = ('<arena_lineups name="%s" is_dd="1" is_season_squad="0" has_ineligible_set="0" has_dh="1" capt_pos="%d" capt_pit="%d" curr_season_eligible="1">'
              '<season name="Season 1" short_name="1"/><stats ovr="%d" %s/><lineup>%s</lineup><bench>%s</bench><starters>%s</starters><relief>%s</relief>'
              '</arena_lineups>' % (escape_mini_attr(team.get('name', 'Squad 1')) if mini else team.get('name', 'Squad 1'),
-                                   ovr, squad_stats(lineup + dh, starters + relief), rows(order, 'lineup'), rows(bench, 'bench'),
+                                   picked['position'], picked['pitcher'], ovr, squad_stats(lineup + dh, starters + relief), rows(order, 'lineup'), rows(bench, 'bench'),
                                    rows(starters, 'starters'), rows(relief, 'relief')))
     if mini:
         inner = inner.replace(' curr_season_eligible="1">', ' curr_season_eligible="1" ovr_limit="99">', 1)
     return '<response>%s</response>' % inner
+
+
+# ---------------------------------------------------------------- Captains
+# Study: reports\online\proposals\captains.md. The client side is all requests and UI script:
+#   arena_captains.info {is_pitcher, squad_type}   (0xe96c20)  -> CAPTINFO.CAPTAINS.CAPTAIN[i] (Manage Squad, Captains tab)
+#   arena_captains.info2 {captain_id}              (0xb23f90)  -> CAPT, the Captain tab of the card view
+#   arena_squad.assign_captain {squad_type, item_mlb_player_id = CAPTCARD.id or REPLACEMENT.id}  (0xe96fd0)
+#   arena_squad.view_lineup arena_lineups@capt_pos / @capt_pit and arena_team.view arena_team@capt_pos / @capt_pit
+#   (0x9d3fa0 parses both per side into the online logic object).
+# The site catalogue has no captain rules, so the theme, tiers and boosts below are LOCAL CHOICES: a captain
+# boosts the players of his own division, hitting captains the nine hitters of the lineup, pitching captains
+# the thirteen pitchers of the staff; more qualifying players reach a higher tier. Boosts are applied by the
+# server to the ratings the game plays with (arena_team.view player_attributes).
+CAPTAIN_SERIES = 'Captain'
+CAPTAIN_LISTS = True        # False: arena_captains.info / info2 answer empty again (the old replies), e.g. if the tab crashes
+CAPTAIN_TIERS = {'position': (3, 5, 7), 'pitcher': (4, 7, 10)}     # qualifying players for tiers 1, 2, 3
+CAPTAIN_BOOST = (3, 6, 10)                                          # rating points per tier
+CAPTAIN_ATTRS = {'position': (('contact_left', 'Contact L'), ('contact_right', 'Contact R'),
+                              ('power_left', 'Power L'), ('power_right', 'Power R')),
+                 'pitcher': (('hits_per_bf', 'H/9'), ('k_per_bf', 'K/9'), ('bb_per_bf', 'BB/9'),
+                             ('pitching_clutch', 'Clutch'))}
+CAPTAIN_RATING_CAP = 125
+# disc_pitch[6:12] holds stamina, clutch, H/9, HR/9, K/9, BB/9 (same order as the non-disc pitcher block)
+CAPTAIN_DISC_PITCH = {'pitching_clutch': 7, 'hits_per_bf': 8, 'hr_per_bf': 9, 'k_per_bf': 10, 'bb_per_bf': 11}
+CAPTAIN_DIVISIONS = {'AL East': ('BAL', 'BOS', 'NYY', 'TB', 'TOR'), 'AL Central': ('CHW', 'CWS', 'CLE', 'DET', 'KC', 'MIN'),
+                     'AL West': ('HOU', 'LAA', 'OAK', 'SEA', 'TEX'), 'NL East': ('ATL', 'MIA', 'NYM', 'PHI', 'WAS', 'WSH'),
+                     'NL Central': ('CHC', 'CIN', 'MIL', 'PIT', 'STL'), 'NL West': ('ARI', 'AZ', 'COL', 'LAD', 'SD', 'SF')}
+CAPTAIN_DIVISION_OF = {team: name for name, teams in CAPTAIN_DIVISIONS.items() for team in teams}
+
+
+def is_captain_card(c):
+    return bool(c) and c.get('series') == CAPTAIN_SERIES
+
+
+def captain_kind(c):
+    return 'position' if c.get('is_hitter') else 'pitcher'
+
+
+def captain_theme(c):
+    return CAPTAIN_DIVISION_OF.get(c.get('team_short_name') or '')
+
+
+def captain_description(c):
+    kind, theme = captain_kind(c), captain_theme(c) or 'his division'
+    group = 'hitters in your lineup' if kind == 'position' else 'pitchers on your staff'
+    attrs = ', '.join(label for _, label in CAPTAIN_ATTRS[kind])
+    tiers = '; '.join(f'Tier {i + 1}: {need} {theme} players, +{CAPTAIN_BOOST[i]}'
+                      for i, need in enumerate(CAPTAIN_TIERS[kind]))
+    return f'{"Hitting" if kind == "position" else "Pitching"} Captain. Boosts {attrs} of {theme} {group}. {tiers}.'
+
+
+def captain_assignments(state=None):
+    """{'position': card or None, 'pitcher': card or None} for the main squad; stale picks drop out."""
+    state = load_state() if state is None else state
+    saved = state.get('captains') if isinstance(state.get('captains'), dict) else {}
+    owned = {c['item_id']: c for c in cards(state) if c['quantity'] > 0}
+    picks = {}
+    for kind in ('position', 'pitcher'):
+        c = owned.get(saved.get(kind))
+        picks[kind] = c if is_captain_card(c) and captain_kind(c) == kind else None
+    return picks
+
+
+def captain_side(squad, kind):
+    lineup, dh, bench, starters, relief = squad
+    return lineup + dh if kind == 'position' else starters + relief
+
+
+def captain_status(c, squad):
+    """How far captain c gets with this squad: qualifying ids, count, tier and whether he is in the squad."""
+    kind, theme = captain_kind(c), captain_theme(c)
+    side = captain_side(squad, kind)
+    in_squad = any(m['item_id'] == c['item_id'] for group in squad for m in group)
+    qualifying = [m['item_id'] for m in side if theme and captain_theme(m) == theme]
+    count = len(qualifying) + (0 if c['item_id'] in qualifying else 1)     # the captain counts once
+    tier = sum(count >= need for need in CAPTAIN_TIERS[kind])
+    return {'kind': kind, 'theme': theme, 'qualifying': qualifying, 'count': count, 'tier': tier,
+            'in_squad': in_squad, 'boost': CAPTAIN_BOOST[tier - 1] if tier else 0}
+
+
+def captain_report(squad=None, state=None):
+    """Active captains of the main squad: {kind: (card, status)}; a captain outside the squad gives no boost."""
+    state = load_state() if state is None else state
+    squad = current_squad(state.get('squad') or None) if squad is None else squad
+    report = {}
+    for kind, c in captain_assignments(state).items():
+        if c is not None:
+            report[kind] = (c, captain_status(c, squad))
+    return report
+
+
+def captain_boosts(report):
+    """{item_id: {rating: points}} for the players an active captain boosts."""
+    boosts = {}
+    for kind, (c, status) in (report or {}).items():
+        if status['in_squad'] and status['tier']:
+            for item_id in status['qualifying']:
+                for key, _ in CAPTAIN_ATTRS[kind]:
+                    boosts.setdefault(item_id, {})[key] = boosts.get(item_id, {}).get(key, 0) + status['boost']
+    return boosts
+
+
+def boosted_card(c, boost):
+    """A copy of card c with captain points added to the ratings the game plays with."""
+    if not boost:
+        return c
+    c = dict(c)
+    native = list(c['disc_pitch']) if c.get('disc_pitch') is not None else None
+    for key, points in boost.items():
+        c[key] = min(CAPTAIN_RATING_CAP, int(c.get(key) or 0) + points)
+        if native is not None and key in CAPTAIN_DISC_PITCH and len(native) > CAPTAIN_DISC_PITCH[key]:
+            index = CAPTAIN_DISC_PITCH[key]
+            native[index] = min(CAPTAIN_RATING_CAP, int(native[index] or 0) + points)
+    if native is not None:
+        c['disc_pitch'] = native
+    return c
+
+
+def captain_flags(c, report=None):
+    """Card attributes for captain state. Empty for a card that is neither a captain nor boosted, so those rows
+    stay exactly as before. captain = the card is a Captain card; captained = an active captain boosts it."""
+    flags = {}
+    if is_captain_card(c):
+        flags.update(captain=1, cpt_name=f'{captain_theme(c) or "Captain"}', cpt_texture='')
+    if c['item_id'] in captain_boosts(report):
+        flags['captained'] = 1
+    return flags
+
+
+def captain_ids(report):
+    pick = lambda kind: (report or {}).get(kind, (None,))[0]
+    return {kind: pick(kind)['item_id'] if pick(kind) else 0 for kind in ('position', 'pitcher')}
+
+
+def captain_tiers_xml(kind, status):
+    tiers = ''.join(
+        '<attr_boosts tier="%d" required="%d" boost="%d" is_active="%d">%s</attr_boosts>'
+        % (i + 1, need, CAPTAIN_BOOST[i], int(status['tier'] == i + 1),
+           ''.join('<attr_boost name="%s" value="%d"/>' % (label, CAPTAIN_BOOST[i]) for _, label in CAPTAIN_ATTRS[kind]))
+        for i, need in enumerate(CAPTAIN_TIERS[kind]))
+    current = ''.join('<attr_boost name="%s" value="%d"/>' % (label, status['boost'] if status['tier'] else -1)
+                      for _, label in CAPTAIN_ATTRS[kind])
+    return '<boost_tiers>%s</boost_tiers><boosts>%s</boosts>' % (tiers, current)
+
+
+def captain_row(tag, c, status, active):
+    esc = lambda v: str(v).replace('&', '&amp;').replace('"', '&quot;').replace('<', '&lt;')
+    kind = status['kind']
+    pos = FIELD_NUMBER.get(c['display_position'], 0)
+    attrs = card_attrs(c, type_id=0, position=pos, new_position=pos, is_live_set=0, captain=1, captained=0,
+                       cpt_name=status['theme'] or 'Captain', cpt_texture='', is_active=int(active),
+                       cur_boost=status['tier'], in_squad=int(status['in_squad']), is_pitcher=int(kind == 'pitcher'),
+                       qualifying=status['count'], required=CAPTAIN_TIERS[kind][min(status['tier'], 2)],
+                       boost=status['boost'], captain_type='Hitting' if kind == 'position' else 'Pitching',
+                       has_rank_change=0, has_matchup=0, has_augment=0, seq_level=0,
+                       **compare_attrs(c, pos), **squad_card_text(c, pos))
+    return '<%s %s desc="%s">%s</%s>' % (tag, attrs, esc(captain_description(c)), captain_tiers_xml(kind, status), tag)
+
+
+def captains_info(params):
+    """arena_captains.info: the owned Captain cards of one kind for the Captains tab of Manage Squad."""
+    q = params_of(params)
+    if not isinstance(q, dict) or str(q.get('squad_type', 0)) != '0':
+        return None
+    kind = 'pitcher' if str(q.get('is_pitcher', 0)) == '1' else 'position'
+    state = load_state()
+    squad = current_squad(state.get('squad') or None)
+    picked = captain_ids(captain_report(squad, state))[kind]
+    seen, rows = set(), []
+    for c in cards(state):
+        if c['quantity'] > 0 and is_captain_card(c) and captain_kind(c) == kind and c['item_id'] not in seen:
+            seen.add(c['item_id'])
+            rows.append(captain_row('captain', c, captain_status(c, squad), c['item_id'] == picked))
+    return '<response><captains>%s</captains></response>' % ''.join(rows) if rows else None
+
+
+def captains_info2(params):
+    """arena_captains.info2 {captain_id}: the Captain tab of the card view; nothing for other cards (as before)."""
+    q = params_of(params)
+    try:
+        c = card_by_id(int(q.get('captain_id', -1)))
+    except (AttributeError, TypeError, ValueError):
+        c = None
+    if not is_captain_card(c):
+        return None
+    state = load_state()
+    squad = current_squad(state.get('squad') or None)
+    picked = captain_ids(captain_report(squad, state))[captain_kind(c)]
+    return '<response>%s</response>' % captain_row('captain', c, captain_status(c, squad), c['item_id'] == picked)
+
+
+def assign_captain(params):
+    """arena_squad.assign_captain {squad_type, item_mlb_player_id}: assigns the card as captain of its kind;
+    sending the current captain again unassigns him (the menu offers Assign / Unassign on the same card)."""
+    q = params_of(params)
+    if not isinstance(q, dict) or str(q.get('squad_type', 0)) != '0':
+        return envelope(status=1, message='Captains can be set for the main squad only.'), 'refused'
+    try:
+        item_id = int(q.get('item_mlb_player_id', -1))
+    except (TypeError, ValueError):
+        item_id = -1
+    state = load_state()
+    picks = captain_assignments(state)
+    saved = {kind: c['item_id'] if c else 0 for kind, c in picks.items()}
+    if item_id <= 0:
+        saved = {'position': 0, 'pitcher': 0}
+    else:
+        c = next((x for x in cards(state) if x['item_id'] == item_id and x['quantity'] > 0), None)
+        if not is_captain_card(c):
+            return envelope(status=1, message='That card is not one of your Captains.'), 'refused'
+        kind = captain_kind(c)
+        saved[kind] = 0 if saved[kind] == item_id else item_id
+    state['captains'] = saved
+    save_state(state)
+    return envelope(view_lineup(params) or '<response/>'), 'made'
+
+
+def captain_reply(name, params):
+    if name.startswith('arena_captains.') and not CAPTAIN_LISTS:
+        return None
+    if name == 'arena_captains.info':
+        inner = captains_info(params)
+    elif name == 'arena_captains.info2':
+        inner = captains_info2(params)
+    elif name == 'arena_squad.assign_captain':
+        return assign_captain(params)
+    else:
+        return None
+    return (envelope(inner), 'made') if inner else None
+
+
+def loading_captains(report):
+    """captains_home / captains_away content for one side (the Captain_Boost_Panel of the loading screen)."""
+    attrs, children = {}, []
+    for kind, role in (('pitcher', 'pitcher'), ('position', 'position')):
+        c, status = (report or {}).get(kind, (None, None))
+        active = c is not None and status['in_squad']
+        attrs['has_' + role] = int(active)
+        if active:
+            name = c['name'].strip().replace('&', '&amp;').replace('"', '&quot;').replace('<', '&lt;')
+            values = ''.join('<attr_boost name="%s" value="%d"/>' % (label, status['boost'] if status['tier'] else -1)
+                             for _, label in CAPTAIN_ATTRS[kind])
+            children.append(f'<{role} name="{name}" boost="{status["tier"]}"><boosts>{values}</boosts></{role}>')
+        else:
+            children.append(f'<{role} name="" boost="0"><boosts>' + '<attr_boost name="" value="-1"/>' * 4
+                            + f'</boosts></{role}>')
+    return attrs, ''.join(children)
 
 
 # ---------------------------------------------------------------- Showdown
@@ -3942,7 +4191,7 @@ def player_collection(query, *, search=False):
         start = page * COLLECTION_PAGE_SIZE
         owned = owned[start:start + COLLECTION_PAGE_SIZE]
     items = ''.join('<item %s/>' % card_attrs(c, type_id=0, order=i + 1, seq_level=0,
-                                             is_live_set=0, captain=0, captained=0)
+                                             is_live_set=0, **{'captain': 0, 'captained': 0, **captain_flags(c)})
                     for i, c in enumerate(owned))
     body = '<items count="%d" total="%d" page="%d" pages="%d" items_collected="%d" items_total="%d">%s</items>' % (
         len(owned), collected, page + 1, pages, collected, catalogue_count, items)
@@ -4203,7 +4452,8 @@ def _cpu_team(index, short, city, name):
 
 def view_team(params):
     # our own team: arena_team.view {"player_id":<account>,"squad_type":0}
-    return team_reply(current_squad(), load_state().get('arena_team'))
+    squad = current_squad()
+    return team_reply(squad, load_state().get('arena_team'), captains=captain_report(squad))
 
 
 def view_by_team(params):
@@ -4285,8 +4535,10 @@ def home_panels(params):
     affinity = affinity_home_panel(load_state())
     if any(i not in slots for i in range(10)):
         return '<response>%s%s</response>' % (season, affinity)
-    rows = ''.join('<position %s/>' % card_attrs(slots[i], position=i, new_position=i, captain=0, captained=0, is_oop=0,
-                                                 is_2nd=0, has_rank_change=0, has_matchup=0, has_augment=0)
+    report = captain_report()
+    rows = ''.join('<position %s/>' % card_attrs(slots[i], position=i, new_position=i,
+                                                 **{'captain': 0, 'captained': 0, **captain_flags(slots[i], report)},
+                                                 is_oop=0, is_2nd=0, has_rank_change=0, has_matchup=0, has_augment=0)
                    for i in range(10))
     return '<response><roster>%s</roster>%s%s</response>' % (rows, season, affinity)
 
@@ -4595,8 +4847,10 @@ def worn_uniform(value, side):
     return cpu_team(FALLBACK_UNIFORM_CLUB)['%s_uniform_id' % side]
 
 
-def team_reply(squad, team):
+def team_reply(squad, team, captains=None):
     lineup, dh, bench, starters, relief = squad
+    boosts = captain_boosts(captains)
+    picked = captain_ids(captains)
     if not lineup or not team:
         return None
     if any('lineup_ord' in c for c in lineup + dh):       # a saved squad: its own batting order and positions
@@ -4611,7 +4865,7 @@ def team_reply(squad, team):
         slots.setdefault('pitching_role', 0)
         slots.setdefault('pitching_position', 0)
         slots.setdefault('role', {'SP': 0, 'RP': 1, 'CP': 2}.get(c['display_position'], 7))   # 0 starter, 1 reliever, 2 closer, 7 position player (seen in the game's own team records)
-        ratings = player_ratings(c)
+        ratings = player_ratings(boosted_card(c, boosts.get(c['item_id'])))
         # is_active is compared with the word "true" (0x9d3fa0); "1" made the builder skip every player
         # player_stats follows stat_names (reader 0x9aebf0). The one name that matters to play is
         # ENERGY: it goes into the player's record (+0xc0); without it every pitcher starts at 0
@@ -4645,13 +4899,14 @@ def team_reply(squad, team):
     team_id = team.get('id', DD_TEAM_ID)
     return ('<response><arena_team id="%d" name="%s" location="%s" abbreviation="%s" mini_cpu="%d" tier="" trophy_data="" is_logo_approved="true" '
             'draft_state="0" has_dh="1" wins="%d" losses="%d" rating="0" rating_coop="0" logo_version="0" br_wins="0" br_losses="0" '
-            'capt_pit="0" capt_pos="0" onramp_step="0" home_uniform_team_id="%d" away_uniform_team_id="%d" %s/>'
+            'capt_pit="%d" capt_pos="%d" onramp_step="0" home_uniform_team_id="%d" away_uniform_team_id="%d" %s/>'
             # arena_players is a SIBLING of arena_team (0x9d3fa0 looks both up under <response>);
             # nested inside the team it was ignored and the game's roster stayed empty.
             '<arena_players total="%d" appearance_names="%s" attribute_names="%s" stat_names="ENERGY">%s</arena_players>'
             '</response>'
             % (team_id, esc(team.get('name', 'Squad')), esc(team.get('location', '')), esc(team.get('abbreviation', '')),
                team.get('mini_cpu', 0), team.get('mini_wins', 0), team.get('mini_losses', 0),
+               picked['pitcher'], picked['position'],
                # WHICH UNIFORM A TEAM WEARS: home_uniform_team_id / away_uniform_team_id (own team: logic+0x780 / +0x778,
                # the same fields arena_team.update_uniform_id sends as home_uniform_id / away_uniform_id). A value
                # whose low 16 bits are 10000 or more goes to the CUSTOM loader (0x199723a -> 0x19d56e0), which has never worked;
@@ -4676,15 +4931,17 @@ def loading_screen(params):
         return None
 
     squads = {DD_TEAM_ID: current_squad(), club: cpu_squad(club)}
-    body = loading_cards(*(squads[team_id] for team_id in team_ids))
+    report = captain_report(squads[DD_TEAM_ID])
+    body = loading_cards(*(squads[team_id] for team_id in team_ids),
+                         captains=tuple(report if team_id == DD_TEAM_ID else None for team_id in team_ids))
     if body is not None:
         _affinity_lineup = (team_ids, affinity_squad_clubs(squads[DD_TEAM_ID]))
     return body
 
 
-def loading_cards(home, away):
+def loading_cards(home, away, captains=(None, None)):
     rows = []
-    for roster in (home, away):
+    for roster, report in zip((home, away), captains):
         squad = [card for group in roster for card in group]
         # VERIFIED 0x9c7ef0: the lookup uses rows 0–25 for home and the rest for away.
         if len(squad) != 26:
@@ -4694,13 +4951,14 @@ def loading_cards(home, away):
                 card, bat_hand=HAND.get(card.get('bat_hand'), 0),
                 throw_hand=HAND.get(card.get('throw_hand'), 0),
                 is_live_set=int(card.get('series') == 'Live'),
-                captain=0, captained=0, set_name=card.get('set_name') or ''))
+                **{'captain': 0, 'captained': 0, **captain_flags(card, report)}, set_name=card.get('set_name') or ''))
 
-    boosts = '<boosts>' + '<attr_boost name="" value="-1"/>' * 4 + '</boosts>'
-    captain_slots = ''.join(f'<{role} name="" boost="0">{boosts}</{role}>'
-                            for role in ('pitcher', 'position'))
-    captains = ''.join(f'<captains_{side} has_pitcher="0" has_position="0">'
-                       f'{captain_slots}</captains_{side}>' for side in ('home', 'away'))
+    sides = []
+    for side, report in zip(('home', 'away'), captains):
+        attrs, captain_slots = loading_captains(report)
+        sides.append(f'<captains_{side} has_pitcher="{attrs["has_pitcher"]}" has_position="{attrs["has_position"]}">'
+                     f'{captain_slots}</captains_{side}>')
+    captains = ''.join(sides)
     # VERIFIED 0xb602f0: the callback stashes this response as arena_ls_stash.
     return (f'<response><tourncheck home="0" away="0"/><cards>{"".join(rows)}</cards>'
             f'{captains}</response>')
@@ -5841,7 +6099,8 @@ SHOP_PACKS = {
     510026: ShopPack('Future Stars Pack', 'PACK_SCOUTINGREPORT', 'base', 450, (PackDraw(2, ('Future Stars',)),)),
     510027: ShopPack('Monthly Awards Pack', 'PACK_SCOUTINGREPORT_SEPTEMBER', 'update', 450, (PackDraw(2, ('Monthly Awards',)),)),
     510028: ShopPack('Postseason Pack', 'PACK_PENNANTCHASE', 'update', 450, (PackDraw(2, ('Postseason', '2023 Postseason')),)),
-    510029: ShopPack('Captain Pack', 'PACK_THESHOW', 'base', 450, (PackDraw(2, ('Captain',)),)),
+    510029: ShopPack('Captain Pack', 'PACK_THESHOW', 'base', 250, (PackDraw(1, ('Captain',)),),
+                     description='One random Diamond Captain. Assign him in My Squad, Captains, to boost players of his division.'),
     510030: ShopPack('Kaiju Pack', 'PACK_THESHOW_KAIJUTAKEOVER', 'update', 450, (PackDraw(2, ('Kaiju',)),)),
     510031: ShopPack('Home Run Derby Pack', 'PACK_BALLINCONTROL', 'base', 450, (PackDraw(2, ('Home Run Derby', '2023 Home Run Derby')),)),
     510040: ShopPack('Diamond Duos Pack', 'PACK_DIAMONDDUOS_01', 'update', 1200, (PackDraw(2, rarity='Diamond'),)),
@@ -6213,7 +6472,7 @@ def shop_revealed_card(card, quantity, *, is_new):
         league_logo='', series_texture_name=special.get('series_texture_name') or '',
         has_augment=0, has_matchup=0, has_rank_change=0,
         sequence=0, seq_level=0, stars=0, new_rank=card['ovr'], in_squad=0,
-        captain=0, captained=0, is_live_set=0, set_name=special.get('set_name') or '',
+        **{'captain': 0, 'captained': 0, **captain_flags(card)}, is_live_set=0, set_name=special.get('set_name') or '',
         **compare_attrs(card, pos), **squad_card_text(card, pos),
     )
 
@@ -7397,6 +7656,9 @@ def reply_body(name, mode, params='', game_data=None):
         if inner is not None:
             return envelope(inner), 'made'
         return envelope(status=1, message='The local loading screen requires two complete Play vs. CPU squads.'), 'refused'
+    captain = captain_reply(name, params)
+    if captain is not None:
+        return captain
     if name in EMPTY_MARKET_REPLIES:
         return envelope(EMPTY_MARKET_REPLIES[name]), 'made'
     exchange = exchange_reply(name, params)

@@ -4,6 +4,7 @@ import datetime
 import hashlib
 import io
 import json
+import os
 import re
 import sys
 import time
@@ -95,50 +96,136 @@ def bio_fields(card, places):
                 weight=number(card.get('weight')))
 
 
-def roster_identities(decoder, stats, base, update, teams, live):
+def roster_identity(decoder, name, blocks, teams, edition):
+    record = blocks['record']
+
+    def get(key):
+        return decoder.bits(record, decoder.BITS[key])
+    first = decoder.string(record[112:128])
+    last = decoder.string(record[128:144])
+    team_id = get('team')
+    position = get('position')
+    return dict(
+        pid=decoder.uint(record, 186, 2), online=decoder.uint(record, 180, 4), blocks=blocks, name=name,
+        names={name_key(name), name_key(last + first)}, edition=edition,
+        asset=decoder.picture_stem(first, last),
+        team=teams[team_id] if team_id < len(teams) else None,
+        jersey={get('jersey_number'), get('original_jersey_number')} - {127},
+        age=get('age'), birth=get('birthplace'), height=get('height_inches'),
+        weight=get('weight_minus_100') + 100, legend=bool(get('i_am_legend')), pitcher=position == 0,
+        positions=set(decoder.POSITIONS[position:position + 1]) | {
+            slot for slot in decoder.SECONDARY if get('secondary_' + slot)}, surname=name_key(last),
+        bats=(decoder.HANDS + [None])[get('bat_hand')],
+        throws=(decoder.HANDS + [None])[get('throw_hand')])
+
+
+def update_records(decoder, stats, update):
+    """Records of the 1.21 tables, unless the active roster already is the update's."""
+    if not update:
+        return
+    folder = Path(update) / 'FRONTEND/STATS'
+    try:
+        if folder.resolve() == Path(stats).resolve():
+            return
+    except OSError:
+        return
+    for source in ('base', 'live'):
+        try:
+            raw, _, _ = decoder.source_tables(folder, source, False)
+        except (OSError, ValueError):
+            continue
+        yield from decoder.records(raw)
+
+
+def roster_identities(decoder, stats, base, update, teams, live, update_roster=False):
     raw, _, _ = decoder.source_tables(Path(stats), 'base', False)
     by_id = {}
     for name, blocks, _ in decoder.records(raw):
-        record = blocks['record']
-        pid = decoder.uint(record, 186, 2)
+        pid = decoder.uint(blocks['record'], 186, 2)
         if not name or not pid:
             continue
         if pid in by_id and decoder.fullness(by_id[pid]['blocks']) >= decoder.fullness(blocks):
             continue
-        def get(key):
-            return decoder.bits(record, decoder.BITS[key])
-        first = decoder.string(record[112:128])
-        last = decoder.string(record[128:144])
-        team_id = get('team')
-        by_id[pid] = dict(
-            pid=pid, online=decoder.uint(record, 180, 4), blocks=blocks, name=name,
-            names={name_key(name), name_key(last + first)},
-            team=teams[team_id] if team_id < len(teams) else None,
-            jersey={get('jersey_number'), get('original_jersey_number')} - {127},
-            age=get('age'), birth=get('birthplace'), height=get('height_inches'),
-            weight=get('weight_minus_100') + 100,
-            bats=(decoder.HANDS + [None])[get('bat_hand')],
-            throws=(decoder.HANDS + [None])[get('throw_hand')])
+        by_id[pid] = roster_identity(decoder, name, blocks, teams, 'base')
     for card in live:
         if card['roster_player_id'] in by_id:
             by_id[card['roster_player_id']]['team'] = card.get('team_short_name')
+    # The update spells some names differently ("Michael Harris II"). Only the
+    # same roster ID with the same online ID lends its name to a model.
+    added = {}
+    for name, blocks, _ in update_records(decoder, stats, update):
+        record = blocks['record']
+        pid, online = decoder.uint(record, 186, 2), decoder.uint(record, 180, 4)
+        if not name or not pid:
+            continue
+        row = by_id.get(pid)
+        if row is not None:
+            if online == row['online']:
+                last, first = decoder.string(record[128:144]), decoder.string(record[112:128])
+                row['names'].update((name_key(name), name_key(last + first)))
+        elif update_roster and (pid not in added or
+                                decoder.fullness(added[pid]['blocks']) < decoder.fullness(blocks)):
+            added[pid] = roster_identity(decoder, name, blocks, teams, 'update')
+    by_id.update(added)
     by_online = defaultdict(list)
     for row in by_id.values():
         if row['online']:
             by_online[row['online']].append(row)
-    for root in (base, update):
+    for edition, root in (('base', base), ('update', update)):
         if not root:
             continue
         for pid, online, stem, alias in decoder.edition_picture_names(Path(root)):
+            exact = by_id.get(pid)
+            if exact and exact['edition'] == edition and name_key(stem) in exact['names']:
+                exact['asset'] = alias
             candidates = by_online.get(online, ())
             if len(candidates) == 1:
                 row = candidates[0]
             else:
-                row = by_id.get(pid)
+                row = exact
                 if not row or name_key(stem) not in row['names']:
                     continue
             row['names'].update((name_key(stem), name_key(alias)))
+    # A 1.00 game lacks the heads that only the update ships. Keep update-only
+    # players whose head is on the base disc or who have no scanned head at all.
+    for row in added.values():
+        if ((Path(update) / 'PS4/CHARACTERS/HEADS' / row['asset']).is_dir()
+                and not (Path(base) / 'PS4/CHARACTERS/HEADS' / row['asset']).is_dir()):
+            del by_id[row['pid']]
     return by_id.values()
+
+
+ERA = re.compile(r'(?:19|20)\d\d\Z')
+
+
+def person_key(row):
+    # Era versions of one player share the online ID (RUTH_BABE, RUTH_BABE1915).
+    # Without one, require the same name, hands, height and birthplace.
+    if row['online']:
+        return 'online', row['online']
+    return 'roster', name_key(row['name']), row['bats'], row['throws'], row['height'], row['birth']
+
+
+def era_year(row, card):
+    era = ERA.search(row['asset'] or '')
+    if era:
+        return int(era[0])
+    year, age = card.get('series_year'), number(card.get('age'))
+    if type(year) is int and age and row['age']:
+        return year - age + row['age']
+    return None
+
+
+def choose_version(rows, card, scores):
+    """Pick the version of one player whose era is closest to the card's season."""
+    rows = [row for row in rows if row['edition'] == 'base'] or rows
+    year = card.get('series_year')
+
+    def key(row):
+        era = era_year(row, card)
+        distance = abs(era - year) if era is not None and type(year) is int else 999
+        return distance, -scores.get(row['pid'], 0), row['pid']
+    return min(rows, key=key)
 
 
 def birthplace_codes(site, names):
@@ -179,26 +266,53 @@ def match_identity(card, from_name, from_art, by_height, places):
     named = {row['pid'] for row in from_name}
     pictured = {row['pid'] for row in from_art}
     candidates = {row['pid']: row for row in (*from_name, *from_art)}
-    if not candidates:
+    if not candidates and card.get('series') == 'Incognito':
         # For a nickname with no name evidence, require exact physical data
-        # and a birthplace corroborated by the numbered roster region.
+        # and a birthplace corroborated by the numbered roster region. A real
+        # name without a roster player is someone else's card ("Jacob Young"
+        # had matched Ryan Miller).
         candidates = {row['pid']: row for row in by_height.get(bio['height'], ())
                       if bio['birth'] is not None and row['birth'] == bio['birth']
                       and all(bio[key] is not None and bio[key] == row[key]
                               for key in ('weight', 'bats', 'throws'))}
-    ranked = sorted([(match_score(row, bio) + 12 * (pid in named) + 12 * (pid in pictured), pid, row)
-                     for pid, row in candidates.items()], reverse=True)
+    scores = {pid: match_score(row, bio) + 12 * (pid in named) + 12 * (pid in pictured)
+              for pid, row in candidates.items()}
+    people = defaultdict(list)
+    for row in candidates.values():
+        people[person_key(row)].append(row)
+    # Compare distinct players. Versions of the same player do not compete.
+    ranked = sorted(((max(scores[row['pid']] for row in rows), key) for key, rows in people.items()),
+                    key=lambda item: item[0], reverse=True)
     if not ranked:
         return None
-    score, pid, row = ranked[0]
+    score, key = ranked[0]
     if len(ranked) > 1 and score - ranked[1][0] < 5:
         return None
-    if pid not in named and pid not in pictured:
-        if bio['jersey'] not in row['jersey'] or score < 20:
+    rows = people[key]
+    pids = {row['pid'] for row in rows}
+    if not pids & (named | pictured):
+        if not any(bio['jersey'] in row['jersey'] for row in rows) or score < 20:
             return None
-    elif (len(candidates) > 1 or pid not in named) and score < 18:
+    elif (len(ranked) > 1 or not pids & named) and score < 18:
         return None
-    return row
+    row = rows[0] if len(rows) == 1 else choose_version(rows, card, scores)
+    # A namesake shares the name but not the person ("Jacob Gonzalez").
+    return None if len(contradictions(row, card, bio)) >= 2 else row
+
+
+def contradictions(row, card, bio):
+    found = []
+    if bio['bats'] and bio['throws'] and (bio['bats'], bio['throws']) != (row['bats'], row['throws']):
+        found.append('hands')
+    if bio['height'] and abs(bio['height'] - row['height']) > 1:
+        found.append('height')
+    if bio['birth'] is not None and bio['birth'] != row['birth']:
+        found.append('birthplace')
+    year = card.get('series_year')
+    if bio['age'] and type(year) is int and not row['legend'] and not is_live(card):
+        if abs(ROSTER_SEASON - row['age'] - (year - bio['age'])) > 2:
+            found.append('birth year')
+    return found
 
 
 def bio_key(card):
@@ -230,31 +344,112 @@ def match_nickname(card, references):
                 or (jersey and age and difference <= 5)):
             continue
         score = 4 * team + 5 * jersey + 4 * age + 3 * year + (20 - difference)//5
-        pid = row['pid']
-        # Multiple cards can corroborate the same model.
-        if pid not in candidates or candidates[pid][0] < score:
-            candidates[pid] = score, pid, row
-    ranked = sorted(candidates.values(), reverse=True)
+        who = person_key(row[0])
+        # Multiple cards can corroborate the same player.
+        if who not in candidates or candidates[who][0] < score:
+            candidates[who] = score, who, row
+    ranked = sorted(candidates.values(), key=lambda item: item[0], reverse=True)
     if ranked and (len(ranked) == 1 or ranked[0][0] - ranked[1][0] >= 4):
-        return ranked[0][2]
+        rows = ranked[0][2]
+        return rows[0] if len(rows) == 1 else choose_version(rows, card, {})
     return None
 
 
-def special_cards(site, pictures, decoder, stats, base, update, teams, live, positions, rarities):
+def people(rows):
+    groups = defaultdict(list)
+    for row in rows:
+        groups[person_key(row)].append(row)
+    return list(groups.values())
+
+
+# The 1.00 roster gives current players their age in the 2023 season. Legend
+# and era versions carry the age of their era instead.
+ROSTER_SEASON = 2023
+OUTFIELD = {'LF', 'CF', 'RF'}
+
+
+def birth_years(site, by_name):
+    """Birth years implied by the named cards of each unambiguously named player."""
+    years = defaultdict(set)
+    for card in site:
+        players = people(by_name.get(name_key(card.get('name') or ''), ()))
+        age, year = number(card.get('age')), card.get('series_year')
+        if is_live(card):
+            year = ROSTER_SEASON          # Live cards state the current age
+        if len(players) == 1 and age and type(year) is int:
+            years[person_key(players[0][0])].add(year - age)
+    return years
+
+
+def physical_people(card, by_height, places, births, weight, years, jersey, legend_jersey=True):
+    """Players with the card's height, hands, birthplace, role, weight and birth year."""
+    bio = bio_fields(card, places)
+    year = card.get('series_year')
+    if (bio['birth'] is None or type(year) is not int
+            or any(bio[key] is None for key in ('height', 'weight', 'bats', 'throws', 'age'))):
+        return []
+    born = year - bio['age']
+    position = card.get('display_position')
+    pitcher = position in ('SP', 'RP', 'CP')
+    found = defaultdict(list)
+    for row in by_height.get(bio['height'], ()):
+        if ((row['bats'], row['throws'], row['birth'], row['pitcher'])
+                != (bio['bats'], bio['throws'], bio['birth'], pitcher)):
+            continue
+        if abs(row['weight'] - bio['weight']) > (weight if not row['legend'] else min(weight, 20)):
+            continue
+        # Legend and era records state the age of their era. Without a named card that
+        # gives the birth year, they need the jersey instead.
+        known = births.get(person_key(row))
+        if known:
+            if min(abs(value - born) for value in known) > years:
+                continue
+        elif not row['legend'] and abs(ROSTER_SEASON - row['age'] - born) > years:
+            continue
+        if (jersey or (row['legend'] and legend_jersey)) and bio['jersey'] not in row['jersey']:
+            continue
+        if jersey and not (pitcher or position == 'DH' or position in row['positions']
+                           or (position in OUTFIELD and row['positions'] & OUTFIELD)):
+            continue
+        found[person_key(row)].append(row)
+    return list(found.values())
+
+
+def match_physical(card, by_height, places, births):
+    """An Incognito card hides the name. Accept one player only when the evidence is complete."""
+    # A surname inside the nickname ("Funky Muncy") is name evidence.
+    words = {name_key(word) for word in re.split(r'[^A-Za-z]+', card.get('name') or '')}
+    named = [rows for rows in physical_people(card, by_height, places, births, 35, 2, False, False)
+             if any(len(row['surname']) >= 4 and row['surname'] in words for row in rows)]
+    if len(named) == 1:
+        return choose_version(named[0], card, {})
+    loose = physical_people(card, by_height, places, births, 35, 2, False)
+    # Otherwise require the jersey and position as well, and no other player even close.
+    strict = physical_people(card, by_height, places, births, 20, 1, True)
+    if len(strict) == 1 and len(loose) == 1:
+        return choose_version(strict[0], card, {})
+    return None
+
+
+def special_cards(site, pictures, decoder, stats, base, update, teams, live, positions, rarities,
+                  update_roster=None):
+    if update_roster is None:
+        update_roster = os.environ.get('SHOW23_UPDATE_ROSTER_SPECIALS') == '1'
     by_name = defaultdict(list)
     by_height = defaultdict(list)
-    for row in roster_identities(decoder, stats, base, update, teams, live):
+    for row in roster_identities(decoder, stats, base, update, teams, live, update_roster):
         for alias in row['names']:
             if alias:
                 by_name[alias].append(row)
         by_height[row['height']].append(row)
     places = birthplace_codes(site, by_name)
+    births = birth_years(site, by_name)
     ids = card_ids(site)
     references = defaultdict(list)
     for card in site:
-        names = by_name.get(name_key(card.get('name') or ''), ())
-        if len(names) == 1:
-            references[bio_key(card)].append((card, names[0]))
+        players = people(by_name.get(name_key(card.get('name') or ''), ()))
+        if len(players) == 1:
+            references[bio_key(card)].append((card, players[0]))
     used = {c['item_id'] for c in live}
     matched = []
     dropped = Counter()
@@ -277,7 +472,7 @@ def special_cards(site, pictures, decoder, stats, base, update, teams, live, pos
         row = match_identity(card, by_name.get(name_key(name), ()),
                              [r for key in art_names for r in by_name.get(key, ())], by_height, places)
         if row is None and card['series'] == 'Incognito':
-            row = match_nickname(card, references)
+            row = match_nickname(card, references) or match_physical(card, by_height, places, births)
         if row is None:
             dropped['identity'] += 1
             continue
