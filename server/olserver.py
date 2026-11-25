@@ -6552,14 +6552,17 @@ def shop_open(state, shop, query):
 def shop_reply(name, params):
     if name == 'show_shop_product.view_platform_products':
         return envelope('<response><products/><redeemables/></response>'), 'made'
-    if name in ('inventory.check_for_rewards', 'arena_tutorial.inventory.view_packs'):
+    if name == 'inventory.check_for_rewards':
         return envelope('<response><items/></response>'), 'made'
-    if name == 'inventory.view_packs':
+    # A new player's first game puts the Open Packs screen into the game's new-player flow, where it
+    # asks through arena_tutorial.*. The packs are the same ones: answered empty, the screen showed
+    # no pack although one was owned.
+    if name in ('inventory.view_packs', 'arena_tutorial.inventory.view_packs'):
         return envelope(shop_owned_packs(load_state().get('pack_shop', {}))), 'made'
-    if name in ('inventory.draft_pack_open', 'inventory.draft_pack_submit_picks',
-                'arena_tutorial.inventory.open_pack', 'inventory.quick_sell'):
+    if name in ('inventory.draft_pack_open', 'inventory.draft_pack_submit_picks', 'inventory.quick_sell'):
         return envelope(status=1, message='This inventory action is unavailable on the local server.'), 'refused'
-    if not (name.startswith('show_shop_product.') or name == 'inventory.open_pack'):
+    if not (name.startswith('show_shop_product.')
+            or name in ('inventory.open_pack', 'arena_tutorial.inventory.open_pack')):
         return None
     try:
         query = params_of(params)
@@ -6576,7 +6579,7 @@ def shop_reply(name, params):
             inner = shop_shelf(product_id)
         elif name == 'show_shop_product.buy':
             inner = shop_buy(state, shop, query)
-        elif name == 'inventory.open_pack':
+        elif name in ('inventory.open_pack', 'arena_tutorial.inventory.open_pack'):
             inner = shop_open(state, shop, query)
         elif name == 'show_shop_product.purchase_complete':
             receipt_id = query.get('purchase_uuid')
