@@ -40,7 +40,8 @@ Games run at a higher frame rate than on the emulator build, and the distorted t
 ## Diamond Dynasty
 
 - **Sign-in** uses the server's fixed account name. You start with a 26-player squad of Common cards built from the game's own roster and 5,000 Stubs.
-- **Modes and features:** Play vs. CPU with results, XP and Stubs kept; Mini Seasons; Conquest; Showdown; Programs including Team Affinity; the pack shop paid for with Stubs; exchanges; collections, inventory and team equipment.
+- **Modes and features:** Play vs. CPU with results, XP and Stubs kept; ten repeatable Daily Missions; Mini Seasons; Conquest (Batter Up 1, World Baseball Classic and Pennant Chase maps); Showdown (Starter, World Baseball Classic, Pennant Chase); Moments; Programs including Team Affinity, World Baseball Classic, Monthly Awards and Pennant Chase; the pack shop paid for with Stubs; exchanges; collections, inventory and team equipment.
+- **Authored content:** missions, programs, Moments, Conquest maps and Showdowns are data files in `server/content/CUSA35521/<revision>/`, checked when the server starts; the server refuses to start with a clear message if a file is invalid.
 - **Optional special-card import:** the launcher can fetch the card list and missing pictures from the publisher's public website on request.
 
 If an existing progress file cannot be read, the server leaves it intact. Storylines is unavailable on the local server and now shows a message instead of crashing. The Community Market and buying Stubs remain switched off. The server runs on your own PC and supports single-player play only.

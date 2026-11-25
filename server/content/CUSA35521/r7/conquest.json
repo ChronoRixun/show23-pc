@@ -1,0 +1,249 @@
+[
+  {
+    "id": 101,
+    "name": "Batter Up 1 (local)",
+    "description": "Capture the Rays stronghold. In Attack, press X on your tile with 2M+ fans, then press X on an adjacent target. In Move, press X on a friendly 2M+ tile, then X on a highlighted friendly destination and choose an amount.",
+    "preview_texture": "CONQUEST_BATTERUP1",
+    "start": 107,
+    "enemy_stronghold": 109,
+    "enemy_club": 3,
+    "garrison": 1,
+    "cells": [
+      [
+        8,
+        63,
+        0
+      ],
+      [
+        19,
+        63,
+        0
+      ],
+      [
+        20,
+        63,
+        0
+      ],
+      [
+        43,
+        63,
+        0
+      ],
+      [
+        44,
+        63,
+        0
+      ],
+      [
+        71,
+        63,
+        0
+      ],
+      [
+        72,
+        63,
+        0
+      ],
+      [
+        73,
+        63,
+        0
+      ],
+      [
+        100,
+        63,
+        0
+      ],
+      [
+        101,
+        63,
+        0
+      ],
+      [
+        102,
+        63,
+        0
+      ],
+      [
+        103,
+        63,
+        0
+      ],
+      [
+        104,
+        63,
+        0
+      ],
+      [
+        105,
+        63,
+        0
+      ],
+      [
+        106,
+        63,
+        0
+      ],
+      [
+        107,
+        30,
+        8
+      ],
+      [
+        108,
+        63,
+        0
+      ],
+      [
+        109,
+        3,
+        2
+      ],
+      [
+        110,
+        63,
+        0
+      ],
+      [
+        138,
+        63,
+        0
+      ],
+      [
+        139,
+        63,
+        0
+      ],
+      [
+        140,
+        63,
+        0
+      ],
+      [
+        167,
+        63,
+        0
+      ],
+      [
+        168,
+        63,
+        0
+      ],
+      [
+        194,
+        63,
+        0
+      ],
+      [
+        195,
+        63,
+        0
+      ],
+      [
+        221,
+        63,
+        0
+      ]
+    ],
+    "goals": [
+      {
+        "id": 2,
+        "description": "Own two territories.",
+        "target": 2,
+        "stubs": 25,
+        "xp": 0,
+        "pack": 0,
+        "metric": "territories"
+      },
+      {
+        "id": 3,
+        "description": "Build your fan base to 9M.",
+        "target": 9,
+        "stubs": 0,
+        "xp": 100,
+        "pack": 0,
+        "metric": "fans"
+      },
+      {
+        "id": 1,
+        "description": "Capture every stronghold. Reward: one Standard Player Pack.",
+        "target": 2,
+        "stubs": 0,
+        "xp": 0,
+        "pack": 510001,
+        "metric": "strongholds"
+      }
+    ],
+    "program_credit": null
+  },
+  {
+    "id": 102,
+    "name": "World Baseball Classic",
+    "description": "Capture the Rays stronghold to earn 10 points toward the next World Baseball Classic program objective. Restart the map to earn its rewards again.",
+    "preview_texture": "CONQUEST_WBC",
+    "start": 112,
+    "enemy_stronghold": 113,
+    "enemy_club": 3,
+    "garrison": 1,
+    "cells": [
+      [
+        111,
+        63,
+        0
+      ],
+      [
+        112,
+        30,
+        8
+      ],
+      [
+        113,
+        3,
+        3
+      ],
+      [
+        142,
+        63,
+        0
+      ],
+      [
+        143,
+        63,
+        0
+      ],
+      [
+        144,
+        63,
+        0
+      ]
+    ],
+    "goals": [
+      {
+        "id": 2,
+        "description": "Own two territories.",
+        "metric": "territories",
+        "target": 2,
+        "stubs": 50,
+        "xp": 0,
+        "pack": 0
+      },
+      {
+        "id": 1,
+        "description": "Capture the Rays stronghold. Reward: 100 Stubs and a Standard Player Pack.",
+        "metric": "strongholds",
+        "target": 2,
+        "stubs": 100,
+        "xp": 0,
+        "pack": 510001
+      }
+    ],
+    "program_credit": {
+      "program_id": 732001,
+      "mission_ids": [
+        730101,
+        730102,
+        730103
+      ]
+    }
+  }
+]

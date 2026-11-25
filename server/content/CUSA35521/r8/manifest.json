@@ -1,0 +1,12 @@
+{
+  "schema_version": 8,
+  "title": "CUSA35521",
+  "revision": "r8",
+  "files": [
+    "missions.json",
+    "programs.json",
+    "moments.json",
+    "conquest.json",
+    "showdowns.json"
+  ]
+}

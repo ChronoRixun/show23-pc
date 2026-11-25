@@ -20,6 +20,7 @@ import asyncio, base64, csv, datetime, hashlib, json, math, os, random, re, secr
 import xml.etree.ElementTree as ET
 from collections import ChainMap, Counter
 from functools import lru_cache
+from pathlib import Path
 from typing import NamedTuple
 from uuid import uuid4
 
@@ -507,7 +508,7 @@ class StateUnreadable(Exception):
     """The progress file exists but could not be read; it has been left untouched."""
 
 
-def load_state():
+def load_state(*, migrate_team=True):
     failure = None
     for attempt in range(STATE_READ_TRIES):
         try:
@@ -527,7 +528,7 @@ def load_state():
         raise StateUnreadable(
             'The progress file %s exists but cannot be read (%s). It was left untouched. Close other '
             'programs that may be using it, or restore a backup, then start again.' % (STATE_FILE, failure))
-    if migrate_local_team(state):
+    if migrate_team and migrate_local_team(state):
         save_state(state)
     return state
 
@@ -629,6 +630,7 @@ def program_goal(program, tickets, *, available=True, maximum=PATH_TOTAL, goal_n
     goal = mini_node(goals, 'goal', progress_current=tickets, progress_max=maximum,
                      mission_criteria_id=0, preview_count=0, stat='', **common)
     ET.SubElement(goal, 'items')
+    return stage
 
 
 def program_pack_fields(pack_id):
@@ -641,11 +643,11 @@ def program_pack_fields(pack_id):
                 item_label_aaadeb49z9__=pack.name)  # script 0xf1697e59
 
 
-def program_item(parent, tier):
+def program_item(parent, tier, *, tag='item'):
     fields = program_pack_fields(tier.pack_id) if tier.pack_id else dict(
         id=0, item_id=0, type_id=-1, name='Stubs', description='Stubs credited to your wallet.',
         quantity=0, rank=0, rarity_id=0, texture_name='', item_label_aaadeb49z9__='Stubs')
-    item = mini_node(parent, 'item', **fields)
+    item = mini_node(parent, tag, **fields)
     ET.SubElement(item, 'item_exclusives')
 
 
@@ -670,6 +672,9 @@ def program_tier_row(parent, tier, tickets, claimed):
 
 
 def program_view(params):
+    PROGRAM_MOMENT_CONTEXT.set(None)
+    PROGRAM_MOMENT_LAUNCH.set(None)
+    BROWSER_MOMENT_CONTEXT.set(())
     query = params_of(params)
     program_id = query.get('program_id', 0) if isinstance(query, dict) else None
     division = affinity_index(program_id, AFFINITY_PROGRAM_BASE, len(AFFINITY_DIVISIONS))
@@ -679,6 +684,10 @@ def program_view(params):
             division = club // 5
     if division is not None:
         return affinity_view(division)
+    programs = active_title_content().programs
+    authored = next((record for key, record in programs.items() if str(key) == str(program_id)), None)
+    if authored is not None:
+        return authored_program_view(authored)
     available = str(program_id) in ('0', str(PROGRAM_ID))
     state = load_state() if available else {}
     profile = state.get('profile', {})
@@ -693,7 +702,9 @@ def program_view(params):
     program = mini_node(response, 'program', max_program_tickets=PATH_TOTAL,
                         max_bonus_tickets=BONUS_STEP, has_unlimited_reward='False',
                         just_completed_program='False', **program_fields(profile, available=available))
-    program_goal(program, min(tickets, PATH_TOTAL), available=available)
+    stage = program_goal(program, min(tickets, PATH_TOTAL), available=available)
+    if available:
+        program_daily_goals(stage, profile)
     rewards = ET.SubElement(program, 'rewards')
     if available:
         claimed = set(profile.get('program_tier_claims', ()))
@@ -713,6 +724,10 @@ def program_list(params):
     club = affinity_index(group, AFFINITY_CLUB_GROUP_BASE, len(MLB_TEAMS))
     if club is not None:
         return affinity_list((club // 5,))
+    authored = [program for program in active_title_content().programs.values()
+                if any(str(group_id) == group for group_id in program['list_groups'])]
+    if authored:
+        return authored_program_list(authored)
     # 10000 is the default catalogue. Unimplemented groups have countable empty lists.
     response = ET.Element('response')
     fields = program_fields(load_state().get('profile', {})) if group == '10000' else None
@@ -733,10 +748,625 @@ def add_bonus_xp(params):
     return '<response><bonus_xp amount="0"/></response>'
 
 
+MISSION_CONTENT_DIR = Path(HERE) / 'content' / 'CUSA35521' / 'r8'
+DAILY_GOAL_GROUP_ID = 730000
+MISSION_REROLL_FLAG = 'reward_flag_ab_dkxi'  # 0x35fa44, hash 0xbc667a79 gates Get New Mission
+# Type-0 detail indexes the global slot vector. Keep one small ordered board.
+DAILY_SLOT_LIMIT = 10
+MISSION_MODES = (3, 6, 8)  # Play vs. CPU, Mini Seasons, Conquest
+CARD_MISSION_SERIES = ('Live Series', 'Monthly Awards', 'Topps Now', 'World Baseball Classic', 'Awards')
+# Each tuple holds the display unit followed by the team/card stats to sum.
+STAT_MISSIONS = {
+    'hits': ('Hits', 'hits'),
+    'home_runs': ('HR', 'home_runs'),
+    'extra_base_hits': ('XBH', 'doubles', 'triples', 'home_runs'),
+    'rbi': ('RBI', 'rbi'),
+    'runs': ('Runs', 'runs'),
+    'stolen_bases': ('SB', 'stolen_bases'),
+    'pitching_strikeouts': ('K', 'pitching_strikeouts'),
+    'shutout': ('Games',),
+    'win_margin': ('Games',),
+    'walks': ('Walks', 'walks'),
+    'doubles': ('Doubles', 'doubles'),
+    'triples': ('Triples', 'triples'),
+}
+
+
+class MissionContentInvalid(ValueError):
+    """An authored Diamond Dynasty revision could not be activated."""
+
+
+class TitleContent(NamedTuple):
+    missions: dict
+    programs: dict
+    moments: dict
+    situations: dict
+    conquest: dict
+    showdowns: dict
+    moment_groups: dict
+
+
+# Fields in the ordinary Moment conditions parser: WINS (0xae0fa1),
+# pitching K (0xae10fd), HR (0xae12ab), OUTS (0xae14fd), pitching RUNS (0xae1723).
+MOMENT_OBJECTIVES = {
+    'walk_off': ('batting', 'WINS', 1),
+    'pitching_strikeouts': ('pitching', 'K', 2),
+    'home_run': ('batting', 'HR', 1),
+}
+
+
+def content_positive(value):
+    return type(value) is int and 0 < value <= 0x7fffffff
+
+
+def content_text(value):
+    return (isinstance(value, str) and bool(value.strip())
+            and not re.search(r'[^\t\n\r\x20-\ud7ff\ue000-\ufffd\U00010000-\U0010ffff]', value))
+
+
+def content_record(value, fields):
+    return isinstance(value, dict) and value.keys() == fields
+
+
+def load_title_content(directory):
+    directory = Path(directory)
+
+    def invalid(detail):
+        return MissionContentInvalid(f'Cannot load Diamond Dynasty content from {directory}: {detail}.')
+
+    def unique_keys(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError(f'duplicate key {key!r}')
+            result[key] = value
+        return result
+
+    def read_json(name):
+        try:
+            return json.loads((directory / name).read_text(encoding='utf-8'),
+                              object_pairs_hook=unique_keys)
+        except (OSError, ValueError, RecursionError) as error:
+            raise invalid(f'{name} could not be read ({error})') from error
+
+    manifest = read_json('manifest.json')
+    if not isinstance(manifest, dict) or manifest.keys() != {'schema_version', 'title', 'revision', 'files'}:
+        raise invalid('manifest.json must contain schema_version, title, revision and files')
+    version = manifest['schema_version']
+    if type(version) is not int or not 1 <= version <= 8:
+        raise invalid('manifest.json schema_version must be an integer from 1 through 8')
+    if manifest['title'] != 'CUSA35521' or manifest['revision'] != directory.name:
+        raise invalid(f'manifest.json must identify title CUSA35521 and revision {directory.name}')
+    expected_files = {'missions.json'} if version == 1 else {'missions.json', 'programs.json'}
+    if version >= 4:
+        expected_files.add('moments.json')
+    if version >= 5:
+        expected_files.add('conquest.json')
+    if version >= 6:
+        expected_files.add('showdowns.json')
+    files = manifest['files']
+    if (not isinstance(files, list) or len(files) != len(expected_files)
+            or any(not isinstance(name, str) for name in files) or set(files) != expected_files):
+        raise invalid(f'manifest.json files must list {", ".join(sorted(expected_files))} once')
+    try:
+        present = {path.name for path in directory.iterdir()} - {'manifest.json'}
+    except OSError as error:
+        raise invalid(f'the revision files could not be listed ({error})') from error
+    if present != expected_files:
+        differences = ', '.join(sorted(present ^ expected_files))
+        raise invalid(f'manifest.json files do not match the revision directory ({differences})')
+
+    missions = read_json('missions.json')
+    if not isinstance(missions, list) or not missions:
+        raise invalid('missions.json must contain a nonempty list of missions')
+    common = {'id', 'name', 'description', 'evaluator', 'target', 'cadence'}
+    mission_index = {}
+    slots = set()
+    for index, mission in enumerate(missions, 1):
+        label = f'missions.json mission {index}'
+        fields = common | {'slot_id', 'reward'}
+        if version >= 2:
+            placement = mission.get('shows_in') if isinstance(mission, dict) else None
+            if (not isinstance(placement, list) or not placement
+                    or any(surface not in ('daily', 'program') for surface in placement)
+                    or len(set(placement)) != len(placement)):
+                raise invalid(f'{label} shows_in must list daily, program, or both without duplicates')
+            fields = common | {'shows_in'}
+            if 'daily' in placement:
+                fields |= {'slot_id', 'reward'}
+        if version >= 3:
+            fields |= {'modes'}
+            if isinstance(mission, dict):
+                fields |= mission.keys() & {'card_filter', 'min_margin'}
+        if not content_record(mission, fields):
+            raise invalid(f'{label} must contain {", ".join(sorted(fields))}')
+        for field in ('id', 'target', 'slot_id') if 'slot_id' in fields else ('id', 'target'):
+            if not content_positive(mission[field]):
+                raise invalid(f'{label} {field} must be a positive integer within signed 32-bit range')
+        mission_id = mission['id']
+        if mission_id in mission_index:
+            raise invalid(f'{label} has duplicate id {mission_id}')
+        if 'slot_id' in fields:
+            slot_id = mission['slot_id']
+            if slot_id in slots:
+                raise invalid(f'{label} has duplicate slot_id {slot_id}')
+            slots.add(slot_id)
+        for field in ('name', 'description'):
+            if not content_text(mission[field]):
+                raise invalid(f'{label} {field} must be nonempty text valid in XML')
+        evaluator = mission['evaluator']
+        if not isinstance(evaluator, str) or (
+                evaluator not in ('cpu_game_finished', 'cpu_game_won')
+                and (version < 3 or evaluator not in STAT_MISSIONS)):
+            raise invalid(f'{label} has an unsupported evaluator')
+        if version >= 3:
+            validate_mission_options(mission, label, invalid)
+        if mission['cadence'] != 'permanent':
+            raise invalid(f'{label} cadence must be permanent')
+        if 'reward' in fields:
+            reward = mission['reward']
+            if not content_record(reward, {'kind', 'amount'}):
+                raise invalid(f'{label} reward must contain kind and amount')
+            if reward['kind'] != 'stubs':
+                raise invalid(f'{label} has an unsupported reward kind')
+            if not content_positive(reward['amount']):
+                raise invalid(f'{label} reward.amount must be a positive integer within signed 32-bit range')
+        mission_index[mission_id] = mission
+    if len(slots) > DAILY_SLOT_LIMIT:
+        raise invalid(f'missions.json daily board exceeds {DAILY_SLOT_LIMIT} slots')
+    moments, situations, groups = (validate_moment_content(read_json('moments.json'), invalid, browser=version >= 7)
+                                   if version >= 4 else ({}, {}, {}))
+    browser_moments = {mid for mid, moment in moments.items()
+                       if moment['set_id'] in groups.get(moment['group_id'], {}).get('sets', {})}
+    programs = (validate_authored_programs(read_json('programs.json'), mission_index, invalid,
+                                           moments if version >= 4 else None, browser_moments=browser_moments)
+                if version >= 2 else {})
+    if moments.keys() & (mission_index.keys() | programs.keys()):
+        raise invalid('moments.json moment ids cannot reuse a mission or program id')
+    conquest = (validate_conquest_content(read_json('conquest.json'), programs, invalid, multi_club=version >= 8)
+                if version >= 5 else {})
+    showdowns = (validate_showdown_content(read_json('showdowns.json'), programs, moments, directory.name, invalid,
+                                           multiple=version >= 8)
+                 if version >= 6 else {})
+    return TitleContent(mission_index, programs, moments, situations, conquest, showdowns, groups)
+
+
+def validate_mission_options(mission, label, invalid):
+    modes = mission['modes']
+    if (not isinstance(modes, list) or not modes
+            or any(type(mode) is not int or mode not in MISSION_MODES for mode in modes)
+            or len(set(modes)) != len(modes)):
+        raise invalid(f'{label} modes must contain distinct supported modes (3, 6, 8)')
+    evaluator = mission['evaluator']
+    if evaluator == 'win_margin':
+        if not content_positive(mission.get('min_margin')):
+            raise invalid(f'{label} win_margin needs a positive min_margin')
+    elif 'min_margin' in mission:
+        raise invalid(f'{label} min_margin is only valid for win_margin')
+    if 'card_filter' in mission:
+        filters = mission['card_filter']
+        if (len(STAT_MISSIONS.get(evaluator, ())) <= 1 or not isinstance(filters, dict)
+                or not filters or filters.keys() - {'series', 'club'}):
+            raise invalid(f'{label} card_filter needs a card statistic and series, club, or both')
+        if 'series' in filters and filters['series'] not in CARD_MISSION_SERIES:
+            raise invalid(f'{label} card_filter has an unknown series')
+        if 'club' in filters and filters['club'] not in tuple(team[0] for team in MLB_TEAMS):
+            raise invalid(f'{label} card_filter has an unknown club')
+
+
+def validate_moment_content(content, invalid, *, browser=False):
+    keys = {'moments', 'situations', 'groups'} if browser else {'moments', 'situations'}
+    if (not content_record(content, keys)
+            or any(not isinstance(rows, list) or not rows for rows in content.values())):
+        raise invalid(f'moments.json needs nonempty {", ".join(sorted(keys))} lists')
+    situations = {}
+    bounds = {'inning': (9, 9), 'user_runs': (0, 98), 'cpu_runs': (1, 99),
+              'outs': (0, 2), 'balls': (0, 3), 'strikes': (0, 2)}
+    for row in content['situations']:
+        fields = {'id', 'base_runners', *bounds}
+        if browser and isinstance(row, dict) and 'inning_is_top' in row:
+            fields.add('inning_is_top')
+        if (not content_record(row, fields)
+                or not content_positive(row['id']) or row['id'] in situations):
+            raise invalid('moments.json situations need unique positive ids and all situation fields')
+        if type(row.get('inning_is_top', False)) is not bool:
+            raise invalid('moments.json inning_is_top must be a boolean')
+        for field, (low, high) in bounds.items():
+            if browser and field in ('user_runs', 'cpu_runs'):
+                low, high = 0, 99
+            value = row[field]
+            if type(value) is not int or not low <= value <= high:
+                raise invalid(f'moments.json situation {row["id"]} {field} must be between {low} and {high}')
+        bases = row['base_runners']
+        if (not isinstance(bases, list) or len(bases) != 3
+                or any(type(slot) is not int or slot not in (-1, *range(1, 9)) for slot in bases)
+                or len({slot for slot in bases if slot != -1}) != sum(slot != -1 for slot in bases)):
+            raise invalid('moments.json needs three base runners with distinct batting slots or -1')
+        situations[row['id']] = row
+
+    moments, team_ids = {}, set()
+    fields = {'id', 'group_id', 'set_id', 'team_id', 'name', 'description', 'texture_name',
+              'user_club', 'opponent_club', 'situation_id', 'stubs', 'difficulty'}
+    reserved = {row.identifier for row in (*SHOWDOWN_LEGACY_MOMENTS, *showdown_blue_order(0))}
+    for row in content['moments']:
+        expected = fields | {'objective'} if browser and isinstance(row, dict) and 'objective' in row else fields
+        if not content_record(row, expected):
+            raise invalid(f'moments.json each moment must contain {", ".join(sorted(fields))}')
+        for field in ('id', 'group_id', 'set_id', 'team_id', 'situation_id', 'stubs'):
+            if not content_positive(row[field]):
+                raise invalid(f'moments.json moment {field} must be a positive integer')
+        if row['id'] in moments or row['id'] in reserved:
+            raise invalid('moments.json moment ids must be unique and cannot reuse a Showdown id')
+        if row['situation_id'] not in situations:
+            raise invalid('moments.json moment references an unknown situation')
+        situation = situations[row['situation_id']]
+        objective = row.get('objective', 'walk_off')
+        if not isinstance(objective, str) or objective not in MOMENT_OBJECTIVES:
+            raise invalid('moments.json moment objective is unsupported')
+        top = situation.get('inning_is_top', False)
+        lead = situation['user_runs'] - situation['cpu_runs']
+        if ((top, lead) != {'walk_off': (False, -1), 'pitching_strikeouts': (True, 1),
+                           'home_run': (False, 0)}[objective]
+                or objective == 'pitching_strikeouts' and situation['outs'] > 1):
+            raise invalid(f'moments.json situation does not match the {objective} objective')
+        if not 10002 <= row['team_id'] <= 65535 or row['team_id'] in team_ids:
+            raise invalid('moments.json moment needs a unique custom team id between 10002 and 65535')
+        if (any(type(row[club]) is not int or not 0 <= row[club] < len(MLB_TEAMS)
+                for club in ('user_club', 'opponent_club')) or row['user_club'] == row['opponent_club']):
+            raise invalid('moments.json moment needs distinct MLB user and opponent clubs')
+        if not all(content_text(row[field]) for field in ('name', 'description')):
+            raise invalid('moments.json moment name and description need nonempty XML text')
+        if not isinstance(row['texture_name'], str) or not re.fullmatch(r'[A-Z0-9_]*', row['texture_name']):
+            raise invalid('moments.json moment texture_name must be a bare texture key or empty text')
+        if row['difficulty'] not in SHOWDOWN_DIFFICULTIES:
+            raise invalid('moments.json moment difficulty is unsupported')
+        moments[row['id']] = row
+        team_ids.add(row['team_id'])
+    if set(situations) != {moment['situation_id'] for moment in moments.values()}:
+        raise invalid('moments.json contains a situation unreferenced by a Moment')
+    groups = validate_moment_groups(content['groups'], moments, invalid) if browser else {}
+    return moments, situations, groups
+
+
+def validate_moment_groups(groups, moments, invalid):
+    fields = {'id', 'name', 'description', 'texture_name'}
+    index, set_ids = {}, set()
+
+    def valid(row, extra):
+        return (content_record(row, fields | extra) and content_positive(row['id'])
+                and all(content_text(row[field]) for field in ('name', 'description'))
+                and isinstance(row['texture_name'], str) and re.fullmatch(r'[A-Z0-9_]*', row['texture_name']))
+
+    for group in groups:
+        if (not valid(group, {'sets'}) or group['id'] in index
+                or not isinstance(group['sets'], list) or not group['sets']):
+            raise invalid('moments.json browser groups need unique ids, text, texture keys and nonempty sets')
+        sets = {}
+        for row in group['sets']:
+            if not valid(row, set()) or row['id'] in set_ids:
+                raise invalid('moments.json browser sets need unique ids, text and texture keys')
+            ids = tuple(mid for mid, moment in moments.items()
+                        if (moment['group_id'], moment['set_id']) == (group['id'], row['id']))
+            if not ids:
+                raise invalid('moments.json browser sets need at least one Moment')
+            sets[row['id']] = dict(row, moment_ids=ids)
+            set_ids.add(row['id'])
+        index[group['id']] = dict(group, sets=sets)
+    for moment in moments.values():
+        group, set_id = moment['group_id'], moment['set_id']
+        if (group in index or set_id in set_ids) and set_id not in index.get(group, {}).get('sets', {}):
+            raise invalid('moments.json Moment references a mismatched browser group and set')
+    return index
+
+
+def validate_authored_programs(programs, missions, invalid, moments=None, *, browser_moments=()):
+    if not isinstance(programs, list) or not programs:
+        raise invalid('programs.json must contain a nonempty list of programs')
+    index = {}
+    referenced = set()
+    linked_moments = set()
+    fields = {'id', 'list_groups', 'name', 'subtitle', 'texture_name', 'texture_name_bkg',
+              'repeat', 'total_points', 'stages', 'tiers'}
+    for position, program in enumerate(programs, 1):
+        label = f'programs.json program {position}'
+        if not content_record(program, fields):
+            raise invalid(f'{label} must contain {", ".join(sorted(fields))}')
+        program_id = program['id']
+        if (not content_positive(program_id) or program_id == PROGRAM_ID or program_id in index
+                or affinity_index(program_id, AFFINITY_LEGACY_PROGRAM_BASE, len(MLB_TEAMS)) is not None
+                or affinity_index(program_id, AFFINITY_PROGRAM_BASE, len(AFFINITY_DIVISIONS)) is not None):
+            raise invalid(f'{label} has an invalid, reserved or duplicate program id')
+        groups = program['list_groups']
+        if (not isinstance(groups, list) or not groups
+                or any(not content_positive(group) or group in (10000, 10002)
+                       or affinity_index(group, AFFINITY_CLUB_GROUP_BASE, len(MLB_TEAMS)) is not None
+                       for group in groups) or len(set(groups)) != len(groups)):
+            raise invalid(f'{label} list_groups must contain distinct, non-reserved group IDs')
+        for field in ('name', 'subtitle'):
+            if not content_text(program[field]):
+                raise invalid(f'{label} {field} must be nonempty text valid in XML')
+        for field in ('texture_name', 'texture_name_bkg'):
+            value = program[field]
+            if not isinstance(value, str) or not re.fullmatch(r'[A-Z0-9_]*', value):
+                raise invalid(f'{label} {field} must be a bare texture key or empty text')
+        total = program['total_points']
+        if not content_positive(total):
+            raise invalid(f'{label} total_points must be a positive integer')
+        if program['repeat'] != 'next_game':
+            raise invalid(f'{label} repeat must be next_game')
+        stages = program['stages']
+        if not isinstance(stages, list) or not 1 <= len(stages) <= 255:
+            raise invalid(f'{label} must contain 1 to 255 stages')
+        stage_ids, goal_ids = set(), set()
+        points = 0
+        for stage in stages:
+            stage_fields = {'id', 'name', 'goals'}
+            if moments is not None and isinstance(stage, dict) and 'moment_goal' in stage:
+                stage_fields.add('moment_goal')
+            if (not content_record(stage, stage_fields) or not content_positive(stage['id'])
+                    or stage['id'] in stage_ids or not content_text(stage['name'])
+                    or not isinstance(stage['goals'], list) or not stage['goals']):
+                raise invalid(f'{label} stages need unique ids, names and a nonempty goal list')
+            stage_ids.add(stage['id'])
+            for goal in stage['goals']:
+                if not content_record(goal, {'mission_id', 'points'}):
+                    raise invalid(f'{label} each goal must contain mission_id and points')
+                mid = goal['mission_id']
+                if not content_positive(mid) or mid not in missions:
+                    raise invalid(f'{label} goal references an unknown mission')
+                if 'program' not in missions[mid]['shows_in'] or mid in goal_ids:
+                    raise invalid(f'{label} goal mission {mid} needs program placement and a unique reference')
+                if not content_positive(goal['points']):
+                    raise invalid(f'{label} goal points must be a positive integer')
+                goal_ids.add(mid)
+                points += goal['points']
+            if 'moment_goal' in stage_fields:
+                link = stage['moment_goal']
+                if (not content_record(link, {'group_id', 'moment_id', 'credit_mission_id'})
+                        or any(not content_positive(value) for value in link.values())):
+                    raise invalid(f'{label} moment_goal needs positive group, moment and credit mission ids')
+                mid = link['moment_id']
+                if mid not in moments or mid in linked_moments:
+                    raise invalid(f'{label} moment_goal references an unknown or already linked Moment')
+                credit = link['credit_mission_id']
+                if (not any(goal['mission_id'] == credit for goal in stage['goals'])
+                        or missions[credit]['target'] != 1
+                        or missions[credit]['shows_in'] != ['program']):
+                    raise invalid(f'{label} moment_goal needs a one-unit program goal in its stage')
+                if link['group_id'] in stage_ids:
+                    raise invalid(f'{label} moment_goal group id conflicts with a stage')
+                stage_ids.add(link['group_id'])
+                linked_moments.add(mid)
+        if total != points:
+            raise invalid(f'{label} total_points must equal the sum of goal points')
+        referenced.update(goal_ids)
+        tiers = program['tiers']
+        if not isinstance(tiers, list) or not tiers:
+            raise invalid(f'{label} must contain at least one reward tier')
+        previous = 0
+        for tier in tiers:
+            if (not content_record(tier, {'threshold', 'reward'}) or not content_positive(tier['threshold'])
+                    or not previous < tier['threshold'] <= total):
+                raise invalid(f'{label} tier thresholds must be positive and strictly increasing up to total_points')
+            previous = tier['threshold']
+            reward = tier['reward']
+            kind = reward.get('kind') if isinstance(reward, dict) else None
+            if kind == 'stubs' and content_record(reward, {'kind', 'amount'}) and content_positive(reward['amount']):
+                continue
+            if kind == 'pack' and content_record(reward, {'kind', 'product_id'}):
+                if not content_positive(reward['product_id']) or reward['product_id'] not in SHOP_PACKS:
+                    raise invalid(f'{label} tier references an unknown pack product')
+                continue
+            raise invalid(f'{label} tier must award positive Stubs or an owned pack product')
+        if previous != total:
+            raise invalid(f'{label} last tier threshold must equal total_points')
+        index[program_id] = program
+    if any('program' in mission['shows_in'] and mid not in referenced for mid, mission in missions.items()):
+        raise invalid('missions.json has a mission with program placement and no program goal reference')
+    if moments is not None and linked_moments.union(browser_moments) != moments.keys():
+        raise invalid('moments.json has an unlinked program Moment')
+    return index
+
+
+def load_mission_content(directory):
+    return tuple(load_title_content(directory).missions.values())
+
+
+@lru_cache(maxsize=1)
+def active_title_content():
+    return load_title_content(MISSION_CONTENT_DIR)
+
+
+def active_missions():
+    return tuple(mission for mission in active_title_content().missions.values()
+                 if 'daily' in mission.get('shows_in', ('daily',)))
+
+
+def mission_count(counters, key):
+    value = counters.get(key, 0) if isinstance(counters, dict) else 0
+    return max(0, value) if type(value) is int else 0
+
+
+def mission_unit(mission):
+    return STAT_MISSIONS.get(mission['evaluator'], ('Games',))[0]
+
+
+def mission_rows(profile):
+    progress = profile.get('mission_progress')
+    paid_cycles = profile.get('mission_paid_cycles')
+    for mission in active_missions():  # Preserve the shared stage/slot row order.
+        key = str(mission['id'])
+        target = mission['target']
+        remaining = mission_count(progress, key) - mission_count(paid_cycles, key) * target
+        current = min(target, max(0, remaining))
+        description = f'{mission["description"]} Reward: {mission["reward"]["amount"]} Stubs.'
+        yield mission, dict(id=mission['id'], name=mission['name'], description=description,
+                            type_tab=0, is_complete=int(current == target),
+                            progress_current=current, progress_max=target, stat=mission_unit(mission))
+
+
+def program_daily_goals(stage, profile):
+    rows = list(mission_rows(profile))
+    group = mini_node(stage, 'goals', id=DAILY_GOAL_GROUP_ID, name='Daily Missions',
+                      description='Finish games against the CPU in Diamond Dynasty.',
+                      type=0, is_group=1, is_complete=int(all(fields['is_complete'] for _, fields in rows)),
+                      type_tab=0, tickets=0, mode_name='')
+    for _, fields in rows:
+        goal = mini_node(group, 'goal', type=0, tickets=0, mission_criteria_id=0,
+                         preview_count=0, mode_name='', **fields)
+        ET.SubElement(goal, 'items')
+
+
 def mission_slots(params):
-    # 0xf0bc60 and 0xf07f80 clear DATA_M and bind response/missions, even for
-    # zero daily slots. Without refresh_time neither creates a refresh timer.
-    return '<response><missions/></response>'
+    profile = load_state(migrate_team=False).get('profile', {})
+    response = ET.Element('response')
+    missions = ET.SubElement(response, 'missions')
+    for mission, fields in mission_rows(profile):
+        # The type-0 script binds current_progress/max_progress at 0x35fc94/0x35fcc4.
+        row = mini_node(missions, 'mission', mission_slot_id=mission['slot_id'],
+                        current_progress=fields['progress_current'], max_progress=fields['progress_max'],
+                        timed_tab=0, timed_remaining=0, submode=0, **{MISSION_REROLL_FLAG: 0}, **fields)
+        # The type-0 detail reads the amount (0x35fa94) with a fixed XP display
+        # argument (0x3539a0). The description above advertises the real Stubs.
+        extras = ET.SubElement(ET.SubElement(row, 'reward'), 'extras')
+        mini_node(extras, 'extra', amount=0)
+    return mini_xml(response)
+
+
+def authored_program_state(profile, program):
+    return profile.get('authored_programs', {}).get(str(program['id']), {})
+
+
+def authored_program_status(program, saved, missions):
+    """Return points and the first unfinished stage (or the stage count when complete)."""
+    units = saved.get('units')
+    current_stage = len(program['stages'])
+    points = 0
+    for index, stage in enumerate(program['stages']):
+        for goal in stage['goals']:
+            mid = goal['mission_id']
+            if mission_count(units, str(mid)) >= missions[mid]['target']:
+                points += goal['points']
+            else:
+                current_stage = min(current_stage, index)
+    return points, current_stage
+
+
+def authored_program_tiers(program):
+    for level, tier in enumerate(program['tiers'], 1):
+        reward = tier['reward']
+        yield PathTier(level, tier['threshold'], reward.get('amount', 0), reward.get('product_id', 0))
+
+
+def authored_texture(key):
+    if key and any(Path(folder, 'CROSS', 'LIVE', key + '.WEBP').is_file()
+                   for folder in (LAYOUT.update, LAYOUT.base) if folder):
+        return key
+    return ''
+
+
+def authored_program_fields(program, saved, missions):
+    points, current = authored_program_status(program, saved, missions)
+    tiers = tuple(authored_program_tiers(program))
+    reached = sum(tier.threshold <= points for tier in tiers)
+    next_level = min(len(tiers), reached + 1)
+    total = program['total_points']
+    fields = program_fields({})
+    fields.update(id=program['id'], name=program['name'], name_short=program['name'],
+                  subtitle=program['subtitle'], description=program['subtitle'],
+                  program_group_id=program['list_groups'][0],
+                  texture_name=authored_texture(program['texture_name']),
+                  texture_name_bkg=authored_texture(program['texture_name_bkg']),
+                  tickets_earned=points, total_program_tickets=total, max_program_tickets=total,
+                  max_tickets=total, percent_complete=points * 100 // total, is_complete=int(points == total),
+                  current_stage=min(current, len(program['stages']) - 1),
+                  current_level=max(1, reached), next_level=next_level,
+                  xp_to_next_level=tiers[next_level - 1].threshold - points,
+                  xp_earned=points, xp_earned_apao34n_=points, reward_unlocks_aaaa0aaa_yvx=reached,
+                  # The native loop check reads this threshold (0xf0e842).
+                  # FRONTEND 0x3617bd still uses a literal /25,000 caption.
+                  has_unlimited_reward='False', just_completed_program='False', max_bonus_tickets=total)
+    return fields
+
+
+def authored_program_goals(parent, program, saved, missions, current_stage, *, include_moments=False):
+    stages = ET.SubElement(parent, 'stages')
+    units = saved.get('units')
+    mode = 'Play vs. CPU'
+    for index, definition in enumerate(program['stages']):
+        stage = mini_node(stages, 'stage', stage=index, is_unlocked=int(index <= current_stage))
+        goals = mini_node(stage, 'goals', id=definition['id'], name=definition['name'],
+                          description=f'Complete {definition["name"]} goals in {mode}.',
+                          type=2, is_group=1, is_complete=1, type_tab=0, tickets=0, mode_name=mode)
+        # Type 2 uses these goal rows directly, as Team Affinity does. Type 0
+        # would index the global daily DATA_M slots and show the wrong goals.
+        for goal in definition['goals']:
+            mission = missions[goal['mission_id']]
+            target = mission['target']
+            current = min(target, mission_count(units, str(mission['id'])))
+            complete = int(current == target)
+            row = mini_node(goals, 'goal', id=mission['id'], type=2, type_tab=0, mode_name=mode,
+                            name=mission['name'], description=mission['description'],
+                            is_complete=complete, tickets=goal['points'], progress_current=current,
+                            progress_max=target, mission_criteria_id=0, preview_count=0,
+                            stat=mission_unit(mission))
+            ET.SubElement(row, 'items')
+            if not complete:
+                goals.set('is_complete', '0')
+        if include_moments and 'moment_goal' in definition:
+            link = definition['moment_goal']
+            moment = active_title_content().moments[link['moment_id']]
+            credit = next(goal for goal in definition['goals'] if goal['mission_id'] == link['credit_mission_id'])
+            won = int(moment['id'] in saved.get('moment_wins', ()))
+            desc = f'Earn the same {credit["points"]} program points through either {definition["name"]} task.'
+            group = mini_node(stage, 'goals', id=link['group_id'], name='Moments', description=desc,
+                              type=1, is_group=1, is_complete=won, type_tab=0, tickets=0, mode_name='Moments')
+            row = mini_node(group, 'goal', id=moment['id'], type=1, type_tab=0, mode_name='Moments',
+                            name=moment['name'], description=moment['description'], is_complete=won,
+                            tickets=credit['points'], progress_current=won, progress_max=1,
+                            mission_criteria_id=0, preview_count=0, stat='Games')
+            ET.SubElement(row, 'items')
+
+
+def authored_program_view(program):
+    profile = load_state(migrate_team=False).get('profile', {})
+    saved = authored_program_state(profile, program)
+    missions = active_title_content().missions
+    moment_ids = tuple(stage['moment_goal']['moment_id'] for stage in program['stages'] if 'moment_goal' in stage)
+    PROGRAM_MOMENT_CONTEXT.set(moment_ids or None)
+    fields = authored_program_fields(program, saved, missions)
+    response = ET.Element('response')
+    row = mini_node(response, 'program', **fields)
+    authored_program_goals(row, program, saved, missions, fields['current_stage'], include_moments=True)
+    rewards = ET.SubElement(row, 'rewards')
+    claimed = set(saved.get('claimed_tiers', ()))
+    for tier in authored_program_tiers(program):
+        program_tier_row(rewards, tier, fields['tickets_earned'], tier.level in claimed)
+    unlimited = ET.SubElement(row, 'unlimited_rewards')
+    for _ in range(6):
+        mini_node(unlimited, 'unlimited_reward', texture_name='')
+    return mini_xml(response)
+
+
+def authored_program_list(programs):
+    profile = load_state(migrate_team=False).get('profile', {})
+    missions = active_title_content().missions
+    response = ET.Element('response')
+    first = programs[0]
+    mini_node(response, 'active_program', id=first['id'], name_short=first['name'],
+              texture_name=authored_texture(first['texture_name']))
+    rows = mini_node(response, 'programs', display_mode=0)
+    for program in programs:
+        fields = authored_program_fields(program, authored_program_state(profile, program), missions)
+        row = mini_node(rows, 'program', **fields, featured_label_rtay_8i_='Tier Rewards')
+        featured = ET.SubElement(row, 'featured_items')
+        tiers = tuple(authored_program_tiers(program))
+        previews = [tier for tier in tiers if tier.pack_id] or list(tiers)
+        while len(previews) < 2:
+            previews.append(previews[0])
+        for tier in previews[:2]:
+            program_item(featured, tier, tag='featured_item')
+    return mini_xml(response)
 
 
 # One Team Affinity track per division. Store club points as the source of truth.
@@ -1082,24 +1712,163 @@ def affinity_record_game(state, receipt, clubs, won):
         affinity_grant_tiers(state, division, affinity_division_points(state, division))
 
 
-def affinity_cpu_upload(state, game_data):
+def cpu_upload_win(state, record):
+    """Return the local result of a decisive, finished Play vs. CPU report."""
+    if (not record['uuid'] or len(record['uuid']) > 128
+            or record['scheduled'] <= 0 or record['outcome'] != 'FINISHED'):
+        return None
     try:
-        record = decode_summary_record(game_data)
-        if (record['game_type'], record['sub_mode'], record['outcome']) != ('ARENA', 3, 'FINISHED'):
-            return
-        if not record['uuid'] or len(record['uuid']) > 128:
-            return
         teams = summary_teams(record, summary_local_team(state))
-    except (ValueError, struct.error):
-        return
+    except ValueError:
+        return None
     local, = (side for side, team in teams.items() if team['owner_id'] == ACCOUNT_ID)
     away, home = (record['totals'][side]['runs'] for side in ('away', 'home'))
     if away == home:
+        return None
+    return (away > home) == (local == 'away')
+
+
+def match_stat_cards(state, record, card_ids=None):
+    """Resolve only unambiguous items in this side's match squad."""
+    if card_ids is None:
+        ids = [record['ids'][side] for side in SUMMARY_SIDES]
+        setup = _affinity_lineup
+        card_ids = setup[2] if setup and len(setup) == 3 and setup[0] == ids else squad_ids(state.get('squad') or {})
+    if not card_ids:
+        return {}
+    selected, cards = set(card_ids), {}
+    try:
+        for card in all_cards():
+            item = card['item_id']
+            if item in selected:
+                # A second catalogue entry for the same item makes the join ambiguous.
+                cards[item] = None if item in cards else card
+    except (OSError, ValueError, KeyError, TypeError, struct.error):
+        return {}
+    return cards
+
+
+def stat_mission_units(mission, stats, margin, cards):
+    evaluator = mission['evaluator']
+    if evaluator == 'shutout':
+        return int(margin is not None and margin > 0 and stats['team'].get('runs_allowed') == 0)
+    if evaluator == 'win_margin':
+        return int(margin is not None and margin >= mission['min_margin'])
+    fields = STAT_MISSIONS[evaluator][1:]
+    if any(field not in stats['team'] for field in fields):
+        return 0
+    filters = mission.get('card_filter')
+    if not filters:
+        return sum(stats['team'][field] for field in fields)
+    total = 0
+    for item, line in stats['cards'].items():
+        card = cards.get(item)
+        if not card:
+            continue
+        series = card.get('series')
+        if series == 'Live':
+            series = 'Live Series'
+        if 'series' in filters and filters['series'] != series:
+            continue
+        club = card.get('team_id')
+        if 'club' in filters and (type(club) is not int or not 0 <= club < len(MLB_TEAMS)
+                                  or MLB_TEAMS[club][0] != filters['club']):
+            continue
+        total += sum(line['batting'].get(field, 0) + line['pitching'].get(field, 0) for field in fields)
+    return total
+
+
+def mission_game_credits(state, record, won, *, card_ids=None):
+    """Measure an accepted result without changing state or paying anything."""
+    if (record['game_type'] != 'ARENA' or record['outcome'] != 'FINISHED'
+            or record['sub_mode'] not in MISSION_MODES):
+        return {}
+    sides = [side for side in SUMMARY_SIDES if record['players'][side] == ACCOUNT_ID]
+    if len(sides) != 1:
+        return {}
+    local = sides[0]
+    other = 'away' if local == 'home' else 'home'
+    sides_stats = record.get('stats') or {}
+    stats = sides_stats.get(local)
+    scores = [sides_stats.get(side, {}).get('team', {}).get('runs') for side in (local, other)]
+    margin = scores[0] - scores[1] if None not in scores else None
+    missions = [mission for mission in active_title_content().missions.values()
+                if record['sub_mode'] in mission.get('modes', (3,))]
+    cards = (match_stat_cards(state, record, card_ids)
+             if stats is not None and any(mission.get('card_filter') for mission in missions) else {})
+    credits = {}
+    for mission in missions:
+        evaluator = mission['evaluator']
+        if evaluator == 'cpu_game_finished':
+            amount = 1
+        elif evaluator == 'cpu_game_won':
+            amount = int(won)
+        else:
+            amount = stat_mission_units(mission, stats, margin, cards) if stats is not None else 0
+        if amount:
+            credits[str(mission['id'])] = amount
+    return credits
+
+
+def settle_daily_missions(profile, credits):
+    progress = profile.setdefault('mission_progress', {})
+    paid_cycles = profile.setdefault('mission_paid_cycles', {})
+    for mission in active_missions():
+        key = str(mission['id'])
+        amount = credits.get(key, 0)
+        if not amount:
+            continue
+        units = mission_count(progress, key) + amount
+        progress[key] = units
+        cycles = units // mission['target']
+        newly_earned = cycles - mission_count(paid_cycles, key)
+        if newly_earned > 0:
+            profile['stubs'] = profile.get('stubs', 0) + newly_earned * mission['reward']['amount']
+            paid_cycles[key] = cycles
+
+
+def settle_authored_programs(state, credits, *, program_id=None):
+    content = active_title_content()
+    if not content.programs:
         return
-    receipt = hashlib.sha256(game_data).hexdigest()
-    if receipt in state.get('team_affinity', {}).get('game_receipts', {}):
-        return
-    affinity_record_game(state, receipt, affinity_upload_clubs(state, record), (away > home) == (local == 'away'))
+    profile = state.setdefault('profile', {})
+    programs = content.programs.values() if program_id is None else (content.programs[program_id],)
+    for program in programs:
+        key = str(program['id'])
+        saved = authored_program_state(profile, program)
+        _, current = authored_program_status(program, saved, content.missions)
+        completed = current == len(program['stages'])
+        stage = program['stages'][0 if completed else current]
+        if not any(credits.get(str(goal['mission_id'])) for goal in stage['goals']):
+            continue
+        if completed or not saved:
+            # Keep the completed stage and paid tiers visible until the next
+            # game that advances the first stage. The cycle number is the prior paid watermark.
+            saved = {'cycle': saved.get('cycle', 0) + 1, 'units': {}, 'claimed_tiers': []}
+            profile.setdefault('authored_programs', {})[key] = saved
+        units = saved['units']
+        for goal in stage['goals']:
+            mission = content.missions[goal['mission_id']]
+            mid = str(mission['id'])
+            if mid in credits:
+                units[mid] = min(mission['target'], mission_count(units, mid) + credits[mid])
+        points, _ = authored_program_status(program, saved, content.missions)
+        claimed = set(saved['claimed_tiers'])
+        for tier in authored_program_tiers(program):
+            if points < tier.threshold or tier.level in claimed:
+                continue
+            if tier.pack_id:
+                grant_owned_pack(state.setdefault('pack_shop', {}), tier.pack_id)
+            else:
+                profile['stubs'] = profile.get('stubs', 0) + tier.stubs
+            claimed.add(tier.level)
+        saved['claimed_tiers'] = sorted(claimed)
+
+
+def settle_game_missions(state, credits):
+    if credits:
+        settle_daily_missions(state.setdefault('profile', {}), credits)
+        settle_authored_programs(state, credits)
 
 
 def up_levels(xp):
@@ -1166,13 +1935,36 @@ def xp_grant_answer(body):
 
 def game_create(params, game_data=None):
     # 0x9e8460: keep the empty completion reply for mlb_game.create.
-    state = load_state()
+    if game_data is None:
+        return '<response/>'
+    try:
+        record = decode_summary_record(game_data, include_stats=True)
+    except (ValueError, struct.error):
+        return '<response/>'
+    state = load_state(migrate_team=False)
+    if (record['game_type'], record['sub_mode']) == ('ARENA', 3):
+        won = cpu_upload_win(state, record)
+        if won is None:
+            # Keep the existing quit summary while withholding all game credit.
+            if record['outcome'] in ('QUIT', 'QUIT_ON') and remember_summary_upload(state, record):
+                save_state(state)
+            return '<response/>'
+        # A UUID can be reused by a subsequent game. Reuse the exact-payload receipt
+        # from Team Affinity so old uploads and retries cannot earn any game credit.
+        receipt = hashlib.sha256(game_data).hexdigest()
+        if receipt in state.get('team_affinity', {}).get('game_receipts', {}):
+            return '<response/>'
+        credits = mission_game_credits(state, record, won)
+        affinity_record_game(state, receipt, affinity_upload_clubs(state, record), won)
+        settle_game_missions(state, credits)
+
+    # Dispatch and persistence are synchronous on the service event loop. All
+    # credit, the receipt and any legacy team migration commit in one replace.
+    migrate_local_team(state)
     p = state.setdefault('profile', {})
     p['games'] = p.get('games', 0) + 1
     p['stubs'] = p.get('stubs', 0) + STUBS_PER_GAME
-    if game_data is not None:
-        affinity_cpu_upload(state, game_data)
-        remember_summary_upload(state, game_data)
+    remember_summary_upload(state, record)
     save_state(state)
     return '<response/>'
 
@@ -1209,10 +2001,18 @@ def view_post_game(params):
 
 def all_progress(params):
     # 0x9c3ae0 / 0xbfde90: stable program, stage and goal shape; the total is a divisor.
-    fields = program_fields(load_state().get('profile', {}))
+    profile = load_state().get('profile', {})
+    fields = program_fields(profile)
     response = ET.Element('response')
     program = mini_node(response, 'program', **fields)
     program_goal(program, fields['tickets_earned'])
+    content = active_title_content()
+    for definition in content.programs.values():
+        saved = authored_program_state(profile, definition)
+        points, current = authored_program_status(definition, saved, content.missions)
+        row = mini_node(response, 'program', id=definition['id'], name=definition['name'],
+                        tickets_earned=points, total_program_tickets=definition['total_points'])
+        authored_program_goals(row, definition, saved, content.missions, current)
     return mini_xml(response)
 
 
@@ -2222,6 +3022,7 @@ from contextvars import ContextVar
 SHOWDOWN_RAID_ID = 7001
 SHOWDOWN_BLUE_TEST = True
 SHOWDOWN_BLUE_RAID_ID = 7002
+SHOWDOWN_WBC_RAID_ID = 7003
 SHOWDOWN_NAME = 'STARTER'
 SHOWDOWN_DESCRIPTION = ('Draft a squad, win short rallies, and earn upgrades for the final score chase. '
                         'This introduction takes its inspiration from the 2022 Cy Young winners, '
@@ -2320,6 +3121,64 @@ class ShowdownRefusal(ValueError):
     pass
 
 
+def validate_showdown_content(rows, programs, moments, revision, invalid, *, multiple=False):
+    if not isinstance(rows, list) or not rows or (not multiple and len(rows) != 1):
+        raise invalid('showdowns.json needs authored raids')
+    raids = {}
+    used = set(moments) | {node.identifier for node in (*SHOWDOWN_LEGACY_MOMENTS, *showdown_blue_order(0))}
+    fields = {'id', 'name', 'description', 'cover', 'rounds', 'boss_roster_id', 'program_credit', 'moments'}
+    for row in rows:
+        if (not content_record(row, fields) or not content_positive(row['id'])
+                or row['id'] in raids or row['id'] in (SHOWDOWN_RAID_ID, SHOWDOWN_BLUE_RAID_ID)):
+            raise invalid('showdowns.json needs complete fields and unique authored raid ids')
+        validate_showdown_definition(row, used, invalid)
+        only_program = 732001 if row['id'] == SHOWDOWN_WBC_RAID_ID else None
+        validate_linked_credit(row['program_credit'], programs, invalid, 'showdowns.json', only_program=only_program)
+        raids[row['id']] = dict(row, revision=revision)
+    if SHOWDOWN_WBC_RAID_ID not in raids:
+        raise invalid('showdowns.json needs WBC raid id 7003')
+    return raids
+
+
+def validate_showdown_definition(row, used, invalid):
+    if (not all(content_text(row[field]) for field in ('name', 'description'))
+            or not isinstance(row['cover'], str) or not re.fullmatch(r'[A-Z0-9_]+', row['cover'])):
+        raise invalid('showdowns.json needs XML-safe text and a bare cover texture key')
+    if not content_positive(row['boss_roster_id']):
+        raise invalid('showdowns.json needs a positive boss roster id')
+    rounds = row['rounds']
+    if not isinstance(rounds, list) or not 1 <= len(rounds) <= len(SHOWDOWN_ROUNDS):
+        raise invalid('showdowns.json needs one to ten draft rounds')
+    for entry in rounds:
+        if (not isinstance(entry, list) or len(entry) != 2 or not isinstance(entry[0], str)
+                or not isinstance(entry[1], list) or any(not isinstance(pos, str) for pos in entry[1])
+                or (entry[0], tuple(entry[1])) not in SHOWDOWN_ROUNDS):
+            raise invalid('showdowns.json draft round must use a supported roster or perk slot')
+    nodes = row['moments']
+    if not isinstance(nodes, list) or len(nodes) != 2:
+        raise invalid('showdowns.json needs a rally and a matching type-4 final')
+    for kind, node in zip((3, 4), nodes):
+        if (not content_record(node, set(ShowdownMoment._fields))
+                or type(node['kind']) is not int or node['kind'] != kind):
+            raise invalid('showdowns.json needs a type-3 rally followed by a complete type-4 final')
+        if not content_positive(node['identifier']) or node['identifier'] in used:
+            raise invalid('showdowns.json Moment ids must be unique')
+        used.add(node['identifier'])
+        if (not content_text(node['name']) or not isinstance(node['art'], str)
+                or not re.fullmatch(r'[A-Z0-9_]+', node['art']) or node['difficulty'] not in SHOWDOWN_DIFFICULTIES):
+            raise invalid('showdowns.json Moment text, art or difficulty is invalid')
+        bounds = {'opponent': (0, len(MLB_TEAMS) - 1), 'cpu_score': (0, 99), 'outs': (1, 27),
+                  'banked_runs': (0, 9 if kind == 3 else 0), 'stubs': (0, 0x7fffffff), 'xp': (0, 0x7fffffff)}
+        for key, (low, high) in bounds.items():
+            if type(node[key]) is not int or not low <= node[key] <= high:
+                raise invalid(f'showdowns.json Moment {key} is out of bounds')
+        second = node['second_base']
+        if (second is not None and (type(second) is not int or not 1 <= second <= 8)
+                or type(node['ends_run_on_loss']) is not bool or type(node['batter_upgrade']) is not bool
+                or (node['perk_rarity'] is not None and node['perk_rarity'] not in ('Bronze', 'Gold', 'Diamond'))):
+            raise invalid('showdowns.json Moment runners, failure action or upgrade is invalid')
+
+
 def showdown_is_blue(run):
     return bool(run and run.get('track') == 'blue_test')
 
@@ -2330,6 +3189,8 @@ def showdown_blue_order(candidate):
 
 
 def showdown_raid_id(run):
+    if run and run.get('definition'):
+        return run['definition']['id']
     return SHOWDOWN_BLUE_RAID_ID if showdown_is_blue(run) else SHOWDOWN_RAID_ID
 
 
@@ -2337,6 +3198,8 @@ def showdown_moments(run=None):
     if showdown_is_blue(run):
         return showdown_blue_order(run['candidate'])
     track = run.get('track') if run else 'starter_runner'
+    if run and run.get('definition'):
+        return tuple(ShowdownMoment(**node) for node in run['definition']['moments'])
     if track == 'starter_runner':
         return SHOWDOWN_MOMENTS
     if track == 'starter':
@@ -2393,7 +3256,7 @@ def showdown_progress(parent, run=None):
         mini_node(data, 'Node', State=node_state, MomentId=moment.identifier)
 
 
-def showdown_catalogue(run=None, diagnostic=None):
+def showdown_catalogue(run=None, diagnostic=None, *, authored=None):
     response = ET.Element('response')
     available = ET.SubElement(response, 'AvailableRaids')
     in_progress = ET.SubElement(response, 'InProgressRaids')
@@ -2414,13 +3277,26 @@ def showdown_catalogue(run=None, diagnostic=None):
             label = SHOWDOWN_BLUE_MOMENTS[active_run['candidate']].name
         showdown_catalogue_raid(in_progress if resumable else available, active_run, raid_id,
                                label, description, moments(active_run), include_progress=resumable)
+    active_runs = {raid_id: saved['run'] for raid_id, saved in showdown_authored_accounts(authored or {})
+                   if saved.get('run') and showdown_terminal(saved['run']) is None}
+    definitions = dict(active_title_content().showdowns)
+    definitions.update((raid_id, run['definition']) for raid_id, run in active_runs.items())
+    for raid_id, definition in definitions.items():
+        active_run = active_runs.get(raid_id)
+        resumable = showdown_ready(active_run)
+        moments = tuple(ShowdownMoment(**node) for node in definition['moments'])
+        cover = authored_texture(definition['cover']) or 'BKG_SHOWDOWN_BOSS'
+        showdown_catalogue_raid(in_progress if resumable else available, active_run, raid_id,
+                               definition['name'], definition['description'], moments,
+                               include_progress=resumable, cover=cover)
     return mini_xml(response)
 
 
-def showdown_catalogue_raid(parent, run, raid_id, label, description, moments, *, include_progress):
+def showdown_catalogue_raid(parent, run, raid_id, label, description, moments, *, include_progress, cover=None):
     # The diagnostic entry gets another stock cover: with the Starter's it was
     # taken for a duplicate on the select screen (run 114).
-    cover = 'SHOWDOWN_TA1_EAST' if raid_id == SHOWDOWN_BLUE_RAID_ID else 'SHOWDOWN_STARTER'
+    if cover is None:
+        cover = 'SHOWDOWN_TA1_EAST' if raid_id == SHOWDOWN_BLUE_RAID_ID else 'SHOWDOWN_STARTER'
     raid = mini_node(parent, 'Raid', Id=raid_id, Name=label, Description=description,
                      CoverTexture=cover, Timed='false', TimeText='', IsCoop='false',
                      EntryPrice=SHOWDOWN_FEE, DraftData='{}')
@@ -2545,10 +3421,26 @@ def showdown_run_for(run, query, *, required=False):
     return None
 
 
+def showdown_authored_accounts(account):
+    # Keep the original WBC save location for in-progress drafts and results.
+    yield SHOWDOWN_WBC_RAID_ID, account.get('wbc', {})
+    for key, saved in account.get('authored', {}).items():
+        yield int(key), saved
+
+
 def showdown_entry_account(account, query):
+    requested = showdown_id(query.get('raid_team_id', query.get('team_id')))
+    raid_id = showdown_number(query.get('raid_id'))
+    for authored_id, entry in showdown_authored_accounts(account):
+        run = entry.get('run') or {}
+        if requested and requested in (showdown_id(run.get('id')), showdown_id(entry.get('last_abandoned'))):
+            return entry
+        if requested in (None, '0' * 32) and raid_id == authored_id:
+            return entry
+    if requested in (None, '0' * 32) and raid_id in active_title_content().showdowns:
+        return {}
     if SHOWDOWN_BLUE_TEST:
         diagnostic = account.get('blue_test', {})
-        requested = showdown_id(query.get('raid_team_id', query.get('team_id')))
         run = diagnostic.get('run') or {}
         if requested and requested in (showdown_id(run.get('id')), showdown_id(diagnostic.get('last_abandoned'))):
             return diagnostic
@@ -2572,11 +3464,17 @@ def showdown_blue_log(moment):
 def showdown_create(state, account, query):
     raid_id = showdown_number(query.get('raid_id'))
     blue = SHOWDOWN_BLUE_TEST and raid_id == SHOWDOWN_BLUE_RAID_ID
-    if not blue and raid_id != SHOWDOWN_RAID_ID:
+    wbc = raid_id == SHOWDOWN_WBC_RAID_ID
+    definition = active_title_content().showdowns.get(raid_id)
+    if not blue and not definition and raid_id != SHOWDOWN_RAID_ID:
         raise ShowdownRefusal('This Showdown is unavailable.')
     state['showdown'] = account
     if blue:
         account = account.setdefault('blue_test', {})
+    if wbc:
+        account = account.setdefault('wbc', {})
+    elif definition:
+        account = account.setdefault('authored', {}).setdefault(str(raid_id), {})
     existing = account.get('run')
     if existing is not None and showdown_terminal(existing) is None:
         if not existing['paid']:
@@ -2588,7 +3486,7 @@ def showdown_create(state, account, query):
         account['run'] = run
         save_state(state)
         return run
-    rounds = SHOWDOWN_ROUNDS[:2] if blue else SHOWDOWN_ROUNDS
+    rounds = definition['rounds'] if definition else SHOWDOWN_ROUNDS[:2] if blue else SHOWDOWN_ROUNDS
     # Draft loans are drawn from the catalogue. The owner's held variants
     # carry the usual display data. Never change either source inventory.
     pool = {c['item_id']: c for c in all_cards()}
@@ -2613,7 +3511,7 @@ def showdown_create(state, account, query):
         if group == 'perk':
             # Later perk offers are sampled after the previous pick, so
             # both rounds have four different cards and cannot repeat a pick.
-            offers = perk_ids if draft[-1]['group'] == 'perk' else rng.sample(perk_ids, SHOWDOWN_CHOICES)
+            offers = perk_ids if draft and draft[-1]['group'] == 'perk' else rng.sample(perk_ids, SHOWDOWN_CHOICES)
             draft.append({'group': group, 'offers': offers})
             continue
         # Use distinct people across the roster and all player offers,
@@ -2631,9 +3529,22 @@ def showdown_create(state, account, query):
            'draft': draft, 'initial_rounds': len(draft), 'picks': [], 'perk': None, 'equipped_perks': []}
     if blue:
         run.update(track='blue_test', candidate=account.get('next', 0), moment_results=[False])
+    if definition:
+        boss = select_showdown_boss(pool.values(), definition)
+        run.update(track='wbc' if wbc else 'authored', definition=definition,
+                   boss_item_id=boss['item_id'] if boss else None)
     account['run'] = run
     save_state(state)
     return run
+
+
+def select_showdown_boss(cards, definition):
+    candidates = [card for card in cards if card['roster_player_id'] == definition['boss_roster_id']
+                  and card['display_position'] in ('SP', 'RP', 'CP')]
+    series = 'World Baseball Classic' if definition['id'] == SHOWDOWN_WBC_RAID_ID else 'Awards'
+    return max(candidates, key=lambda card: (card['series'] == series,
+                                             card['series'] in ('Live', 'Live Series'), card['ovr'],
+                                             -card['item_id']), default=None)
 
 
 def showdown_pay(state, run, query):
@@ -2713,7 +3624,8 @@ def showdown_picks(run=None):
 
 
 def showdown_lineup(run):
-    body = lineup_reply(current_squad(run['squad']), {'name': SHOWDOWN_NAME}, mini=True)
+    body = lineup_reply(current_squad(run['squad']), {'name': run.get('definition', {}).get('name', SHOWDOWN_NAME)},
+                        mini=True)
     response = ET.fromstring(body or showdown_neutral('raids.view_lineup'))
     lineups = response.find('arena_lineups')
     lineups.attrib.update(draft_state=str(len(run['picks'])),
@@ -2723,51 +3635,66 @@ def showdown_lineup(run):
     return mini_xml(response)
 
 
-def showdown_options(moment):
+def singles_options(opponent, user_team, situation_id, outs, difficulty_name, bases=None, *, stadium=None):
     # 0xae2699–0xae2bc9 immediately dereferences several of these lookups.
     # 0xae27e9 to 0xae2910 maps JSON strings '0' through '4' to native values 4 through 8.
-    difficulty = str(SHOWDOWN_DIFFICULTIES.index(moment.difficulty))
+    difficulty = str(SHOWDOWN_DIFFICULTIES.index(difficulty_name))
     gameplay = dict(Balks='Off', Ejections='Off', GuessPitch='Off', HittingDifficulty=difficulty,
                     PitchingDifficulty=difficulty, Injuries='Off', NumInnings=9, PresMode='Fast Play',
-                    QuickCounts='Off', Stadium=str(moment.opponent), Time='1100',
+                    QuickCounts='Off', Stadium=str(opponent if stadium is None else stadium), Time='1100',
                     UmpireClosePlays='On', UmpiringAccuracy='Perfect', Weather='0',
                     BlackAndWhiteMode=False, VideoName='', StrikeZone='On', HotZones='Off')
     option = dict(GameplaySetupData=gameplay,
-                  OpponentTeamData=dict(TeamType='mlb_team', TeamId=moment.opponent),
-                  UsersTeamData=dict(TeamType='user_dd_team', TeamId=DD_TEAM_ID,
-                                     allowLineupEditing=False),  # Required at 0xae3433.
-                  StartingSituationData=dict(situationId=moment.identifier, userCurrentBatter=0,
+                  OpponentTeamData=dict(TeamType='mlb_team', TeamId=opponent),
+                  UsersTeamData=dict(**user_team, allowLineupEditing=False),  # Required at 0xae3433.
+                  StartingSituationData=dict(situationId=situation_id, userCurrentBatter=0,
                                              cpuCurrentBatter=0, cpuCurrentPitcher=0,
                                              userCurrentPitcher=0, cpuCurrentPitcherIsStarter=True,
                                              userCurrentPitcherIsStarter=True),
-                  DurationData=dict(Type='outs', Value=moment.outs))
-    if moment.second_base is not None:
-        option['StartingSituationData'].update(firstBase=-1, secondBase=moment.second_base, thirdBase=-1)
+                  DurationData=dict(Type='outs', Value=outs))
+    if bases is not None:
+        option['StartingSituationData'].update(zip(('firstBase', 'secondBase', 'thirdBase'), bases))
     return json.dumps({'OptionsList': [option]})
+
+
+def showdown_options(moment):
+    bases = None if moment.second_base is None else (-1, moment.second_base, -1)
+    return singles_options(moment.opponent, {'TeamType': 'user_dd_team', 'TeamId': DD_TEAM_ID},
+                           moment.identifier, moment.outs, moment.difficulty, bases)
 
 
 def showdown_banked_runs(run):
     return sum(moment.banked_runs for moment, won in zip(showdown_moments(run), run.get('moment_results', ())) if won)
 
 
-def showdown_blue_criteria(field, threshold, actor=-1):
+def showdown_blue_criteria(field, threshold, actor=-1, *, mode='batting'):
     # -1 is the native fallback sentinel. The team/actor binding remains an
     # experiment. The tokens, integer types, and complete row shape are known.
-    row = dict(mode='batting', field=field, condition='>=', value=threshold, id=actor,
+    row = dict(mode=mode, field=field, condition='>=', value=threshold, id=actor,
                pre='Reach ', post=f' {field}', post_singular=f' {field}')
     return json.dumps(dict(stat_binder=0, stat_conditions=[row]))
 
 
-def showdown_mission_definitions(ids, run=None, *, blue=False):
+def showdown_mission_definitions(ids, run=None, *, blue=False, definition=None):
     response = ET.Element('response')
     mission_set = ET.SubElement(response, 'SinglesMissionSet')
+    if run and run.get('definition'):
+        definition = run['definition']
     ready = showdown_ready(run)
     results = run.get('moment_results', []) if ready else []
     banked = showdown_banked_runs(run) if ready else 0
-    moments = showdown_moments(run) if run or not blue else showdown_blue_order(0)
+    moments = (tuple(ShowdownMoment(**node) for node in definition['moments']) if definition and not run
+               else showdown_moments(run) if run or not blue else showdown_blue_order(0))
     for index, moment in enumerate(moments):
         if moment.identifier in ids:
             name = moment.name
+            if moment.kind == 4 and definition:
+                if run:
+                    boss = pinned_showdown_boss(run['boss_item_id'], definition['boss_roster_id'])
+                else:
+                    boss = select_showdown_boss(all_cards(), definition)
+                if boss is None:
+                    name = f'Local {MLB_TEAMS[moment.opponent][1]} Final'
             # The native recap focuses the previous node (0xc84e70). Label
             # it as settled while keeping the active node's wire state intact.
             if index < len(results):
@@ -2783,7 +3710,7 @@ def showdown_mission_definitions(ids, run=None, *, blue=False):
                         f'{goal} before making three outs.')
             win = json.dumps({'outs_remaining': moment.outs})
             lose = '{"stat_conditions":[]}'
-            raid_id = SHOWDOWN_BLUE_RAID_ID if blue else SHOWDOWN_RAID_ID
+            raid_id = definition['id'] if definition else SHOWDOWN_BLUE_RAID_ID if blue else SHOWDOWN_RAID_ID
             if blue and moment.kind < 3:
                 _, field, actor = SHOWDOWN_BLUE_CASES[moment.kind]
                 player = card_by_id(run['squad']['lineup'][0][0]) if run and actor == 'leadoff' else None
@@ -2824,11 +3751,371 @@ def showdown_team_reply(state, run):
     squad = current_squad(run['squad'])
     if tuple(map(len, squad)) != (8, 1, 4, 5, 8):
         raise ShowdownRefusal('The saved Showdown roster needs 26 players.')
+    return singles_team_reply(squad, team)
+
+
+def singles_team_reply(squad, team, *, jersey_team_id=None):
     response = ET.fromstring(team_reply(squad, team))
     # The Singles callback reads this in addition to the shared builder's
     # has_dh bit (0xb68cd2 and 0x9d3fa0).
-    response.find('arena_team').set('use_dh', 'true')
+    roster = response.find('arena_team')
+    roster.set('use_dh', 'true')
+    if jersey_team_id is not None:
+        # The Singles roster callback reads jersey_team_id (0xb68fa2, hash
+        # 0x4f3f443a) into the per-game selector at +0xe0 (0xb698e6).
+        roster.set('jersey_team_id', str(jersey_team_id))
     return mini_xml(response)
+
+
+PROGRAM_MOMENT_CONTEXT = ContextVar('program_moment_context', default=None)
+PROGRAM_MOMENT_OPPONENT = ContextVar('program_moment_opponent', default=None)
+PROGRAM_MOMENT_LAUNCH = ContextVar('program_moment_launch', default=None)
+BROWSER_MOMENT_CONTEXT = ContextVar('browser_moment_context', default=())
+MOMENT_RESULT_OPERAND = 'result_bzyyv77'  # XML hash 0x3ed28744 at 0x9e8c1d.
+MOMENT_EMPTY_TOTALS = '{"winning_totals":[],"losing_totals":[]}'
+
+
+def program_moment_definition(parent, moment, situation, *, order=0):
+    outs = 3 - situation['outs']
+    opponent = moment['opponent_club']
+    user_club = moment['user_club']
+    options = singles_options(opponent, {'TeamType': 'custom_team', 'TeamId': moment['team_id']},
+                              situation['id'], outs, moment['difficulty'], situation['base_runners'],
+                              stadium=user_club)
+    objective = moment.get('objective', 'walk_off')
+    mode, field, target = MOMENT_OBJECTIVES[objective]
+    losing = (showdown_blue_criteria('RUNS', 1, mode='pitching') if mode == 'pitching'
+              else showdown_blue_criteria('OUTS', outs))
+    mini_node(parent, 'SinglesMission', Id=moment['id'], GroupId=moment['group_id'], SetsId=moment['set_id'],
+              Name=moment['name'], Description=moment['description'], Large_Texture=authored_texture(moment['texture_name']),
+              Order=order, StartDate=0, EndDate=0, Timed='false', TimeText='', Repeatable='true', NumGames=1,
+              RewardsXp=0, RewardsStubs=moment['stubs'], RewardsItem=0,
+              UnlockCriteriaType=0, UnlockCriteriaDesc='', UnlockCriteriaDetail='{}',
+              WinningCriteriaType=0, WinningCriteriaDetail=showdown_blue_criteria(field, target, mode=mode),
+              LosingCriteriaType=0, LosingCriteriaDetail=losing,
+              PerGameOptions=options, UserJerseyTeamId=user_club, OppJerseyTeamId=opponent,
+              UserAbbreviation=MLB_TEAMS[user_club][0], OppAbbreviation=MLB_TEAMS[opponent][0])
+
+
+def program_moment_situation(parent, moment, situation):
+    first, second, third = situation['base_runners']
+    data = dict(version=1, name=moment['name'], inning=situation['inning'],
+                inningIsTop=situation.get('inning_is_top', False),
+                scoreCPU=situation['cpu_runs'], scoreUser=situation['user_runs'], userIsHome=True,
+                balls=situation['balls'], strikes=situation['strikes'], outs=situation['outs'],
+                runnerOnFirst=first != -1, runnerOnSecond=second != -1, runnerOnThird=third != -1)
+    mini_node(parent, 'Situation', id=situation['id'], data=json.dumps(data))
+
+
+def program_moment_launch(moment):
+    club = moment['user_club']
+    squad = cpu_squad(club)
+    if tuple(map(len, squad)) != (8, 1, 4, 5, 8):
+        return envelope(status=1, message='The local Moment roster needs 26 players.'), 'refused'
+    team = dict(cpu_team(club), id=moment['team_id'])
+    inner = singles_team_reply(squad, team, jersey_team_id=club)
+    state = load_state(migrate_team=False)
+    progress = state.setdefault('ordinary_moments', {}).setdefault(str(moment['id']),
+                                                                  {'attempt': 0, 'receipts': {}})
+    attempt = progress['attempt']
+    if attempt == 0 or f'{attempt}:0' in progress['receipts']:
+        # The native team request is part of the launch queue. Reads on the
+        # program and duplicate roster requests during setup arm no extra attempt.
+        progress['attempt'] += 1
+        save_state(state)
+    PROGRAM_MOMENT_CONTEXT.set((moment['id'],))
+    PROGRAM_MOMENT_OPPONENT.set(moment['opponent_club'])
+    PROGRAM_MOMENT_LAUNCH.set(moment['id'])
+    return envelope(inner), 'moment roster'
+
+
+def program_moment_start(params):
+    moment_id = PROGRAM_MOMENT_LAUNCH.get()
+    if moment_id is None:
+        return None
+    try:
+        if json.loads(params) != {}:
+            return None
+    except ValueError:
+        return None
+    state = load_state(migrate_team=False)
+    progress = state.get('ordinary_moments', {}).get(str(moment_id))
+    if not progress or not progress['attempt']:
+        return None
+    # An ordinary single-game loss restarts from this empty request without
+    # fetching its roster again. The original start already has an armed slot.
+    prior = progress['receipts'].get(f'{progress["attempt"]}:0')
+    if prior and not prior['won']:
+        progress['attempt'] += 1
+        save_state(state)
+    return envelope('<response><raid started="1"/></response>'), 'moment start'
+
+
+def moment_criteria_hint(raw):
+    flag = str(raw).lower()
+    if flag in ('', 'false', '0'):
+        return False
+    if flag == 'true':
+        return True
+    # 0x9eaa30 emits a %d ID for each achieved criterion, joined by commas.
+    # Keep the boolean spellings used by the older local requests as well.
+    ids = flag.split(',')
+    if len(ids) > 16 or any(not re.fullmatch(r'-?(?:0|[1-9][0-9]{0,9})', key)
+                            or not -0x80000000 <= int(key) <= 0x7fffffff for key in ids):
+        raise ValueError('invalid criteria flags')
+    return True
+
+
+def parse_moment_score(query, *, win_target=1):
+    if showdown_number(query.get('game_id')) != 0:  # The sole OptionsList index.
+        raise ValueError('invalid Moment game index')
+    win_hint = moment_criteria_hint(query.get('winning_criteria_achieved'))
+    loss_hint = moment_criteria_hint(query.get('losing_criteria_achieved'))
+    data = query.get('data')
+    if isinstance(data, str) and len(data) <= 8192:
+        data = json.loads(data)
+    if not content_record(data, {'winning_totals', 'losing_totals'}):
+        raise ValueError('invalid criteria totals')
+    for rows in data.values():
+        if not isinstance(rows, list) or len(rows) > 16:
+            raise ValueError('invalid criteria rows')
+        for row in rows:
+            if (not content_record(row, {'id', 'value', 'success'})
+                    or type(row['id']) is not int or not -1 <= row['id'] <= 0x7fffffff
+                    or type(row['value']) is not int or not 0 <= row['value'] <= 0x7fffffff
+                    or type(row['success']) not in (bool, int) or row['success'] not in (0, 1)):
+                raise ValueError('invalid criteria row')
+    winning = data['winning_totals']
+    losing = data['losing_totals']
+    won = any(row['success'] for row in winning)
+    lost = any(row['success'] for row in losing) if losing else loss_hint
+    if won and lost:
+        raise ValueError('conflicting criteria totals')
+    if (won and not any(row['success'] and row['value'] >= win_target for row in winning)
+            or not winning and win_hint and not lost):
+        raise ValueError('win criteria total is missing')
+    return won, json.dumps(data, separators=(',', ':'))
+
+
+def program_moment_score(moment, query):
+    try:
+        won, data = parse_moment_score(query, win_target=MOMENT_OBJECTIVES[moment.get('objective', 'walk_off')][2])
+    except (ValueError, RecursionError):
+        return envelope(status=1, message='The local Moment result could not be read.'), 'refused'
+    state = load_state(migrate_team=False)
+    progress = state.get('ordinary_moments', {}).get(str(moment['id']))
+    if not progress or not progress['attempt']:
+        return envelope(status=1, message='Launch the local Moment before submitting a result.'), 'refused'
+    # game_id is games_completed when the client sends the score (0x9eaa30,
+    # +0x194). One-game retries all send 0; the persisted launch scopes it.
+    key = f'{progress["attempt"]}:0'
+    receipt = progress['receipts'].get(key)
+    if receipt is None:
+        receipt = {'won': won, 'data': data}
+        progress['receipts'][key] = receipt
+        if won:
+            profile = state.setdefault('profile', {})
+            profile['stubs'] = profile.get('stubs', 0) + moment['stubs']
+            settle_program_moment(state, moment['id'])
+        save_state(state)
+    PROGRAM_MOMENT_OPPONENT.set(None)
+    if receipt['won']:
+        PROGRAM_MOMENT_LAUNCH.set(None)
+    response = ET.Element('response')
+    mini_node(response, 'SinglesMissionProgress', state=4 if receipt['won'] else 0,
+              games_completed=int(receipt['won']), data=receipt['data'], **{MOMENT_RESULT_OPERAND: 0})
+    return envelope(mini_xml(response)), 'moment score'
+
+
+def settle_program_moment(state, moment_id):
+    for program in active_title_content().programs.values():
+        for stage in program['stages']:
+            link = stage.get('moment_goal')
+            if link is None or link['moment_id'] != moment_id:
+                continue
+            # The linked one-unit goal can be reached through either route.
+            # This awards the ordinary program tiers without touching dailies or TA.
+            settle_authored_programs(state, {str(link['credit_mission_id']): 1}, program_id=program['id'])
+            saved = authored_program_state(state['profile'], program)
+            if saved:
+                wins = saved.setdefault('moment_wins', [])
+                if moment_id not in wins:
+                    wins.append(moment_id)
+            return
+
+
+def moment_browser_complete(state, mid):
+    progress = state.get('ordinary_moments', {}).get(str(mid), {})
+    reset_after = progress.get('reset_after', 0)
+    return any(receipt['won'] and int(key.partition(':')[0]) > reset_after
+               for key, receipt in reversed(progress.get('receipts', {}).items()))
+
+
+def moment_browser_reset(mid):
+    state = load_state(migrate_team=False)
+    progress = state.get('ordinary_moments', {}).get(str(mid))
+    if progress and progress['attempt'] > progress.get('reset_after', 0):
+        attempt = progress['attempt']
+        progress['reset_after'] = attempt
+        # Consume an unfinished attempt too, so a delayed score cannot pay it.
+        progress['receipts'].setdefault(f'{attempt}:0', {'won': False, 'data': MOMENT_EMPTY_TOTALS})
+        save_state(state)
+    if PROGRAM_MOMENT_LAUNCH.get() == mid:
+        PROGRAM_MOMENT_LAUNCH.set(None)
+        PROGRAM_MOMENT_OPPONENT.set(None)
+
+
+def moment_browser_index(index, query, field):
+    if field not in query:
+        return list(index.values())
+    ids = dict.fromkeys(showdown_number(part.strip()) for part in str(query[field]).split(','))
+    return [index[mid] for mid in ids if mid in index]
+
+
+MOMENT_BROWSER_METHODS = ('get_checksum', 'get_groups_list', 'view_groups', 'view_sets', 'view_missions',
+                          'view_group_progress', 'view_set_progress')
+
+
+def moment_browser_reply(method, query, content):
+    groups = content.moment_groups
+    if not groups:
+        return None
+    response = ET.Element('response')
+    if method == 'get_checksum':
+        definitions = (groups, content.moments, content.situations)
+        checksum = hashlib.sha256(json.dumps(definitions, sort_keys=True).encode()).hexdigest()
+        mini_node(response, 'Checksum', value=checksum)
+    elif method == 'get_groups_list':
+        mini_node(response, 'SinglesMissionGroups', ids=','.join(map(str, groups)))
+    elif method == 'view_groups':
+        container = ET.SubElement(response, 'SinglesMissionGroups')
+        for group in moment_browser_index(groups, query, 'group_ids'):
+            texture = authored_texture(group['texture_name'])
+            mini_node(container, 'Group', id=group['id'], name=group['name'], Description=group['description'],
+                      textureLarge=texture, textureSmall=texture, unlockCriteriaDesc='', unlockCriteriaDetail='{}',
+                      TimeText='', EndDate=0)
+    elif method == 'view_sets':
+        for group in moment_browser_index(groups, query, 'group_ids'):
+            container = ET.SubElement(response, 'SinglesMissionGroup')
+            for row in group['sets'].values():
+                texture = authored_texture(row['texture_name'])
+                mini_node(container, 'Set', Id=row['id'], GroupId=group['id'], Name=row['name'],
+                          Description=row['description'], TextureLarge=texture, TextureSmall=texture,
+                          UnlockCriteriaDesc='', UnlockCriteriaDetail='{}', TimeText='', EndDate=0)
+    else:
+        sets = {sid: row for group in groups.values() for sid, row in group['sets'].items()}
+        if method == 'view_missions':
+            selected = moment_browser_index(sets, query, 'set_ids')
+            ids = tuple(mid for row in selected for mid in row['moment_ids'])
+            BROWSER_MOMENT_CONTEXT.set(ids)
+            PROGRAM_MOMENT_CONTEXT.set(ids or None)
+            PROGRAM_MOMENT_LAUNCH.set(None)
+            for row in selected:
+                container = mini_node(response, 'SinglesMissionSet', set_id=row['id'])
+                for order, mid in enumerate(row['moment_ids']):
+                    moment = content.moments[mid]
+                    program_moment_definition(container, moment, content.situations[moment['situation_id']], order=order)
+        else:
+            state = load_state(migrate_team=False)
+            if method == 'view_group_progress':
+                container = ET.SubElement(response, 'SinglesGroupProgress')
+                for group in moment_browser_index(groups, query, 'group_ids'):
+                    done = all(moment_browser_complete(state, mid)
+                               for row in group['sets'].values() for mid in row['moment_ids'])
+                    mini_node(container, 'Group', group_id=group['id'], state=4 if done else 0)
+            else:
+                container = ET.SubElement(response, 'SinglesSetProgress')
+                for row in moment_browser_index(sets, query, 'set_ids'):
+                    done = all(moment_browser_complete(state, mid) for mid in row['moment_ids'])
+                    mini_node(container, 'Set', set_id=row['id'], state=4 if done else 0)
+    return envelope(mini_xml(response)), 'moment browser'
+
+
+def program_moment_reply(name, params):
+    relevant = ('singles_mission.view_missions_by_ids', 'singles_mission.view_situations',
+                'arena_tutorial.singles_mission.view_situations', 'singles_mission.view_progress',
+                'singles_mission.view_teams', 'singles_mission.score_post', 'singles_mission.reset_mission',
+                'arena_team.view', 'textures.screen')
+    namespace, _, method = name.rpartition('.')
+    browser = namespace == 'singles_mission' and method in MOMENT_BROWSER_METHODS
+    if name not in relevant and not browser:
+        return None
+    query = params_of(params)
+    if not isinstance(query, dict):
+        return None
+    if name == 'textures.screen':
+        if str(query.get('screen', '')).lower() == 'dd_navdiamonddynasty':
+            PROGRAM_MOMENT_CONTEXT.set(None)
+            PROGRAM_MOMENT_OPPONENT.set(None)
+            PROGRAM_MOMENT_LAUNCH.set(None)
+            BROWSER_MOMENT_CONTEXT.set(())
+        return None
+    if name == 'arena_team.view':
+        opponent = PROGRAM_MOMENT_OPPONENT.get()
+        if (opponent is not None and 'player_id' not in query and 'mini_run_id' not in query
+                and showdown_number(query.get('team_id')) == opponent
+                and showdown_number(query.get('squad_type', 0)) in (0, 4)):
+            body = view_by_team(params)
+            if body:
+                return envelope(body), 'moment opponent'
+        return None
+    content = active_title_content()
+    if browser:
+        return moment_browser_reply(method, query, content)
+    if name == 'singles_mission.view_teams':
+        if 'raid_team_id' in query:
+            return None
+        team = showdown_number(query.get('team_ids'))
+        for moment in content.moments.values():
+            if moment['team_id'] == team:
+                return program_moment_launch(moment)
+        return None
+    if name in ('singles_mission.score_post', 'singles_mission.reset_mission'):
+        moment = content.moments.get(showdown_number(query.get('mission_id')))
+        if moment is None:
+            return None
+        if name == 'singles_mission.score_post':
+            return program_moment_score(moment, query)
+        if moment['id'] in BROWSER_MOMENT_CONTEXT.get():
+            moment_browser_reset(moment['id'])
+        return envelope('<response/>'), 'moment reset'
+
+    if name.endswith('view_missions_by_ids'):
+        key = 'moment_ids'
+    elif name.endswith('view_progress'):
+        key = 'mission_ids'
+    else:
+        key = 'situation_ids'
+    if key in query:
+        ids = [showdown_number(part.strip()) for part in str(query[key]).split(',')]
+        if key == 'situation_ids':
+            ids = [m['id'] for m in content.moments.values() if m['situation_id'] in ids]
+    else:
+        ids = PROGRAM_MOMENT_CONTEXT.get() or ()
+    selected = [content.moments[mid] for mid in dict.fromkeys(ids) if mid in content.moments]
+    if name.endswith('view_missions_by_ids'):
+        PROGRAM_MOMENT_CONTEXT.set(tuple(row['id'] for row in selected) or None)
+    if not selected:
+        return None
+    response = ET.Element('response')
+    if name.endswith('view_missions_by_ids'):
+        parent = ET.SubElement(response, 'SinglesMissionSet')
+        for row in selected:
+            program_moment_definition(parent, row, content.situations[row['situation_id']])
+    elif name.endswith('view_progress'):
+        parent = ET.SubElement(response, 'SinglesMissionProgress')
+        browser_ids = BROWSER_MOMENT_CONTEXT.get()
+        state = load_state(migrate_team=False) if browser_ids else {}
+        # State 4 displays completion (0xbe1be1), but games_completed indexes
+        # OptionsList (0xc83f2a). Every replay needs index zero and fresh criteria.
+        for row in selected:
+            won = row['id'] in browser_ids and moment_browser_complete(state, row['id'])
+            mini_node(parent, 'Mission', mission_id=row['id'], state=4 if won else 0, games_completed=0,
+                      data=MOMENT_EMPTY_TOTALS)
+    else:
+        for row in selected:
+            program_moment_situation(response, row, content.situations[row['situation_id']])
+    return envelope(mini_xml(response)), 'moment content'
 
 
 def showdown_start_node(state, run, query):
@@ -2885,9 +4172,53 @@ def showdown_record_result(state, run, query):
     if won:  # The hub can also send false to close an unfinished attempt (0xc870e2).
         affinity_record_game(state, f'showdown:{run["id"]}:{index}',
                              affinity_squad_clubs(current_squad(run['squad'])), True)
+        if run.get('definition') and moment.kind == 4:
+            settle_linked_program_goal(state, run['definition']['program_credit'])
     # Store the result and wallet change together. The consumed index and the
     # terminal state reject retries, including after a reload.
     save_state(state)
+
+
+def pinned_showdown_boss(item, roster):
+    card = card_by_id(item) if item is not None else None
+    if card and card['roster_player_id'] == roster and card['display_position'] in ('SP', 'RP', 'CP'):
+        return card
+    return None
+
+
+def showdown_bind_opponent(run, cursor):
+    moments = showdown_moments(run)
+    if cursor >= len(moments):
+        SHOWDOWN_OPPONENT.set(None)
+        return
+    moment = moments[cursor]
+    if run.get('definition') and moment.kind == 4:
+        SHOWDOWN_OPPONENT.set((moment.opponent, run['boss_item_id'], run['definition']['boss_roster_id']))
+    else:
+        SHOWDOWN_OPPONENT.set(moment.opponent)
+
+
+def showdown_cpu_squad(index):
+    squad = cpu_squad(index)
+    binding = SHOWDOWN_OPPONENT.get()
+    if not isinstance(binding, tuple) or binding[0] != index:
+        return squad
+    _, item, roster = binding
+    boss = pinned_showdown_boss(item, roster)
+    if boss is None or not squad[3]:
+        return squad
+    starters, relief = list(squad[3]), list(squad[4])
+    first = starters[0]
+    # Slot 0 is the starter selected by PerGameOptions. When another Doval
+    # variant was already on the Giants roster, exchange its slot with the
+    # displaced starter to keep 26 distinct players and all pitching slots.
+    starters[0] = boss
+    for group, start in ((starters, 1), (relief, 0)):
+        for slot in range(start, len(group)):
+            if group[slot]['roster_player_id'] == roster:
+                group[slot] = first
+                return (*squad[:3], starters, relief)
+    return (*squad[:3], starters, relief)
 
 
 def showdown_shared(name, params):
@@ -2915,6 +4246,8 @@ def showdown_shared(name, params):
         # CPU (0xb57a68). A preceding raid roster request scopes this lookup.
         # The by-team route already serves clubs.
         opponent = SHOWDOWN_OPPONENT.get()
+        if isinstance(opponent, tuple):
+            opponent = opponent[0]
         if (opponent is not None and 'player_id' not in query and 'mini_run_id' not in query
                 and showdown_number(query.get('team_id')) == opponent
                 and showdown_number(query.get('squad_type')) in (0, 4)):
@@ -2937,6 +4270,15 @@ def showdown_shared(name, params):
             except Exception as error:
                 print(f'Showdown definitions failed ({type(error).__name__})', file=sys.stderr)
                 return envelope(showdown_mission_definitions(ids, blue=blue)), 'showdown neutral'
+        if None not in ids:
+            account = load_state(migrate_team=False).get('showdown', {})
+            runs = {raid_id: entry['run'] for raid_id, entry in showdown_authored_accounts(account) if entry.get('run')}
+            definitions = dict(active_title_content().showdowns)
+            definitions.update((raid_id, run['definition']) for raid_id, run in runs.items())
+            for raid_id, definition in definitions.items():
+                if ids <= {node['identifier'] for node in definition['moments']}:
+                    run = runs.get(raid_id)
+                    return envelope(showdown_mission_definitions(ids, run, definition=definition)), 'showdown definitions'
         SHOWDOWN_SITUATION_RUN.set(None)
         SHOWDOWN_OPPONENT.set(None)
         return None
@@ -2956,8 +4298,7 @@ def showdown_shared(name, params):
             return envelope(showdown_situations(run)), 'showdown situations'
         body = showdown_team_reply(state, run)
         cursor = len(run.get('moment_results', []))
-        moments = showdown_moments(run)
-        SHOWDOWN_OPPONENT.set(moments[cursor].opponent if cursor < len(moments) else None)
+        showdown_bind_opponent(run, cursor)
         return envelope(body), 'showdown drafted roster'
     except Exception as error:
         print(f'Showdown {name} failed ({type(error).__name__})', file=sys.stderr)
@@ -3021,6 +4362,8 @@ def showdown_neutral(name, run=None):
 def showdown_reply(name, params):
     if not name.startswith('raids.'):
         return showdown_shared(name, params)
+    if name in ('raids.enter', 'raids.create_team', 'raids.start_node'):
+        PROGRAM_MOMENT_LAUNCH.set(None)
     try:
         query = params_of(params)
         if not isinstance(query, dict):
@@ -3037,7 +4380,7 @@ def showdown_reply(name, params):
             SHOWDOWN_SITUATION_RUN.set(None)
             SHOWDOWN_OPPONENT.set(None)
             SHOWDOWN_BLUE_GAME.set(False)
-            inner = showdown_catalogue(root_account.get('run'), root_account.get('blue_test'))
+            inner = showdown_catalogue(root_account.get('run'), root_account.get('blue_test'), authored=root_account)
         elif name == 'raids.create_team':
             created = showdown_create(state, root_account, query)
             inner = f'<response><TeamId>{created["id"]}</TeamId></response>'
@@ -3076,6 +4419,8 @@ def showdown_reply(name, params):
                     inner = '<response><raid started="1"/></response>'
                     diagnostic = showdown_is_blue(run)
                     SHOWDOWN_BLUE_GAME.set(diagnostic)
+                    if run.get('definition'):
+                        showdown_bind_opponent(run, run['pending_moment'])
                     if diagnostic:
                         moment = showdown_moments(run)[run['pending_moment']]
                         kind = f'blue test started {showdown_blue_log(moment)} success=pending'
@@ -3107,6 +4452,8 @@ def showdown_reply(name, params):
                     if terminal is not None:
                         kind += ' completed' if terminal == 3 else ' defeated'
                     SHOWDOWN_SITUATION_RUN.set(run['id'])
+                    if run.get('definition'):
+                        SHOWDOWN_OPPONENT.set(None)
                 inner = showdown_neutral(name, run)
             elif name == 'raids.get_picks':
                 inner = showdown_picks(run)
@@ -4494,7 +5841,7 @@ def view_by_team(params):
     if index >= LEGACY_CPU_TEAM_BASE:
         index -= LEGACY_CPU_TEAM_BASE
     index = index if 0 <= index < len(MLB_TEAMS) else 0
-    return team_reply(cpu_squad(index), cpu_team(index))
+    return team_reply(showdown_cpu_squad(index), cpu_team(index))
 
 
 def collections_reply(name, params):
@@ -4797,14 +6144,42 @@ def player_art():
     return _card_art
 
 
+@lru_cache(maxsize=8)
+def authored_preview_art(update_dir, previews, namespace, art_base):
+    """Expose update-only covers through the existing texture registry."""
+    registry = {'entries': [], 'files': {}}
+    if update_dir:
+        for index, name in enumerate(previews):
+            try:
+                with open(Path(update_dir, 'CROSS', 'LIVE', name + '.WEBP'), 'rb') as source:
+                    data = source.read(512 * 1024 + 1)
+            except OSError:
+                continue
+            if data[:4] == b'RIFF' and data[8:12] == b'WEBP':
+                register_picture(registry, name, art_base + index, f'{namespace}-{index}', data)
+    return registry
+
+
 def card_art():
     """Combined registry used by post_update and the HTTP handler, including after hot reload."""
     players = player_art()
     packs = shop_pack_art(UPDATE_DIR)
     affinity = affinity_tile_art(UPDATE_DIR)
+    previews = tuple(dict.fromkeys(row['preview_texture'] for row in conquest_maps().values()
+                                  if row['id'] != CQ_CHALLENGE))
+    conquest = authored_preview_art(UPDATE_DIR, previews, 'conquest', 521000)
+    content = active_title_content()
+    covers = tuple(row['cover'] for row in content.showdowns.values())
+    showdown = authored_preview_art(UPDATE_DIR, covers, 'showdown', 521100)
+    program_textures = tuple(dict.fromkeys(
+        row[field] for row in content.programs.values() for field in ('texture_name', 'texture_name_bkg')
+        if row[field] and not Path(LAYOUT.base, 'CROSS', 'LIVE', row[field] + '.WEBP').is_file()))
+    program = authored_preview_art(UPDATE_DIR, program_textures, 'program', 521200)
     gear = equipment_faces()
-    return {'entries': players['entries'] + packs['entries'] + affinity['entries'] + gear['entries'],
-            'files': ChainMap(players['files'], packs['files'], affinity['files'], gear['files']),
+    return {'entries': (players['entries'] + packs['entries'] + affinity['entries'] + conquest['entries']
+                        + showdown['entries'] + gear['entries'] + program['entries']),
+            'files': ChainMap(players['files'], packs['files'], affinity['files'], conquest['files'],
+                              showdown['files'], gear['files'], program['files']),
             'override': players['override']}
 
 
@@ -4953,12 +6328,14 @@ def loading_screen(params):
     if not 0 <= club < len(MLB_TEAMS):
         return None
 
-    squads = {DD_TEAM_ID: current_squad(), club: cpu_squad(club)}
+    squads = {DD_TEAM_ID: current_squad(), club: showdown_cpu_squad(club)}
     report = captain_report(squads[DD_TEAM_ID])
     body = loading_cards(*(squads[team_id] for team_id in team_ids),
                          captains=tuple(report if team_id == DD_TEAM_ID else None for team_id in team_ids))
     if body is not None:
-        _affinity_lineup = (team_ids, affinity_squad_clubs(squads[DD_TEAM_ID]))
+        local = squads[DD_TEAM_ID]
+        _affinity_lineup = (team_ids, affinity_squad_clubs(local),
+                            tuple(card['item_id'] for group in local for card in group))
     return body
 
 
@@ -4996,7 +6373,162 @@ HALF_TOTALS = re.compile(r'\^n\^Runs:\s*(\d+)\s+Hits:\s*(\d+)\s+Walks:\s*\d+'
 _summary_setup = None
 
 
-def decode_summary_record(data):
+# Aggregate writer 0xa6a670 and collector 0xa768e0–0xa787ec. Compact card
+# offsets in the study are relative to B/P, not to the start of the record.
+TEAM_STAT_WORDS = {
+    'hits': 0, 'at_bats': 1, 'total_bases': 2, 'home_runs': 3, 'doubles': 4, 'triples': 5,
+    'rbi': 6, 'runs': 7, 'walks': 8, 'batting_strikeouts': 12, 'stolen_bases': 13, 'errors': 17,
+    'hits_allowed': 23, 'runs_allowed': 24, 'earned_runs_allowed': 25, 'walks_allowed': 26,
+    'pitching_strikeouts': 27,
+}
+CARD_BATTING_WORDS = {
+    'hits': 5, 'at_bats': 0, 'total_bases': 11, 'home_runs': 24, 'doubles': 22, 'triples': 23,
+    'rbi': 9, 'runs': 8, 'walks': 36, 'batting_strikeouts': 10, 'stolen_bases': 44, 'errors': 42,
+}
+CARD_PITCHING_WORDS = {
+    'pitching_outs': 19, 'hits_allowed': 4, 'runs_allowed': 8, 'earned_runs_allowed': 9,
+    'walks_allowed': 41, 'pitching_strikeouts': 12,
+}
+
+
+def stat_array(r, count):
+    if r.u8() != count:
+        raise ValueError('unexpected game stat array count')
+    r.take(count * 4)
+
+
+def stat_vector_count(r):
+    count = r.u32()
+    if count > 64:  # Observed player vectors have 26 rows; leave room for display notes/substitutions.
+        raise ValueError('game stat vector exceeds 64 entries')
+    return count
+
+
+GAME_STAT_DIAGNOSTICS = ContextVar('game_stat_diagnostics', default=None)
+
+
+def read_stat_box(r, side, team_id, words, diagnostics):
+    # 0xa6b610: the inning display has nine slots. Full-game named totals
+    # include extra innings, so reconcile those instead of summing the slots.
+    r.string(check_length=True)
+    display_team = r.u32()
+    if display_team != team_id:
+        diagnostics.append(f'{side} display team {display_team} vs report {team_id}')
+    r.take(8)
+    for _ in range(3):
+        stat_array(r, 9)
+    # The name-based batter rows independently corroborate aggregate
+    # doubles, triples, HR, steals and errors (0xa7284b–0xa72956).
+    batting_lanes = ((0, 1), (1, 7), (2, 0), (3, 6), (4, 8), (5, 12),
+                     (7, 4), (8, 5), (9, 3), (13, 17), (16, 13))
+    named_batting = [0] * len(batting_lanes)
+    for _ in range(stat_vector_count(r)):
+        r.string(check_length=True)
+        values = struct.unpack('<25I', r.take(25 * 4))
+        for i, (field, _) in enumerate(batting_lanes):
+            named_batting[i] += values[field]
+    batting = struct.unpack('<6I', r.take(24))
+    for _ in range(2):
+        for _ in range(stat_vector_count(r)):
+            r.string(check_length=True)
+    named_pitching = [0] * 5
+    for _ in range(stat_vector_count(r)):
+        r.string(check_length=True)
+        r.string(check_length=True)
+        values = struct.unpack('<18I', r.take(18 * 4))
+        for i, value in enumerate(values[:5]):
+            named_pitching[i] += value
+    r.string(check_length=True)
+    pitching = struct.unpack('<5I', r.take(20))
+    for _ in range(stat_vector_count(r)):
+        r.string(check_length=True)
+        r.string(check_length=True)
+    # Presentation can omit a card, e.g. a pitcher's fielding error in a DH game.
+    fields = {index: field for field, index in TEAM_STAT_WORDS.items()}
+    for label, values, indices in (
+        ('display batting totals', batting, (1, 7, 0, 6, 8, 12)),
+        ('display pitching totals', pitching, (23, 24, 25, 26, 27)),
+        ('named batting rows', named_batting, [i for _, i in batting_lanes]),
+        ('named pitching rows', named_pitching, (23, 24, 25, 26, 27)),
+    ):
+        for value, index in zip(values, indices):
+            if value != words[index]:
+                diagnostics.append(f'{side} {label} {fields[index]}={value} vs aggregate={words[index]}')
+
+
+def read_card_game_stats(r, team_id):
+    # Native 0xa6fe90 writes the two item IDs, the team, variable-length injury
+    # text and compact batting/pitching blocks. Duplicate rows are ambiguous.
+    cards = {}
+    for _ in range(stat_vector_count(r)):
+        item, _, team, lookup = struct.unpack('<iiQi', r.take(20))
+        if item <= 0 or item != lookup or team != team_id or item in cards:
+            raise ValueError('ambiguous game stat card or team')
+        r.take(35)
+        r.string(check_length=True)
+        batting = struct.unpack('<17h29B', r.take(63))
+        pitching = struct.unpack('<22h22B', r.take(66))
+        r.string(check_length=True)
+        bat = {field: batting[index] for field, index in CARD_BATTING_WORDS.items()}
+        pitch = {field: pitching[index] for field, index in CARD_PITCHING_WORDS.items()}
+        cards[item] = {'batting': bat, 'pitching': pitch}
+    if not cards:
+        raise ValueError('empty game stat card vector')
+    return cards
+
+
+def decode_game_stats(r, aggregates, ids, record):
+    """Validate the optional tail independently of the accepted result header."""
+    diagnostics = GAME_STAT_DIAGNOSTICS.get()
+    if diagnostics is None:
+        diagnostics = []
+    try:
+        if not 0 < r.left() <= 1 << 20:
+            raise ValueError('missing or oversized stat tail')
+        for _ in SUMMARY_SIDES:  # pitcher-slot blocks, 0xa6ae30
+            r.take(8)
+            stat_array(r, 5)
+            stat_array(r, 7)
+            r.take(4)
+        for _ in range(3):      # pitcher decisions, 0xa6a4b0
+            r.string(check_length=True)
+            r.take(12)
+        for side in SUMMARY_SIDES:
+            read_stat_box(r, side, ids[side], aggregates[side], diagnostics)
+        r.take(37)              # game metadata, 0xa6eb00
+        challenge = r.u32()     # active challenge at metadata +37, 0xa6ec44–4b
+        if record['game_type'] == 'ARENA' and record['sub_mode'] == 8:
+            record['conquest_challenge_id'] = challenge
+        sides = {}
+        for side in SUMMARY_SIDES:
+            cards = read_card_game_stats(r, ids[side])
+            words = aggregates[side]
+            team = {field: words[index] for field, index in TEAM_STAT_WORDS.items()}
+            totals = dict(team, pitching_outs=words[22])
+            for field, total in totals.items():
+                lane = 'batting' if field in CARD_BATTING_WORDS else 'pitching'
+                values = [card[lane][field] for card in cards.values()]
+                compact = sum(values)
+                comparable = compact // 3 if field == 'pitching_outs' else compact
+                if comparable != total or min(values) < 0:
+                    diagnostics.append(f'{side} dropped {field}: compact={compact}, aggregate={total}'
+                                       + (' innings' if field == 'pitching_outs' else '')
+                                       + (' (negative card value)' if min(values) < 0 else ''))
+                    team.pop(field, None)
+                    for card in cards.values():
+                        del card[lane][field]
+                else:
+                    team[field] = compact
+            sides[side] = {'team': team, 'cards': cards}
+        if r.left():
+            raise ValueError('unexpected bytes after game stat records')
+        return sides
+    except (ValueError, struct.error) as error:
+        diagnostics.append(f'dropped stat tail: {error}')
+        return None
+
+
+def decode_summary_record(data, *, include_stats=False):
     # VERIFIED writer order 0xb33633-0xb339d3. Strings have the same two lengths as
     # service messages (0xa74c50); enforce both lengths on this attachment.
     r = Reader(data)
@@ -5016,17 +6548,21 @@ def decode_summary_record(data):
     r.take(8)           # eight flags (0xb337c2)
     scheduled = r.u32()
     r.take(8)
-    totals = {}
+    totals, aggregates = {}, {}
     for side in SUMMARY_SIDES:
         stats = struct.unpack('<35I', r.take(35 * 4))
-        # INFERRED indices corroborated by run 91: away 6 runs, 9 hits (0xa768f7, 0xa76f67).
-        totals[side] = {'runs': stats[6], 'hits': stats[0]}
+        # 0xa76f57 collects RBI at word 6, 0xa77067 collects runs at word 7.
+        totals[side] = {'runs': stats[7], 'hits': stats[0]}
+        aggregates[side] = stats
     if r.u8() != 26:
         raise ValueError('unexpected counter count')
     r.take(26 * 4)      # counters are unrelated to innings (0xa70bf9)
-    return dict(game_type=game_type, outcome=outcome, uuid=uuid, sub_mode=sub_mode,
-                players=players, ids=ids, scheduled=scheduled, totals=totals,
-                log=r.string(check_length=True))
+    record = dict(game_type=game_type, outcome=outcome, uuid=uuid, sub_mode=sub_mode,
+                  players=players, ids=ids, scheduled=scheduled, totals=totals,
+                  log=r.string(check_length=True))
+    if include_stats:
+        record['stats'] = decode_game_stats(r, aggregates, ids, record)
+    return record
 
 
 def decode_line_score(record, teams):
@@ -5131,20 +6667,20 @@ def remember_summary_setup(params):
     _summary_setup = (ids, summary_local_team(load_state()))
 
 
-def remember_summary_upload(state, game_data):
+def remember_summary_upload(state, record):
     global _summary_setup
     setup, _summary_setup = _summary_setup, None
     try:
-        record = decode_summary_record(game_data)
         if record['game_type'] != 'ARENA' or not record['uuid']:
-            return
+            return False
         if state.get('last_game_summary', {}).get('uuid') == record['uuid']:
-            return    # Retried upload: retain the original setup and capture time.
+            return False  # Reused UUID: retain the original setup and capture time.
         mine = setup[1] if setup and setup[0] == record['ids'] else summary_local_team(state)
         summary_teams(record, mine)  # Validate sides before committing metadata (game_create saves).
     except ValueError:
-        return
+        return False
     state['last_game_summary'] = dict(uuid=record['uuid'], local_team=mine, created_at=int(time.time()))
+    return True
 
 
 def summary_response(teams, record=None, innings=0, scores=None, errors=None, created_at=0):
@@ -5723,7 +7259,7 @@ def mini_saved_upload(state, key, digest=None):
 
 
 def mini_finish(state, run, data):
-    record = decode_summary_record(data)
+    record = decode_summary_record(data, include_stats=True)
     key = record['uuid']
     if not key or len(key) > 128:
         raise MiniSeasonRefusal('The Mini Seasons upload needs a valid game ID.')
@@ -5761,7 +7297,8 @@ def mini_finish(state, run, data):
     now = int(time.time())
     # GUESS: a quit leaves the fixture replayable. Only a finished upload advances the season.
     if finished:
-        run['results'].append({'uuid': key, 'home_won': home > away, 'user_won': (home > away) == (local == 'home')})
+        won = (home > away) == (local == 'home')
+        run['results'].append({'uuid': key, 'home_won': home > away, 'user_won': won})
         run['seconds'] += max(0, now - pending['started_at'])
         profile = state.setdefault('profile', {})
         profile['games'] = profile.get('games', 0) + 1
@@ -5769,8 +7306,11 @@ def mini_finish(state, run, data):
         cards = pending.get('card_ids', {}).get(local, ())
         clubs = (affinity_card_clubs(card_by_id(item_id) for item_id in cards[:9] + cards[13:18])
                  if len(cards) == 26 else affinity_squad_clubs(current_squad(run['squad'])))
-        affinity_record_game(state, digest, clubs, (home > away) == (local == 'home'))
+        affinity_record_game(state, digest, clubs, won)
+        settle_game_missions(state, mission_game_credits(state, record, won,
+                                                        card_ids=cards or squad_ids(run['squad'])))
         mini_advance_league(state, run)
+    record.pop('stats')
     run['uploads'][key] = {'teams': teams, 'record': record, 'innings': innings, 'scores': scores, 'errors': errors,
                            'created_at': now, 'cur_game': len(run['results']), 'digest': digest, 'day': day,
                            'card_ids': pending.get('card_ids', {})}
@@ -6039,6 +7579,8 @@ def live_module():
             module._IS_RELOAD = True
             module._INHERITED_LAYOUT = LAYOUT
             spec.loader.exec_module(module)
+            module.GAME_STAT_DIAGNOSTICS = GAME_STAT_DIAGNOSTICS
+            module.active_title_content()
             module.COLLECTION, module.ROSTER_SOURCE = COLLECTION, ROSTER_SOURCE
             module.CARD_SOURCE = CARD_SOURCE
             if LAYOUT.install or CARD_SOURCE == 'disc':
@@ -6828,18 +8370,22 @@ def exchange_reply(name, params):
 # Only the active positions are saved. The other 360 still occupy words on the wire.
 from contextvars import ContextVar
 
-CQ_ROWS = ((8,), (19, 20), (43, 44), (71, 72, 73), tuple(range(100, 111)),
-           (138, 139, 140), (167, 168), (194, 195), (221,))
-CQ_IDS = tuple(i for row in CQ_ROWS for i in row)
-CQ_CHALLENGE = 101
-CQ_START, CQ_CAPITAL, CQ_CLUB, CQ_MINE, CQ_EMPTY = 107, 109, 3, 30, 63
+CQ_CHALLENGE = 101  # Save migration and the legacy default selection.
+CQ_MINE, CQ_EMPTY = 30, 63
+CQ_GRID_SIZE = 387
+# Resident native grid, 19 MSB-first masks at 0x201a570. IDs enumerate row/column.
+CQ_GRID_MASKS = (
+    0x08000000, 0x3fc000c6, 0x1ffff0fb, 0x3ffffefe, 0x3ffffffe, 0x7ffffffe,
+    0x7ffffffc, 0x7ffffff8, 0x3ffffff8, 0x3ffffff8, 0x3ffffff8, 0x3ffffff0,
+    0x0ffffff0, 0x07ffffe0, 0x00ffffe0, 0x001fffe0, 0x000bcc70, 0x00038030, 0x00018010,
+)
 CQ_LEVELS = ('Rookie', 'Veteran', 'All-Star', 'Hall of Fame', 'Legend')
 CQ_NO_STORY = '<response><stories/></response>'
 CQ_MUTATIONS = frozenset('attack_empty reinforce move skip_phase restart update_active fight sim'.split())
 CQ_CHOOSER = ContextVar('conquest_chooser_eligibility', default=False)
 CQ_STEAL_PICKER = ContextVar('conquest_steal_picker', default=False)
-CQ_STRONGHOLDS = (CQ_START, CQ_CAPITAL)
-# Local, nonrepeatable rewards. No historical server campaign definitions were recovered.
+
+
 class ConquestGoal(NamedTuple):
     id: int
     description: str
@@ -6847,25 +8393,17 @@ class ConquestGoal(NamedTuple):
     stubs: int
     xp: int
     pack: int
-
-
-CQ_GOALS = (
-    ConquestGoal(2, 'Own two territories.', 2, 25, 0, 0),
-    ConquestGoal(3, 'Build your fan base to 9M.', 9, 0, 100, 0),
-    ConquestGoal(1, 'Capture every stronghold. Reward: one Standard Player Pack.', len(CQ_STRONGHOLDS), 0, 0, 510001),
-)
+    metric: str
 
 class ConquestRefusal(ValueError):
     pass
 
 
 @lru_cache(maxsize=1)
-def conquest_neighbors():
-    # Absolute columns of the first pictured hex in each occupied native row (1..9).
-    # The central row is contiguous. The gaps in the silhouette separate rows, not row IDs.
-    starts = (9, 9, 8, 8, 7, 15, 15, 15, 15)
-    grid = {(x, y): tile for y, (row, start) in enumerate(zip(CQ_ROWS, starts), 1)
-            for x, tile in enumerate(row, start)}
+def conquest_grid():
+    positions = [(x, y) for y, mask in enumerate(CQ_GRID_MASKS) for x in range(32)
+                 if mask & (1 << (31 - x))]
+    grid = {position: i for i, position in enumerate(positions)}
     neighbors = {}
     for (x, y), tile in grid.items():
         left = x + (y % 2) - 1
@@ -6875,35 +8413,185 @@ def conquest_neighbors():
     return neighbors
 
 
-def conquest_fresh(state=None):
-    cells = {str(i): [CQ_EMPTY, 0] for i in CQ_IDS}
-    cells[str(CQ_START)] = [CQ_MINE, 8]
-    cells[str(CQ_CAPITAL)] = [CQ_CLUB, 2]
-    run = dict(challenge_id=CQ_CHALLENGE, cells=cells, turn=1, phase=0, pool=0, revision=0, shown=-1,
+def validate_conquest_content(rows, programs, invalid, *, multi_club=False):
+    if not isinstance(rows, list) or not rows:
+        raise invalid('conquest.json needs authored maps')
+    grid = conquest_grid()
+    if len(grid) != CQ_GRID_SIZE:
+        raise invalid('native Conquest grid must contain 387 hexes')
+    maps = {}
+    fields = {'id', 'name', 'description', 'preview_texture', 'start', 'cells', 'goals', 'program_credit'}
+    for row in rows:
+        expanded = multi_club and isinstance(row, dict) and 'strongholds' in row
+        layout_fields = {'strongholds', 'board_revision'} if expanded else {'enemy_stronghold', 'enemy_club', 'garrison'}
+        if (not content_record(row, fields | layout_fields) or not content_positive(row['id']) or row['id'] in maps):
+            raise invalid('conquest.json maps need complete fields and unique positive ids')
+        label = f'conquest.json map {row["id"]}'
+        if not all(content_text(row[field]) for field in ('name', 'description')):
+            raise invalid(f'{label} needs an XML-safe name and description')
+        if not isinstance(row['preview_texture'], str) or not re.fullmatch(r'[A-Z0-9_]+', row['preview_texture']):
+            raise invalid(f'{label} preview_texture needs a bare texture key')
+        revision = row.get('board_revision', 1)
+        if not content_positive(revision):
+            raise invalid(f'{label} needs a positive board revision')
+        declarations = (row['strongholds'] if expanded
+                        else [[row['enemy_stronghold'], row['enemy_club'], row['garrison']]])
+        if not isinstance(declarations, list) or not 1 <= len(declarations) <= len(MLB_TEAMS):
+            raise invalid(f'{label} needs defending strongholds')
+        strongholds, clubs = {}, set()
+        for entry in declarations:
+            if not isinstance(entry, list) or len(entry) != 3 or any(type(value) is not int for value in entry):
+                raise invalid(f'{label} stronghold needs integer hex id, club and garrison')
+            capital, club, garrison = entry
+            if capital not in grid or capital in strongholds or club in clubs or not 0 <= club < len(MLB_TEAMS):
+                raise invalid(f'{label} strongholds need distinct active hexes and real enemy clubs')
+            if not 1 <= garrison <= 127:
+                raise invalid(f'{label} garrison must fit the seven-bit fan lane')
+            strongholds[capital] = (club, garrison)
+            clubs.add(club)
+        if not isinstance(row['cells'], list) or not row['cells']:
+            raise invalid(f'{label} needs active hexes')
+        cells = {}
+        for cell in row['cells']:
+            if not isinstance(cell, list) or len(cell) != 3 or any(type(value) is not int for value in cell):
+                raise invalid(f'{label} hex needs integer id, owner and fans')
+            tile, owner, fans = cell
+            if tile not in grid or tile in cells:
+                raise invalid(f'{label} hex ids must be distinct and between 0 and 386')
+            if owner not in (CQ_MINE, CQ_EMPTY) and owner not in clubs:
+                raise invalid(f'{label} hex owner must be local, neutral, or a defending club')
+            low, high = (0, 0) if owner == CQ_EMPTY else (1, 127)
+            if not low <= fans <= high:
+                raise invalid(f'{label} hex fan count cannot be encoded')
+            cells[tile] = [owner, fans]
+        start = row['start']
+        if (type(start) is not int or start not in cells or cells[start][0] != CQ_MINE
+                or cells[start][1] < 2 or not any(n in cells and cells[n][0] != CQ_MINE for n in grid[start])):
+            raise invalid(f'{label} needs an owned start with two fans and an attack target')
+        if any(capital not in cells or cells[capital][0] != club
+               for capital, (club, _) in strongholds.items()):
+            raise invalid(f'{label} needs each enemy stronghold on a hex owned by its club')
+        neighbors = {tile: tuple(n for n in grid[tile] if n in cells) for tile in sorted(cells)}
+        reached, todo = {start}, [start]
+        while todo:
+            new = set(neighbors[todo.pop()]) - reached
+            reached.update(new)
+            todo.extend(new)
+        if reached != cells.keys():
+            raise invalid(f'{label} active hexes and capitals must be connected')
+
+        if not isinstance(row['goals'], list) or not row['goals']:
+            raise invalid(f'{label} needs numbered goals')
+        goals = []
+        metrics = {'territories': len(cells), 'fans': len(cells) * 127, 'strongholds': 1 + len(strongholds)}
+        for goal in row['goals']:
+            if (not content_record(goal, set(ConquestGoal._fields))
+                    or not content_positive(goal['id']) or any(other.id == goal['id'] for other in goals)
+                    or not content_text(goal['description']) or not content_positive(goal['target'])):
+                raise invalid(f'{label} goals need unique ids, descriptions and positive targets')
+            if (not isinstance(goal['metric'], str) or goal['metric'] not in metrics
+                    or goal['target'] > metrics[goal['metric']]):
+                raise invalid(f'{label} goal metric or target is unreachable')
+            if (any(type(goal[key]) is not int or not 0 <= goal[key] <= 0x7fffffff
+                    for key in ('stubs', 'xp', 'pack'))
+                    or not any(goal[key] for key in ('stubs', 'xp', 'pack'))
+                    or (goal['pack'] and goal['pack'] not in SHOP_PACKS)):
+                raise invalid(f'{label} goal rewards need valid amounts and known packs')
+            goals.append(ConquestGoal(**goal))
+        completion = [goal for goal in goals if goal.metric == 'strongholds']
+        if len(completion) != 1 or completion[0].target != metrics['strongholds']:
+            raise invalid(f'{label} needs one goal for all strongholds')
+        if row['program_credit'] is not None:
+            validate_linked_credit(row['program_credit'], programs, invalid, label,
+                                   only_program=None if multi_club else 732001)
+        maps[row['id']] = dict(row, cells=cells, neighbors=neighbors, goals=tuple(goals),
+                               completion=completion[0].id, strongholds=strongholds, clubs=clubs,
+                               board_revision=revision)
+    if CQ_CHALLENGE not in maps:
+        raise invalid('conquest.json needs legacy campaign 101')
+    return maps
+
+
+def validate_linked_credit(link, programs, invalid, label, *, only_program=None):
+    if (not content_record(link, {'program_id', 'mission_ids'}) or not content_positive(link['program_id'])
+            or only_program is not None and link['program_id'] != only_program):
+        target = 'WBC' if only_program == 732001 else 'an authored program'
+        raise invalid(f'{label} program credit must reference {target}')
+    program = programs.get(link['program_id'])
+    expected = [g['mission_id'] for stage in program['stages'] for g in stage['goals']] if program else None
+    if not expected or link['mission_ids'] != expected:
+        name = 'WBC' if only_program == 732001 else program['name'] if program else 'authored program'
+        raise invalid(f'{label} program credit must list the {name} objectives in stage order')
+
+
+def conquest_maps():
+    return active_title_content().conquest
+
+
+@lru_cache(maxsize=1)
+def conquest_legacy_wbc():
+    # Revision 1 was shipped through r7. Keep the authored snapshot available
+    # for any active or parked run until the user explicitly restarts it.
+    return load_title_content(Path(HERE) / 'content' / 'CUSA35521' / 'r7').conquest[102]
+
+
+def conquest_map(run):
+    key = run['challenge_id']
+    revision = run.get('board_revision', 1)
+    board = conquest_maps().get(key)
+    if board is not None and revision == board['board_revision']:
+        return board
+    if key == 102 and revision == 1:
+        return conquest_legacy_wbc()
+    raise ConquestRefusal('This Conquest save has an unsupported board revision.')
+
+
+def conquest_neighbors(run):
+    return conquest_map(run)['neighbors']
+
+
+def conquest_capitals(run):
+    board = conquest_map(run)
+    return board['start'], *board['strongholds']
+
+
+def conquest_fresh(state=None, challenge_id=CQ_CHALLENGE, *, prior_claims=()):
+    board = conquest_maps()[challenge_id]
+    cells = {str(tile): owner_fans.copy() for tile, owner_fans in board['cells'].items()}
+    run = dict(challenge_id=challenge_id, board_revision=board['board_revision'],
+               cells=cells, turn=1, phase=0, pool=0, revision=0, shown=-1,
                last=None, pending=None, receipts={}, latest=None)
-    conquest_init_campaign(run)
-    conquest_progress({} if state is None else state, run, entering=True)
+    conquest_init_campaign(run, prior_claims)
+    conquest_progress({} if state is None else state, run)
     return run
 
 
-def conquest_init_campaign(run):
-    run.update(version=2, seed=uuid4().int >> 64, completed=False, progress={}, prior_claims=[],
+def conquest_init_campaign(run, prior_claims=()):
+    run.update(version=3, cycle=1, claimed=list(prior_claims), seed=uuid4().int >> 64,
+               completed=False, progress={}, prior_claims=list(prior_claims),
                notices=[], presented=[], last_cpu=None)
 
 
 def conquest_check(run):
-    if (run['version'] not in (1, 2) or run['challenge_id'] != CQ_CHALLENGE
+    board = conquest_map(run)
+    if (run['version'] not in (1, 2, 3)
             or run['phase'] not in (0, 3, 4, 5, 8) or run['turn'] < 1
-            or not 0 <= run['pool'] <= 127 or set(run['cells']) != {str(i) for i in CQ_IDS}):
+            or not 0 <= run['pool'] <= 127 or set(run['cells']) != {str(i) for i in board['cells']}):
         raise ConquestRefusal('This Conquest save has an unsupported board.')
     for tile, (owner, fans) in run['cells'].items():
         # An enemy stronghold can retain just its separately encoded garrison.
-        floor = 0 if owner == CQ_EMPTY or conquest_garrison(int(tile), owner) else 1
-        if (owner not in (CQ_MINE, CQ_EMPTY, CQ_CLUB) or not isinstance(fans, int)
+        floor = 0 if owner == CQ_EMPTY or conquest_garrison(run, int(tile), owner) else 1
+        if (type(owner) is not int or (owner not in (CQ_MINE, CQ_EMPTY) and owner not in board['clubs'])
+                or type(fans) is not int
                 or not floor <= fans <= 127 or (owner == CQ_EMPTY and fans != 0)):
             raise ConquestRefusal('This Conquest territory has an invalid fan count or owner.')
-    if run['version'] == 2 and not isinstance(run['seed'], int):
+    if run['version'] >= 2 and not isinstance(run['seed'], int):
         raise ConquestRefusal('This Conquest campaign has an invalid turn seed.')
+    if run['version'] == 3 and (
+            not content_positive(run['cycle']) or not isinstance(run['claimed'], list)
+            or any(type(goal) is not int or goal not in {row.id for row in board['goals']}
+                   for goal in run['claimed'])):
+        raise ConquestRefusal('This Conquest campaign has invalid reward claims.')
 
 
 def conquest_number(query, key):
@@ -6914,8 +8602,10 @@ def conquest_number(query, key):
 
 
 def conquest_cell(run, tile):
-    if tile not in CQ_IDS:
-        raise ConquestRefusal('That territory is outside the Batter Up 1 map.')
+    board = conquest_map(run)
+    if tile not in board['cells']:
+        name = board['name'].removesuffix(' (local)')
+        raise ConquestRefusal(f'That territory is outside the {name} map.')
     return run['cells'][str(tile)]
 
 
@@ -6924,7 +8614,7 @@ def conquest_component(run, source):
         return set()
     reached, todo = {source}, [source]
     while todo:
-        for tile in conquest_neighbors()[todo.pop()]:
+        for tile in conquest_neighbors(run)[todo.pop()]:
             if tile not in reached and conquest_cell(run, tile)[0] == CQ_MINE:
                 reached.add(tile)
                 todo.append(tile)
@@ -6932,12 +8622,14 @@ def conquest_component(run, source):
 
 
 def conquest_reconcile_completion(run, claims):
-    """Derive terminal state and goal 1 from the board, without granting or clawing back rewards."""
-    caps = sum(conquest_cell(run, tile)[0] == CQ_MINE for tile in CQ_STRONGHOLDS)
-    won = caps == len(CQ_STRONGHOLDS)
-    changed = run.get('completed') != won or run['progress'].get('1') != caps
+    """Derive completion from the board without altering payouts."""
+    capitals = conquest_capitals(run)
+    goal = conquest_map(run)['completion']
+    caps = sum(conquest_cell(run, tile)[0] == CQ_MINE for tile in capitals)
+    won = caps == len(capitals)
+    changed = run.get('completed') != won or run['progress'].get(str(goal)) != caps
     run['completed'] = won
-    run['progress']['1'] = caps
+    run['progress'][str(goal)] = caps
     if won or run['phase'] == 8:
         phase = 8 if won else 0
         if phase != run['phase'] or run['pool'] != 0:
@@ -6945,26 +8637,48 @@ def conquest_reconcile_completion(run, claims):
             changed = True
     if not won:
         for key in ('notices', 'presented'):
-            if 1 in run[key]:
-                run[key] = [goal for goal in run[key] if goal != 1]
+            if goal in run[key]:
+                run[key] = [notice for notice in run[key] if notice != goal]
                 changed = True
-        if 1 in claims and 1 not in run['prior_claims']:
-            run['prior_claims'].append(1)
+        if goal in claims and goal not in run['prior_claims']:
+            run['prior_claims'].append(goal)
             changed = True
     return changed
 
 
-def conquest_progress(state, run, *, entering=False):
+def settle_linked_program_goal(state, link):
+    if link is None:
+        return
+    content = active_title_content()
+    program = content.programs.get(link['program_id'])
+    if program is None:
+        return
+    saved = authored_program_state(state.setdefault('profile', {}), program)
+    _, current = authored_program_status(program, saved, content.missions)
+    if current == len(program['stages']):
+        current, saved = 0, {}
+    units = saved.get('units')
+    candidates = {goal['mission_id'] for goal in program['stages'][current]['goals']}
+    for mid in link['mission_ids']:
+        if mid not in candidates:
+            continue
+        target = content.missions[mid]['target']
+        if mission_count(units, str(mid)) < target:
+            settle_authored_programs(state, {str(mid): target}, program_id=program['id'])
+            return
+
+
+def conquest_progress(state, run):
     owned = [fans for owner, fans in run['cells'].values() if owner == CQ_MINE]
     profile = state.setdefault('profile', {})
-    claims = profile.setdefault('conquest_batter_up_1_claims', [])
-    if entering:
-        run['prior_claims'] = list(claims)
+    board = conquest_map(run)
+    claims = run['claimed']
     conquest_reconcile_completion(run, claims)
-    metrics = {2: len(owned), 3: sum(owned), 1: run['progress']['1']}
-    for goal in CQ_GOALS:
+    metrics = {'territories': len(owned), 'fans': sum(owned),
+               'strongholds': run['progress'][str(board['completion'])]}
+    for goal in board['goals']:
         key = str(goal.id)
-        value = max(run['progress'].get(key, 0), min(goal.target, metrics[goal.id]))
+        value = max(run['progress'].get(key, 0), min(goal.target, metrics[goal.metric]))
         run['progress'][key] = value
         if value < goal.target or goal.id in claims:
             continue
@@ -6977,6 +8691,8 @@ def conquest_progress(state, run, *, entering=False):
             profile['stubs'] = profile.get('stubs', 0) + goal.stubs
         if goal.pack:
             grant_owned_pack(state.setdefault('pack_shop', {}), goal.pack)
+        if goal.id == board['completion']:
+            settle_linked_program_goal(state, board['program_credit'])
         claims.append(goal.id)
         run['notices'].append(goal.id)
 
@@ -6994,16 +8710,20 @@ def conquest_goal(parent, run, rule, number):
     mini_node(goal, 'item', id=0, type_id=0, rarity_id=0, rank=0, name='', texture_name='')
 
 
-def conquest_chooser(run):
+def conquest_chooser(*runs):
     response = ET.Element('response')
     group = mini_node(response, 'challenges', auto_load=-1)
-    row = mini_node(group, 'challenge', id=run['challenge_id'], name='Batter Up 1 (local)',
-                    description='Capture the Rays stronghold. In Attack, press X on your tile with 2M+ fans, then press X on an adjacent target. In Move, press X on a friendly 2M+ tile, then X on a highlighted friendly destination and choose an amount.',
-                    preview_texture='CONQUEST_BATTERUP1', requires_szn=0, timed=0, time_text='')
-    count = sum(run['progress'][str(g.id)] == g.target for g in CQ_GOALS)
-    goals = mini_node(row, 'goals', num_complete=count)
-    for number, rule in enumerate(CQ_GOALS, 1):
-        conquest_goal(goals, run, rule, number)
+    for run in runs:
+        board = conquest_map(run)
+        preview = board['preview_texture']
+        row = mini_node(group, 'challenge', id=board['id'], name=board['name'],
+                        description=board['description'],
+                        preview_texture=preview if board['id'] == CQ_CHALLENGE else authored_texture(preview),
+                        requires_szn=0, timed=0, time_text='')
+        count = sum(run['progress'][str(goal.id)] == goal.target for goal in board['goals'])
+        goals = mini_node(row, 'goals', num_complete=count)
+        for number, rule in enumerate(board['goals'], 1):
+            conquest_goal(goals, run, rule, number)
     return mini_xml(response)
 
 
@@ -7013,43 +8733,49 @@ def conquest_move_targets(run, source):
 
 
 def conquest_move_sources(run):
-    return [i for i in CQ_IDS if conquest_cell(run, i)[0] == CQ_MINE and conquest_cell(run, i)[1] >= 2
+    return [i for i in conquest_neighbors(run) if conquest_cell(run, i)[0] == CQ_MINE and conquest_cell(run, i)[1] >= 2
             and conquest_move_targets(run, i)]
 
 
 def conquest_start_hex(run):
+    board = conquest_map(run)
+    start = board['start']
     if run['phase'] == 5:
-        return max(conquest_move_sources(run), key=lambda i: conquest_cell(run, i)[1], default=CQ_START)
+        return max(conquest_move_sources(run), key=lambda i: conquest_cell(run, i)[1], default=start)
     if run['phase'] != 0:
-        return CQ_START
+        return start
     # ArenaQuest_GenSelList (0xe06d7a) arms a friendly stack first; only its
     # neighbors can then reach challenge_team_view. START_HEX positions the cursor.
-    selected = CQ_START
+    selected = start
     best = (False, 0, False)
-    for tile, adjacent in conquest_neighbors().items():
+    for tile, adjacent in conquest_neighbors(run).items():
         owner, fans = conquest_cell(run, tile)
         if owner != CQ_MINE or fans < 2:
             continue
         owners = {conquest_cell(run, other)[0] for other in adjacent}
         if not owners - {CQ_MINE}:
             continue
-        rank = (CQ_CLUB in owners, fans, tile == CQ_START)
+        rank = (bool(board['clubs'] & owners), fans, tile == start)
         if rank > best:
             selected, best = tile, rank
     return selected
 
 
-def conquest_garrison(tile, owner):
-    return int(tile == CQ_CAPITAL and owner == CQ_CLUB)
+def conquest_garrison(run, tile, owner):
+    defender, fans = conquest_map(run)['strongholds'].get(tile, (None, 0))
+    return fans if owner == defender else 0
 
 
 def conquest_board(run):
-    words = [CQ_EMPTY << 14] * 387
+    board = conquest_map(run)
+    start, *enemy_capitals = conquest_capitals(run)
+    capitals = {start, *enemy_capitals}
+    words = [CQ_EMPTY << 14] * CQ_GRID_SIZE
     count = fans = 0
-    for tile in CQ_IDS:
+    for tile in conquest_neighbors(run):
         owner, mobile = conquest_cell(run, tile)
-        cap = tile in CQ_STRONGHOLDS
-        garrison = conquest_garrison(tile, owner)
+        cap = tile in capitals
+        garrison = conquest_garrison(run, tile, owner)
         words[tile] = (1 << 21) | (int(cap) << 20) | (owner << 14) | (mobile << 7) | garrison
         if owner == CQ_MINE:
             count += 1
@@ -7061,14 +8787,14 @@ def conquest_board(run):
                   cap_tally=count, fan_tally=fans, skip=0, get_story=0, reinforce=run['pool'],
                   reinforcements=run['pool'], team_lookup=','.join(map(str, range(31))),
                   bits=','.join(map(str, words)))
-    q.set('cq___a_a_d_pyxl4', 'Batter Up 1 (local)')  # hidden-reward title slot, hash 9a0c337a
-    mini_node(mini_node(group, 'container', empty=1), 'hash', terr_id_them=CQ_CAPITAL,
-              terr_id_me=CQ_START, difficulty=0, difficulty_name='Rookie')
+    q.set('cq___a_a_d_pyxl4', board['name'])  # hidden-reward title slot, hash 9a0c337a
+    mini_node(mini_node(group, 'container', empty=1), 'hash', terr_id_them=enemy_capitals[0],
+              terr_id_me=start, difficulty=0, difficulty_name='Rookie')
     teams = mini_node(group, 'teams')
     for i in range(31):
         mini_node(teams, 'team', team_id=DD_TEAM_ID if i == CQ_MINE else i)
     goals = mini_node(group, 'completed_goals')
-    for number, rule in enumerate(CQ_GOALS, 1):
+    for number, rule in enumerate(board['goals'], 1):
         if rule.id in run['notices']:
             conquest_goal(goals, run, rule, number)
     return mini_xml(response)
@@ -7093,7 +8819,7 @@ def conquest_matchup():
 
 def conquest_steal_award(run, tile, skill):
     owner, mobile = conquest_cell(run, tile)
-    if run['phase'] != 3 or tile not in CQ_STRONGHOLDS or owner != CQ_CLUB:
+    if run['phase'] != 3 or not conquest_garrison(run, tile, owner):
         return 0
     # Rookie through Legend offer 1..5M. Leave the permanent garrison and
     # sufficient space in the next Reinforce pool for its normal growth.
@@ -7104,21 +8830,32 @@ def conquest_opponent(run, source, target):
     if source == -1:
         if not conquest_steal_award(run, target, 0):
             raise ConquestRefusal('Choose an enemy stronghold with available fans in the Steal Fans phase.')
-    else:
-        _, dst = conquest_edge(run, source, target)
-        if dst[0] != CQ_CLUB:
-            raise ConquestRefusal('Select a territory occupied by Tampa Bay.')
+        return conquest_cell(run, target)[0]
+    _, dst = conquest_edge(run, source, target)
+    clubs = conquest_map(run)['clubs']
+    if dst[0] not in clubs:
+        if len(clubs) == 1:
+            city = MLB_TEAMS[next(iter(clubs))][1]
+            raise ConquestRefusal(f'Select a territory occupied by {city}.')
+        raise ConquestRefusal('Select a territory occupied by an enemy club.')
+    return dst[0]
+
+
+def conquest_steal_target(run, club):
+    for tile, (defender, _) in conquest_map(run)['strongholds'].items():
+        if defender == club and conquest_steal_award(run, tile, 0):
+            return tile
+    return None
 
 
 def conquest_steal_teams(run):
     response = ET.Element('response')
     teams = mini_node(mini_node(response, 'steal_fans'), 'teams')
-    for tile in CQ_STRONGHOLDS:
+    for tile, (club, garrison) in conquest_map(run)['strongholds'].items():
         owner, mobile = conquest_cell(run, tile)
-        if owner != CQ_CLUB:
+        if owner != club:
             continue
         _, city, name = MLB_TEAMS[owner]
-        garrison = conquest_garrison(tile, owner)
         team = mini_node(teams, 'team', team_id=owner, team_name=f'{city} {name}', aux=mobile + garrison)
         # Keep a defending team listed even when its last fan is the garrison.
         for skill, label in enumerate(CQ_LEVELS):
@@ -7144,7 +8881,7 @@ def conquest_ack(run):
 
 def conquest_edge(run, a, d):
     src, dst = conquest_cell(run, a), conquest_cell(run, d)
-    if (run['phase'] != 0 or d not in conquest_neighbors()[a] or src[0] != CQ_MINE or src[1] < 2):
+    if (run['phase'] != 0 or d not in conquest_neighbors(run)[a] or src[0] != CQ_MINE or src[1] < 2):
         raise ConquestRefusal('Select an owned territory with at least two fans and an adjacent target.')
     return src, dst
 
@@ -7154,23 +8891,33 @@ def conquest_growth(run, owner):
 
 
 def conquest_cpu_turn(run):
-    """Local Rays AI. Resolve one CPU attack, grow fans, then redeploy to a frontier."""
-    rng = random.Random(f"{run['seed']}:{run['turn']}:rays")
-    neighbors = conquest_neighbors()
-    cells = {tile: conquest_cell(run, tile) for tile in CQ_IDS}
+    """Resolve one CPU attack, grow fans, then redeploy to a frontier."""
+    board = conquest_map(run)
+    capitals = conquest_capitals(run)
     result = dict(turn=run['turn'], attack=None, reinforcements=[], move=None)
+    run['last_cpu'] = result
+    active = [(tile, club) for tile, (club, _) in board['strongholds'].items()
+              if conquest_cell(run, tile)[0] == club]
+    if not active:
+        return
+    # The native story applies one attack. Let a different surviving club act
+    # each turn and keep rival clubs from taking each other's strongholds.
+    capital, club = active[(run['turn'] - 1) % len(active)]
+    rng = random.Random(f"{run['seed']}:{run['turn']}:{MLB_TEAMS[club][2].lower()}")
+    neighbors = conquest_neighbors(run)
+    cells = {tile: conquest_cell(run, tile) for tile in neighbors}
 
     def enemy_neighbors(tile):
         return sum(cells[n][0] == CQ_MINE for n in neighbors[tile])
 
     attacks = []
     for a, (owner, fans) in cells.items():
-        if owner != CQ_CLUB or fans <= 1:
+        if owner != club or fans <= 1:
             continue
         for d in neighbors[a]:
             defender, strength = cells[d]
             # The human stronghold defense prompt has no confirmed wire sequence.
-            if defender == CQ_CLUB or d in CQ_STRONGHOLDS:
+            if defender not in (CQ_MINE, CQ_EMPTY) or d in capitals:
                 continue
             priority = 2 if defender == CQ_MINE and fans - 1 > strength else int(defender == CQ_EMPTY)
             attacks.append((priority, enemy_neighbors(d), fans-1-strength, rng.random(), a, d))
@@ -7186,15 +8933,15 @@ def conquest_cpu_turn(run):
                 attackers -= 1
         src[1] = 1
         if attackers:
-            dst[:] = [CQ_CLUB, attackers]
+            dst[:] = [club, attackers]
         else:
             dst[1] = defenders
         result['attack'] = dict(att_hex_id=a, def_hex_id=d, att_hex_result=1,
                                 def_hex_result=dst[1], def_owner_res=dst[0])
 
-    owned = [i for i in CQ_IDS if cells[i][0] == CQ_CLUB]
-    available = conquest_growth(run, CQ_CLUB)
-    for tile in sorted(owned, key=lambda i: (i != CQ_CAPITAL, -enemy_neighbors(i), i)):
+    owned = [i for i in cells if cells[i][0] == club]
+    available = conquest_growth(run, club)
+    for tile in sorted(owned, key=lambda i: (i != capital, -enemy_neighbors(i), i)):
         amount = min(127 - cells[tile][1], available)
         if amount:
             cells[tile][1] += amount
@@ -7208,10 +8955,10 @@ def conquest_cpu_turn(run):
         if cells[a][1] < 2:
             continue
         for d in neighbors[a]:
-            if cells[d][0] != CQ_CLUB or cells[d][1] == 127 or d == CQ_CAPITAL:
+            if cells[d][0] != club or cells[d][1] == 127 or d == capital:
                 continue
-            frontier = sum(cells[n][0] != CQ_CLUB for n in neighbors[d])
-            if frontier and (a == CQ_CAPITAL or enemy_neighbors(d) > enemy_neighbors(a)):
+            frontier = sum(cells[n][0] != club for n in neighbors[d])
+            if frontier and (a == capital or enemy_neighbors(d) > enemy_neighbors(a)):
                 moves.append((enemy_neighbors(d), frontier, rng.random(), a, d))
     if moves:
         *_, a, d = max(moves)
@@ -7219,7 +8966,6 @@ def conquest_cpu_turn(run):
         cells[a][1] -= amount
         cells[d][1] += amount
         result['move'] = [a, d, amount]
-    run['last_cpu'] = result
 
 
 def conquest_cpu_story(run):
@@ -7230,6 +8976,8 @@ def conquest_cpu_story(run):
     # ApplyStory writes absolute populations. A later reinforcement or friendly
     # move this turn may have changed either endpoint after the CPU battle.
     story = turn['attack'].copy()
+    if story['def_hex_id'] not in conquest_neighbors(run).get(story['att_hex_id'], ()):
+        raise ConquestRefusal('The saved Conquest story has invalid hexes.')
     story['att_hex_result'] = conquest_cell(run, story['att_hex_id'])[1]
     story['def_owner_res'], story['def_hex_result'] = conquest_cell(run, story['def_hex_id'])
     mini_node(mini_node(response, 'stories'), 'story', **story)
@@ -7254,8 +9002,8 @@ def conquest_mutate(state, run, service, query):
     if service != 'restart' and pending and (pending.get('options') or pending.get('uuid') or pending.get('upload')):
         raise ConquestRefusal('Finish the pending Conquest game or restart the map.')
     if service == 'restart':
-        fresh = conquest_fresh(state)
-        fresh.update(revision=run['revision'], receipts=run['receipts'], latest=run['latest'])
+        fresh = conquest_fresh(state, run['challenge_id'])
+        fresh.update(revision=run['revision'], receipts=run['receipts'], latest=run['latest'], cycle=run['cycle'] + 1)
         state['conquest'] = run = fresh
     elif service == 'skip_phase':
         old = run['phase']
@@ -7278,7 +9026,7 @@ def conquest_mutate(state, run, service, query):
     elif service == 'sim':
         a, d, attackers, defenders = values
         src, dst = conquest_edge(run, a, d)
-        if (d in CQ_STRONGHOLDS or dst[0] != CQ_CLUB or
+        if (d in conquest_capitals(run) or dst[0] not in conquest_map(run)['clubs'] or
                 not pending or (pending['from'], pending['to'], pending['revision']) != (a, d, run['revision']) or
                 attackers >= src[1] or defenders > dst[1] or bool(attackers) == bool(defenders)):
             raise ConquestRefusal('The simulation must match the selected ordinary territory and its available fans.')
@@ -7292,7 +9040,7 @@ def conquest_mutate(state, run, service, query):
     elif service == 'reinforce':
         tile, amount = values
         dst = conquest_cell(run, tile)
-        if (run['phase'] != 4 or tile not in conquest_component(run, CQ_START)
+        if (run['phase'] != 4 or tile not in conquest_component(run, conquest_map(run)['start'])
                 or not 1 <= amount <= min(run['pool'], 127-dst[1])):
             raise ConquestRefusal('This territory cannot receive that many reinforcements.')
         dst[1] += amount
@@ -7321,9 +9069,11 @@ def conquest_settle(state, run):
     if not (saved and battle.get('uuid')):
         return
     record = saved['record']
-    if record['uuid'] != battle['uuid']:
+    if record['uuid'] != battle['uuid'] or record.get('conquest_challenge_id') != run['challenge_id']:
         raise ConquestRefusal('The result does not match the selected Conquest game.')
-    conquest_opponent(run, battle['from'], battle['to'])
+    club = conquest_opponent(run, battle['from'], battle['to'])
+    if record['ids'] != {'home': club, 'away': DD_TEAM_ID}:
+        raise ConquestRefusal('The report clubs do not match the selected Conquest game.')
     dst = conquest_cell(run, battle['to'])
     if battle['revision'] != run['revision']:
         raise ConquestRefusal('The Conquest board changed before the game finished.')
@@ -7348,10 +9098,11 @@ def conquest_settle(state, run):
         if clubs is None:  # Battle staged before the affinity patch.
             clubs = affinity_upload_clubs(state, record)
         affinity_record_game(state, saved['digest'], clubs, won)
+        settle_game_missions(state, saved.pop('mission_credits', {}))
     conquest_progress(state, run)
     run['receipts'][saved['digest']] = dict(uuid=battle['uuid'], source=battle['from'],
                                             target=battle['to'], turn=run['turn'], skill_level=battle.get('skill_level', 0),
-                                            outcome=record['outcome'], stolen=stolen,
+                                            cycle=run['cycle'], outcome=record['outcome'], stolen=stolen,
                                             home=record['totals']['home']['runs'], away=record['totals']['away']['runs'])
     run['latest'] = saved
     run['pending'] = None
@@ -7360,6 +9111,9 @@ def conquest_settle(state, run):
 
 
 def conquest_upload(state, run, data):
+    record = decode_summary_record(data, include_stats=True)
+    if record.get('conquest_challenge_id') != run['challenge_id']:
+        raise ConquestRefusal('This Conquest upload does not identify the selected campaign.')
     digest = hashlib.sha256(data).hexdigest()
     if digest in run['receipts']:
         return conquest_ack(run)
@@ -7370,41 +9124,43 @@ def conquest_upload(state, run, data):
         if battle['upload']['digest'] != digest:
             raise ConquestRefusal('A different result is already waiting for this Conquest fight.')
         return conquest_ack(run)
-    record = decode_summary_record(data)
+    target = battle['to']
+    if battle['from'] == -1 and target is None:
+        # Steal Fans can send options first, then upload before fight. In that
+        # ordering only the defending club in the report identifies the target.
+        target = conquest_steal_target(run, record['ids']['home'])
+    if target is None:
+        raise ConquestRefusal('This report does not name an eligible Conquest opponent.')
+    club = conquest_opponent(run, battle['from'], target)
     if (not isinstance(record['uuid'], str) or not 0 < len(record['uuid']) <= 128
             or record['scheduled'] != 3 or record['sub_mode'] != 8 or record['game_type'] != 'ARENA'
-            or record['ids'] != {'home':CQ_CLUB, 'away':DD_TEAM_ID}
+            or record['ids'] != {'home': club, 'away': DD_TEAM_ID}
             or record['players']['away'] != ACCOUNT_ID or record['players']['home'] == ACCOUNT_ID
             or record['outcome'] not in ('FINISHED', 'QUIT', 'QUIT_ON')
             or (record['outcome'] == 'FINISHED' and record['totals']['home']['runs'] == record['totals']['away']['runs'])):
-        raise ConquestRefusal('This report does not match a three-inning Conquest game at Tampa Bay.')
+        city = MLB_TEAMS[club][1]
+        raise ConquestRefusal(f'This report does not match a three-inning Conquest game at {city}.')
     teams = summary_teams(record, summary_local_team(state))
     try:
         innings, scores, errors = decode_line_score(record, teams)
     except ValueError:  # Same aggregate-score fallback as Mini Seasons.
         innings, scores, errors = (3 if record['outcome'] == 'FINISHED' else 0), {}, {}
+    credits = mission_game_credits(state, record, record['totals']['away']['runs'] > record['totals']['home']['runs'])
     record.pop('log')
+    record.pop('stats')
+    battle['to'] = target
     battle['upload'] = dict(record=record, teams=teams, innings=innings, scores=scores, errors=errors,
                             digest=digest, created_at=int(time.time()))
     if record['outcome'] == 'FINISHED':
         battle['upload']['affinity_clubs'] = affinity_upload_clubs(state, record)
+        if credits:
+            battle['upload']['mission_credits'] = credits
     conquest_settle(state, run)
     save_state(state)
     return conquest_ack(run)
 
 
 def conquest_service(state, run, service, query):
-    if service in ('view_challenges','update_active'):
-        # On first entry v1.00 can submit its prior, uninitialized choice ("0").
-        if str(query.get('challenge_id', CQ_CHALLENGE)) not in ('0', str(CQ_CHALLENGE)):
-            raise ConquestRefusal('Only the local Batter Up 1 campaign is available.')
-        # The map now has the just-presented rows in QUESTS. Its filtered chooser
-        # refresh is separate; remove only notices actually included in that view.
-        if service == 'view_challenges' and 'challenge_id' in query and run['presented']:
-            run['notices'] = [i for i in run['notices'] if i not in run['presented']]
-            run['presented'] = []
-            save_state(state)
-        return conquest_chooser(run) if service == 'view_challenges' else conquest_ack(run)
     if service == 'view':
         pending = run['pending']
         cancelled = pending and pending.get('options') and not (pending.get('uuid') or pending.get('upload'))
@@ -7420,7 +9176,7 @@ def conquest_service(state, run, service, query):
     if service == 'steal_fans_view':
         return conquest_steal_teams(run)
     if service == 'get_connected_capital':
-        ids = conquest_component(run, CQ_START)
+        ids = conquest_component(run, conquest_map(run)['start'])
         if run['pool'] and run['last'] and run['last'][0] == 'reinforce':
             run['last'] = None
             save_state(state)
@@ -7457,19 +9213,106 @@ def conquest_service(state, run, service, query):
         if not battle and any((r['uuid'], r['source'], r['target']) == (key, a, d)
                               for r in run['receipts'].values()):
             return conquest_ack(run)
-        if (not battle or (battle['from'],battle['to']) != (a,d)
+        if (not battle or battle['from'] != a or battle['to'] not in (None, d)
                 or battle.get('uuid', key) != key):
             raise ConquestRefusal('Select the Conquest matchup before starting the game.')
         conquest_opponent(run, a, d)
         if battle.get('skill_level', skill) != skill:
             raise ConquestRefusal('This game already has a different difficulty.')
-        battle.update(uuid=key, skill_level=skill)
+        battle.update(to=d, uuid=key, skill_level=skill)
         conquest_settle(state, run)
         save_state(state)
         return conquest_ack(run)
     if service in ('def_cards', 'def_pick'):
-        raise ConquestRefusal('Defender assignments are unavailable on this single-stronghold map.')
-    raise ConquestRefusal('This action is unavailable in the local Batter Up 1 campaign.')
+        if len(conquest_map(run)['clubs']) == 1:
+            raise ConquestRefusal('Defender assignments are unavailable on this single-stronghold map.')
+        raise ConquestRefusal('Defender assignments are unavailable on this local map.')
+    name = conquest_map(run)['name'].removesuffix(' (local)')
+    raise ConquestRefusal(f'This action is unavailable in the local {name} campaign.')
+
+
+def conquest_legacy_claims(state):
+    old = state.setdefault('profile', {}).pop('conquest_batter_up_1_claims', [])
+    allowed = {goal.id for goal in conquest_maps()[CQ_CHALLENGE]['goals']}
+    return [goal for goal in old if type(goal) is int and goal in allowed]
+
+
+def conquest_upgrade(state, run):
+    if run['version'] == 3:
+        return False
+    # The legacy account only tracked lifetime claims for 101. Conservatively
+    # attach them to this campaign until its first explicit restart.
+    prior = conquest_legacy_claims(state)
+    if run['version'] == 1:
+        conquest_init_campaign(run, prior)
+        conquest_progress(state, run)
+    else:
+        claims = list(dict.fromkeys([*run['prior_claims'], *prior]))
+        run.update(version=3, cycle=1, claimed=claims)
+        conquest_reconcile_completion(run, claims)
+    for saved in (run.get('latest'), (run.get('pending') or {}).get('upload')):
+        if saved:
+            # This attachment was already validated against the only legacy map.
+            saved['record'].setdefault('conquest_challenge_id', CQ_CHALLENGE)
+    return True
+
+
+def conquest_selection(state, service, query):
+    active = state.get('conquest')
+    current_id = active['challenge_id'] if active else CQ_CHALLENGE
+    wanted = conquest_number(query, 'challenge_id') if 'challenge_id' in query else 0
+    wanted = wanted or current_id  # Uninitialized v1.00 chooser can send 0.
+    if wanted not in conquest_maps():
+        raise ConquestRefusal('That Conquest campaign is unavailable.')
+    changed = False
+    if active is None:
+        active = state['conquest'] = conquest_fresh(state, prior_claims=conquest_legacy_claims(state))
+        changed = True
+    conquest_check(active)
+    changed = conquest_upgrade(state, active) or changed
+    parked = state.get('conquest_inactive', {})
+    if service == 'update_active':
+        if wanted != active['challenge_id']:
+            target = parked.get(str(wanted))
+            if target is None:
+                target = conquest_fresh(state, wanted)
+            conquest_check(target)
+            conquest_upgrade(state, target)
+            parked[str(active['challenge_id'])] = active
+            parked.pop(str(wanted), None)
+            state['conquest_inactive'] = parked
+            active = state['conquest'] = target
+            changed = True
+        if changed:
+            save_state(state)
+        return conquest_ack(active)
+    if service == 'view':
+        changed = conquest_reconcile_completion(active, active['claimed']) or changed
+        if changed:
+            save_state(state)
+        return conquest_service(state, active, service, query)
+
+    # A filtered chooser refresh acknowledges the notices displayed on this map.
+    ids = (wanted,) if 'challenge_id' in query else conquest_maps()
+    choices = []
+    for challenge in ids:
+        if challenge == active['challenge_id']:
+            run = active
+            if 'challenge_id' in query and run['presented']:
+                run['notices'] = [i for i in run['notices'] if i not in run['presented']]
+                run['presented'] = []
+                changed = True
+        else:
+            run = parked.get(str(challenge))
+            if run is None:
+                run = conquest_fresh(challenge_id=challenge)
+            else:
+                conquest_check(run)
+        choices.append(run)
+    if changed:
+        save_state(state)
+    CQ_CHOOSER.set(True)
+    return conquest_chooser(*choices)
 
 
 def conquest_reply(name, params, game_data):
@@ -7511,28 +9354,34 @@ def conquest_reply(name, params, game_data):
                     return None
                 raise ConquestRefusal('The pending Conquest game report is unreadable.') from None
         state = load_state()
-        prior_claims = set(state.get('profile', {}).get('conquest_batter_up_1_claims', ()))
+        if name in (prefix+'view_challenges', prefix+'view', prefix+'update_active'):
+            inner = conquest_selection(state, name[len(prefix):], q)
+            kind = 'conquest'
+            if name == prefix + 'view':
+                run = state['conquest']
+                goals = conquest_map(run)['goals']
+                mine = [fans for owner, fans in run['cells'].values() if owner == CQ_MINE]
+                done = sum(run['progress'][str(g.id)] == g.target for g in goals)
+                kind += f' map turn={run["turn"]} phase={run["phase"]} territories={len(mine)} fans={sum(mine)}'
+                kind += f' goals={done}/{len(goals)} complete={int(run["completed"])} challenge={run["challenge_id"]}'
+            return envelope(inner), kind
         completion_repaired = False
         run = state.get('conquest')
         if run is None:
-            if name in (prefix+'view_challenges', prefix+'view', prefix+'update_active'):
-                if str(q.get('challenge_id', CQ_CHALLENGE)) not in ('0', str(CQ_CHALLENGE)):
-                    raise ConquestRefusal('Only the local Batter Up 1 campaign is available.')
-                if not state and os.path.isfile(STATE_FILE):
-                    with open(STATE_FILE, encoding='utf-8') as f:
-                        if not isinstance(json.load(f),dict):
-                            raise ValueError('invalid state')
-                run = state['conquest'] = conquest_fresh(state)
-                save_state(state)
-            elif name.startswith(prefix) or name in ('game_option.view','mlb_game.create'):
-                raise ConquestRefusal('Open Batter Up 1 before starting a Conquest game.')
-            else:
-                return None
-        battle = run['pending']
-        if name == 'arena_team.view' and ((not battle and not (steal_picker and run['phase'] == 3))
-                                          or str(q.get('team_id')) != str(CQ_CLUB)
-                                          or str(q.get('squad_type',0)) != '0'):
+            if name.startswith(prefix) or name in ('game_option.view', 'mlb_game.create'):
+                raise ConquestRefusal('Open a Conquest campaign before starting a game.')
             return None
+        board = conquest_map(run)
+        battle = run['pending']
+        if name == 'arena_team.view':
+            club = showdown_number(q.get('team_id'))
+            if club not in board['clubs'] or str(q.get('squad_type', 0)) != '0':
+                return None
+            if battle and battle['to'] is not None:
+                if conquest_cell(run, battle['to'])[0] != club:
+                    return None
+            elif not battle and not (steal_picker and run['phase'] == 3):
+                return None
         if name == 'arena_game.summary':
             # UUIDs repeat across modes. The normal transport captures the latest attachment
             # before dispatch. Never substitute a Conquest result for another mode's UUID.
@@ -7542,8 +9391,7 @@ def conquest_reply(name, params, game_data):
             try:
                 with open(os.path.join(WORK,'last-game_data.bin'),'rb') as f:
                     digest = hashlib.sha256(f.read()).hexdigest()
-                    prior = run['receipts'].get(digest, {})
-                    if digest != latest['digest'] and prior.get('uuid') != q['uuid']:
+                    if digest != latest['digest']:
                         return None
             except FileNotFoundError:
                 return None
@@ -7556,6 +9404,11 @@ def conquest_reply(name, params, game_data):
             inner = mini_xml(root)
         elif name == 'arena_team.view':
             inner = view_by_team(params)
+            if inner and battle and battle['from'] == -1 and battle['to'] is None:
+                target = conquest_steal_target(run, club)
+                if target is not None:
+                    battle['to'] = target
+                    save_state(state)
         elif name == 'arena_squad.content_season_check':
             if mini_scoped(q):
                 return None
@@ -7563,25 +9416,26 @@ def conquest_reply(name, params, game_data):
                      '<squads><squad index="0" name="My Squad" is_szn_squad="1"/></squads></response>')
         else:
             conquest_check(run)
-            if run['version'] == 1:
-                # Preserve the old board, revision, pending fight and upload receipts.
-                conquest_init_campaign(run)
-                conquest_progress(state, run, entering=True)
-                save_state(state)
-            elif conquest_reconcile_completion(run, prior_claims):
+            if conquest_upgrade(state, run) or conquest_reconcile_completion(run, run['claimed']):
                 save_state(state)
                 completion_repaired = True
+            prior_claims = set(run['claimed'])
             if name == 'mlb_game.create':
                 inner = conquest_upload(state,run,game_data)
             elif name == 'game_option.view':
                 if run['phase'] == 3 and not battle:
                     # The steal picker jumps straight to setup without a native
-                    # challenge_team_view. Batter Up 1 has a single opponent.
-                    conquest_opponent(run, -1, CQ_CAPITAL)
-                    battle = run['pending'] = {'from': -1, 'to': CQ_CAPITAL, 'revision': run['revision']}
+                    # challenge_team_view. The roster or fight identifies the
+                    # choice when more than one stronghold can be selected.
+                    targets = [tile for tile in board['strongholds'] if conquest_steal_award(run, tile, 0)]
+                    if not targets:
+                        raise ConquestRefusal('No opposing stronghold has fans left to steal.')
+                    battle = run['pending'] = {'from': -1, 'to': targets[0] if len(targets) == 1 else None,
+                                               'revision': run['revision']}
                 if not battle:
                     raise ConquestRefusal('Select an enemy-held territory before choosing Play Game.')
-                conquest_opponent(run, battle['from'], battle['to'])
+                if battle['to'] is not None:
+                    conquest_opponent(run, battle['from'], battle['to'])
                 if battle['revision'] != run['revision']:
                     raise ConquestRefusal('The selected Conquest matchup has changed.')
                 if not battle.get('options'):
@@ -7591,15 +9445,8 @@ def conquest_reply(name, params, game_data):
             else:
                 inner = conquest_service(state,run,name[len(prefix):],q)
         kind = 'conquest'
-        if name == prefix + 'view_challenges':
-            CQ_CHOOSER.set(True)
-        elif name == prefix + 'steal_fans_view' and run['phase'] == 3:
+        if name == prefix + 'steal_fans_view' and run['phase'] == 3:
             CQ_STEAL_PICKER.set(True)
-        elif name == prefix + 'view':
-            mine = [fans for owner, fans in run['cells'].values() if owner == CQ_MINE]
-            kind += f' map turn={run["turn"]} phase={run["phase"]} territories={len(mine)} fans={sum(mine)}'
-            done = sum(run['progress'][str(g.id)] == g.target for g in CQ_GOALS)
-            kind += f' goals={done}/{len(CQ_GOALS)} complete={int(run["completed"])}'
         elif name == prefix + 'skip_phase' and run['phase'] == 0 and run['last_cpu']:
             cpu = run['last_cpu']
             attack = cpu['attack']
@@ -7622,11 +9469,12 @@ def conquest_reply(name, params, game_data):
                     kind += f' {receipt["outcome"]} away={receipt["away"]} home={receipt["home"]}'
                     if receipt.get('source') == -1:
                         kind += f' stolen={receipt.get("stolen", 0)}M'
-        grants = set(state.get('profile', {}).get('conquest_batter_up_1_claims', ())) - prior_claims
-        if grants:
-            kind += ' granted_goals=' + ','.join(str(i) for i in sorted(grants))
         if completion_repaired:
             kind += ' completion-reconciled'
+        if name.startswith(prefix) or name == 'mlb_game.create':
+            grants = set(state['conquest']['claimed']) - prior_claims
+            if grants:
+                kind += ' granted_goals=' + ','.join(str(i) for i in sorted(grants))
         return envelope(inner), kind
     except ConquestRefusal as exc:
         return envelope(status=1,message=escape_mini_attr(exc)), 'refused'
@@ -7639,6 +9487,14 @@ def conquest_transport_reply(cache, req, mode, game_data):
     # IDs are scoped to the service connection. Preserve the original ACK even when
     # a retry arrives after the next view (and the next legal mutation is identical).
     name = req['name']
+    if name in ('singles_mission.view_teams', 'singles_mission.score_post', 'raids.start_node'):
+        key = (req['id'], name, req['params'])
+        if key in cache:
+            return cache[key]
+        result = reply_body(name, mode, req['params'], game_data)
+        if result[1] in ('moment roster', 'moment score', 'moment start'):
+            cache[key] = result
+        return result
     if not name.startswith('arena_quests.'):
         return reply_body(name, mode, req['params'], game_data)
     try:
@@ -7670,9 +9526,16 @@ def reply_body(name, mode, params='', game_data=None):
     mini = mini_reply(name, params, game_data)
     if mini is not None:
         return mini
+    if name == 'raids.start_node':
+        moment_start = program_moment_start(params)
+        if moment_start is not None:
+            return moment_start
     showdown = showdown_reply(name, params)
     if showdown is not None:
         return showdown
+    moment = program_moment_reply(name, params)
+    if moment is not None:
+        return moment
     if name == 'arena_squad.get_loading_screen':
         remember_summary_setup(params)
         if not LAYOUT.install and os.environ.get('SHAD_SCOUT_CAPTURE_ARM'):
@@ -7805,6 +9668,8 @@ async def handle(reader, writer, log, opts, counter=[0]):
                         game_data = req['blobs']['game_data']
                     except OSError as e:
                         log(f'[c{cid}] game_data capture failed: {e!r}')
+                stat_diagnostics = []
+                diagnostic_token = GAME_STAT_DIAGNOSTICS.set(stat_diagnostics)
                 try:
                     text, kind = conquest_transport_reply(conquest_receipts, req, opts['reply'], game_data)
                 except Exception as e:      # a reply that cannot be made must not end the connection
@@ -7817,6 +9682,10 @@ async def handle(reader, writer, log, opts, counter=[0]):
                         kind = 'refused: progress unreadable'
                     else:
                         text, kind = EMPTY_XML, 'empty after an error'
+                finally:
+                    GAME_STAT_DIAGNOSTICS.reset(diagnostic_token)
+                if stat_diagnostics:
+                    log(f'[c{cid}] game stats #{req["id"]}: ' + ' | '.join(stat_diagnostics))
                 if _reload['note']:
                     log(_reload['note'])
                     _reload['note'] = None
@@ -8262,6 +10131,10 @@ def main():
             log_missing_derived(print)
         asyncio.run(selftest())
     elif cmd == 'run':
+        try:
+            active_title_content()
+        except MissionContentInvalid as error:
+            sys.exit(str(error))
         opts = {'ping': 20.0, 'reply': 'empty'}
         option_iter = iter(options)
         for a in option_iter:

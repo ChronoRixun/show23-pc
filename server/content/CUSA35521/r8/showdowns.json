@@ -1,0 +1,152 @@
+[
+  {
+    "id": 7003,
+    "name": "World Baseball Classic Showdown",
+    "cover": "SHOWDOWN_WBC",
+    "description": "Draft a team, bank two runs in the rally, then take the lead in the final. A final win earns 10 points toward your next World Baseball Classic program objective.",
+    "rounds": [
+      [
+        "lineup",
+        [
+          "C"
+        ]
+      ],
+      [
+        "lineup",
+        [
+          "SS"
+        ]
+      ],
+      [
+        "starters",
+        [
+          "SP"
+        ]
+      ],
+      [
+        "perk",
+        []
+      ]
+    ],
+    "boss_roster_id": 19376,
+    "program_credit": {
+      "program_id": 732001,
+      "mission_ids": [
+        730101,
+        730102,
+        730103
+      ]
+    },
+    "moments": [
+      {
+        "identifier": 7201,
+        "kind": 3,
+        "name": "Opening WBC Rally",
+        "art": "MOM_BKG_WBC",
+        "opponent": 0,
+        "cpu_score": 0,
+        "outs": 3,
+        "banked_runs": 2,
+        "difficulty": "Rookie",
+        "ends_run_on_loss": true,
+        "stubs": 50,
+        "xp": 0,
+        "batter_upgrade": false,
+        "perk_rarity": null,
+        "second_base": 8
+      },
+      {
+        "identifier": 7202,
+        "kind": 4,
+        "name": "Doval Final",
+        "art": "BKG_SHOWDOWN_BOSS",
+        "opponent": 29,
+        "cpu_score": 3,
+        "outs": 9,
+        "banked_runs": 0,
+        "difficulty": "Rookie",
+        "ends_run_on_loss": true,
+        "stubs": 300,
+        "xp": 0,
+        "batter_upgrade": false,
+        "perk_rarity": null,
+        "second_base": null
+      }
+    ]
+  },
+  {
+    "id": 7004,
+    "name": "Pennant Chase Showdown",
+    "cover": "SHOWDOWN_PENNANTCHASE",
+    "description": "Draft a team, bank two runs against Cincinnati, then take the lead against New York. Win the final to earn 10 points toward your next Pennant Chase program objective.",
+    "rounds": [
+      [
+        "lineup",
+        [
+          "SS"
+        ]
+      ],
+      [
+        "lineup",
+        [
+          "C"
+        ]
+      ],
+      [
+        "starters",
+        [
+          "SP"
+        ]
+      ],
+      [
+        "perk",
+        []
+      ]
+    ],
+    "boss_roster_id": 3050,
+    "program_credit": {
+      "program_id": 732003,
+      "mission_ids": [
+        730301,
+        730302,
+        730303
+      ]
+    },
+    "moments": [
+      {
+        "identifier": 7211,
+        "kind": 3,
+        "name": "Pennant Rally",
+        "art": "MOM_PRO_PENNANTCHASE_BKG",
+        "opponent": 21,
+        "cpu_score": 0,
+        "outs": 3,
+        "banked_runs": 2,
+        "difficulty": "Rookie",
+        "ends_run_on_loss": true,
+        "stubs": 75,
+        "xp": 0,
+        "batter_upgrade": false,
+        "perk_rarity": null,
+        "second_base": 8
+      },
+      {
+        "identifier": 7212,
+        "kind": 4,
+        "name": "Whitey Ford Final",
+        "art": "BKG_SHOWDOWN_BOSS",
+        "opponent": 2,
+        "cpu_score": 4,
+        "outs": 9,
+        "banked_runs": 0,
+        "difficulty": "Rookie",
+        "ends_run_on_loss": true,
+        "stubs": 350,
+        "xp": 0,
+        "batter_upgrade": false,
+        "perk_rarity": null,
+        "second_base": null
+      }
+    ]
+  }
+]
