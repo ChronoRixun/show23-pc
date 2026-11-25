@@ -13,6 +13,7 @@ import stat
 import subprocess
 import sys
 import tempfile
+from types import SimpleNamespace
 import time
 from uuid import uuid4
 
@@ -81,84 +82,6 @@ def write_metadata(path, content):
         Path(temporary).unlink(missing_ok=True)
 
 
-def read_profile_json(path):
-    def unique_object(pairs):
-        result = dict(pairs)
-        if len(result) != len(pairs):
-            raise ValueError('duplicate keys')
-        return result
-
-    def invalid_constant(value):
-        raise ValueError(f'invalid JSON constant: {value}')
-
-    try:
-        return json.loads(path.read_text(encoding='utf-8-sig'), object_pairs_hook=unique_object,
-                          parse_constant=invalid_constant)
-    except FileNotFoundError:
-        return {}
-    except (ValueError, RecursionError):
-        raise ValueError(f'{path.name} is corrupt. Repair it before playing.') from None
-
-
-def new_users(name):
-    return {'Users': {'commit_hash': '', 'user': [
-        {
-            'np_age': 30, 'np_country': 'us', 'np_date_of_birth': '1994-01-01',
-            'np_language': 'en', 'player_index': slot, 'shadnet_email': '',
-            'shadnet_enabled': False, 'shadnet_npid': '', 'shadnet_password': '',
-            'shadnet_token': '', 'user_color': slot, 'user_id': 999 + slot,
-            'user_name': name if slot == 1 else f'Player {slot}',
-        }
-        for slot in range(1, 5)
-    ]}}
-
-
-def update_user_name(path, name):
-    name = name.strip(' ')
-    if not re.fullmatch(r'[A-Za-z0-9 _-]{3,16}', name):
-        raise ValueError('Player name must be 3–16 letters, digits, spaces, hyphens or underscores.')
-    if not path.exists():
-        return new_users(name)
-    data = read_profile_json(path)
-    group = data.get('Users') if isinstance(data, dict) else None
-    users = group.get('user') if isinstance(group, dict) else None
-    error = 'users.json has an invalid player profile. Repair it before playing.'
-    if not isinstance(users, list) or any(not isinstance(row, dict) or type(row.get('user_id')) is not int
-                                          for row in users):
-        raise ValueError(error)
-    primary = [row for row in users if row['user_id'] == 1000]
-    if len(primary) != 1:
-        raise ValueError(error)
-    row, = primary
-    if type(row.get('player_index')) is not int or row['player_index'] != 1 or not isinstance(row.get('user_name'), str):
-        raise ValueError(error)
-    if row['user_name'] == name:
-        return None
-    row['user_name'] = name
-    return data
-
-
-def write_play_settings(user, resolution, name):
-    config_path = user / 'config.json'
-    config = read_profile_json(config_path)
-    groups = ('General', 'Network', 'Log', 'Debug', 'Input', 'Audio', 'GPU', 'Vulkan')
-    if not isinstance(config, dict) or any(key in config and not isinstance(config[key], dict) for key in groups):
-        raise ValueError('config.json is corrupt. Repair it before playing.')
-    width = RESOLUTION_WIDTH[resolution]
-    config.setdefault('GPU', {}).update(internal_screen_width=width, internal_screen_height=resolution,
-                                       window_width=width, window_height=resolution)
-    user_path = user / 'users.json'
-    users = update_user_name(user_path, name) if name is not None else None
-    # Validate both files before replacing either.
-    updates = [(config_path, config)]
-    if users is not None:
-        updates.append((user_path, users))
-    encoded = [(path, (json.dumps(value, ensure_ascii=False, indent=2, allow_nan=False) + '\n').encode('utf-8'))
-               for path, value in updates]
-    for path, content in encoded:
-        write_metadata(path, content)
-
-
 def setup_install(install, base, update):
     install = Path(install).resolve()
     sources = [('base', '1.00', base)]
@@ -176,7 +99,7 @@ def setup_install(install, base, update):
     game = install / 'data/games' / TITLE
     manifests = install / 'manifests'
     directories = [game, manifests, *(install / relative for relative in
-                   ('data/profiles/default/user', 'data/profiles/default/server', 'data/logs'))]
+                   ('data/profiles/default/server', 'data/logs'))]
     if any(directory.resolve() != directory for directory in directories):
         raise ValueError('The install data folders must not contain links.')
     for directory in directories:
@@ -188,7 +111,7 @@ def setup_install(install, base, update):
 
 
 def setup_cli(install, args):
-    parser = argparse.ArgumentParser(prog='olserver.py setup', allow_abbrev=False)
+    parser = argparse.ArgumentParser(prog='setup', allow_abbrev=False)
     parser.add_argument('--base', type=Path, required=True)
     parser.add_argument('--update', type=Path)
     options = parser.parse_args(args)
@@ -206,10 +129,7 @@ def setup_cli(install, args):
 def require_free_ports(ports):
     for port in ports:
         with socket.socket() as probe:
-            if os.name == 'nt':
-                probe.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
-            else:
-                probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            probe.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
             try:
                 probe.bind(('127.0.0.1', port))
             except OSError as error:
@@ -217,36 +137,23 @@ def require_free_ports(ports):
 
 
 def start_child(args, directory, log, env=None):
-    group = (dict(creationflags=subprocess.CREATE_NEW_PROCESS_GROUP) if os.name == 'nt'
-             else dict(start_new_session=True))
     with log.open('xb') as output:
         return subprocess.Popen(args, cwd=directory, stdin=subprocess.DEVNULL, stdout=output,
-                                stderr=subprocess.STDOUT, env=env, **group)
+                                stderr=subprocess.STDOUT, env=env,
+                                creationflags=subprocess.CREATE_NEW_PROCESS_GROUP)
 
 
 def stop_child(child):
     if child is None or child.poll() is not None:
         return
-    if os.name == 'nt':
-        try:
-            child.send_signal(signal.CTRL_BREAK_EVENT)
-        except OSError:
-            child.terminate()
-    else:
-        try:
-            os.killpg(child.pid, signal.SIGTERM)
-        except ProcessLookupError:
-            pass
+    try:
+        child.send_signal(signal.CTRL_BREAK_EVENT)
+    except OSError:
+        child.terminate()
     try:
         child.wait(timeout=3)
     except subprocess.TimeoutExpired:
-        if os.name == 'nt':
-            child.kill()
-        else:
-            try:
-                os.killpg(child.pid, signal.SIGKILL)
-            except ProcessLookupError:
-                pass
+        child.kill()
         child.wait()
 
 
@@ -267,66 +174,173 @@ def wait_for_server(child, log, prefix, timeout=60):
     raise ValueError(f'The server did not start within {timeout} seconds. See {log}.')
 
 
-def play_install(layout, script, emulator, fullscreen, no_update_art, ports, resolution=1080, name=None):
-    emulator = emulator.resolve()
-    boot = Path(layout.base) / 'eboot.bin'
-    if not emulator.is_file():
-        raise ValueError(f'Emulator executable not found: {emulator}')
-    if not boot.is_file():
-        raise ValueError(f'The base game is missing eboot.bin: {boot.parent}')
+def version_key(value):
+    match = re.fullmatch(r'(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-beta\.(0|[1-9][0-9]*))?', value)
+    if not match:
+        raise ValueError('Invalid runtime or server version.')
+    return (*map(int, match.groups()[:3]), match[4] is None, int(match[4] or 0))
+
+
+def installed_engine(install, script):
+    manifests = install / 'manifests'
+    release = (manifests / 'runtime.txt').read_text(encoding='ascii').strip()
+    version_key(release)
+    root = install / 'runtime' / release
+    if script != (root / 'server/olserver.py').resolve():
+        raise ValueError('Play must use the local server from the active runtime.')
+    server = json.loads((manifests / release / 'server.json').read_text(encoding='utf-8'))
+    if server.get('part') != 'server' or server.get('version') != release:
+        raise ValueError('The local server does not match the active runtime.')
+    try:
+        floor = (manifests / 'server-state-version.txt').read_text(encoding='ascii').strip()
+    except FileNotFoundError:
+        floor = release
+    if version_key(release) < version_key(floor):
+        raise ValueError('This install is reserved for a newer local server. Choose a fresh install folder.')
+    return root / 'emulator'
+
+
+def native_environment(profile, fullscreen, resolution, name, logs):
+    env = {key: value for key, value in os.environ.items() if not key.upper().startswith('BB_')}
+    env.update({
+        'BB_CONFIG': str(profile / 'bbport.ini'),
+        'BB_INPUT_CONFIG': str(profile / 'input.ini'),
+        'BB_GPU_USER_DIR': str(profile / 'user'),
+        'BB_VBLANK_HZ': '0',
+        'BB_FPS_LIMIT': '120',
+        'BB_PRESENT_MODE': 'Mailbox',
+        'BB_READBACK_SMALL_BUFFERS': '1',
+        'BB_READBACK_SMALL_GATE': '1',
+        'BB_READBACK_SMALL_MAX': '4096',
+        'BB_READBACK_TARGETS': '256x512',
+        'BB_UPNP': '0',
+        'BB_LOG_BUFFER': '1',
+        'BB_WINDOW_SIZE': f'{RESOLUTION_WIDTH[resolution]}x{resolution}',
+        'BB_FULLSCREEN': '1' if fullscreen else '0',
+        'BB_USER_NAME': name,
+        'TEMP': str(logs),
+        'TMP': str(logs),
+    })
+    return env
+
+
+def play_install(layout, script, fullscreen, no_update_art, ports, resolution=1080, name='Player'):
+    install = Path(layout.install).resolve()
+    engine = installed_engine(install, script)
     require_free_ports(ports)
-    profile = Path(layout.work).parent
+    server_data = Path(layout.work)
+    profile = server_data.parent / 'engine'
     user = profile / 'user'
-    user.mkdir(parents=True, exist_ok=True)
-    write_play_settings(user, resolution, name)
     logs = Path(layout.logs)
+    if any(path.resolve() != path for path in (server_data, profile, user, logs)):
+        raise ValueError('The install data folders must not contain links.')
+    user.mkdir(parents=True, exist_ok=True)
     logs.mkdir(parents=True, exist_ok=True)
-    ca = Path(layout.work) / 'ca.pem'
+    for config in ('bbport.ini', 'input.ini'):
+        target = profile / config
+        if not target.exists():
+            write_metadata(target, (engine / config).read_bytes())
+        if target.resolve() != target or not target.is_file() or not target.stat().st_size:
+            raise ValueError(f'Invalid game engine settings: {target}')
     suffix = datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%d-%H%M%S') + '-' + uuid4().hex[:8]
+    result = logs / f'prepare-{suffix}.txt'
+    prepare_log = result.with_suffix('.log')
     server_log = logs / f'server-console-{suffix}.log'
-    emulator_log = logs / f'emulator-{suffix}.log'
-    env = dict(os.environ)
+    engine_log = logs / f'engine-{suffix}.log'
+    ca = server_data / 'ca.pem'
+    trust = [server_data / name for name in ('ca.pem', 'ca.key', 'server.pem', 'server.key')]
+
+    def ready_trust():
+        return all(path.resolve() == path and path.is_file() and path.stat().st_size for path in trust)
+
+    py = [sys.executable, '-B', '-X', 'utf8', '-u']
+    env = os.environ.copy()
     if no_update_art:
         env['SHOW23_NO_UPDATE_ART'] = '1'
-    server = game = None
+    helper = server = game = None
     try:
-        server = start_child([sys.executable, '-B', str(script), 'run', '--install', layout.install,
-                              f'--log=server-{suffix}.log'], script.parent, server_log, env)
+        print(f'Preparing game files. The first launch can take a few minutes. Logs: {logs}', flush=True)
+        helper = start_child([*py, engine / 'prepare.py', install, '--launcher-result', result], engine, prepare_log)
+        if helper.wait():
+            raise ValueError(f'Game preparation failed. See {prepare_log}.')
+        key = result.read_text(encoding='ascii')
+        if not re.fullmatch(r'v[0-9]+-[0-9a-f]{64}-[0-9a-f]{16}', key):
+            raise ValueError(f'Game preparation did not produce a usable cache. See {prepare_log}.')
+        cache = install / 'data/engine-cache' / TITLE / key
+        if not all((cache / leaf).is_file() for leaf in ('boot-linked.bin', 'content.bin')):
+            raise ValueError(f'Game preparation did not produce a usable cache. See {prepare_log}.')
+        if not ready_trust():
+            cert_log = logs / f'server-certs-{suffix}.log'
+            helper = start_child([*py, script, 'gen-certs', '--install', install], script.parent, cert_log, env)
+            if helper.wait(timeout=60) or not ready_trust():
+                raise ValueError(f'Local certificate generation failed. See {cert_log}.')
+        print('Starting the local server.', flush=True)
+        server = start_child([*py, script, 'run', '--install', install, f'--log=server-{suffix}.log'],
+                             script.parent, server_log, env)
         wait_for_server(server, server_log, f'listening on 127.0.0.1:{ports[0]} for '.encode('ascii'))
-        if not ca.is_file() or not ca.stat().st_size:
-            raise ValueError(f'The server did not provide its certificate. See {server_log}.')
-        args = [os.fspath(emulator), '-g', str(boot), '-i', '-f', str(fullscreen).lower(),
-                '--show23-local-ca', str(ca)]
-        game = start_child(args, profile, emulator_log)
+        args = [engine / 'bb-probe.exe', cache / 'boot-linked.bin', '--content-profile', cache / 'content.bin',
+                '--app0', layout.base, '--user', user, '--timeout', '0', '--show23-local-ca', ca]
+        game = start_child(args, engine, engine_log, native_environment(profile, fullscreen, resolution, name, logs))
         while game.poll() is None:
-            if server.poll() is not None:
-                raise ValueError(f'The server exited while playing ({server.returncode}). See {server_log}.')
+            if server.poll() is not None and game.poll() is None:
+                raise ValueError(f'The local server exited during play ({server.returncode}). See {server_log}.')
             time.sleep(0.1)
         if game.returncode:
-            print(f'play: emulator exited with status {game.returncode}. See {emulator_log}.', file=sys.stderr)
-        return game.returncode if game.returncode >= 0 else 128 - game.returncode
+            print(f'play: game engine exited with status {game.returncode}. See {engine_log}.', file=sys.stderr)
+        return game.returncode
     finally:
         try:
             stop_child(game)
         finally:
-            stop_child(server)
+            try:
+                stop_child(server)
+            finally:
+                stop_child(helper)
 
 
 def play_cli(layout, script, args, ports):
-    parser = argparse.ArgumentParser(prog='olserver.py play', allow_abbrev=False)
-    parser.add_argument('--emulator', type=Path, required=True)
+    parser = argparse.ArgumentParser(prog='play', allow_abbrev=False)
     parser.add_argument('--fullscreen', action='store_true')
     parser.add_argument('--no-update-art', action='store_true')
     parser.add_argument('--resolution', type=int, choices=RESOLUTION_WIDTH, default=1080)
-    parser.add_argument('--name', help='player name for the primary local profile')
+    parser.add_argument('--name', default='Player', help='player name for the local profile')
     options = parser.parse_args(args)
+    name = options.name.strip(' ')
+    if not re.fullmatch(r'[A-Za-z0-9 _-]{3,16}', name):
+        parser.error('Use 3 to 16 letters, digits, spaces, hyphens or underscores for the player name.')
     if layout.install is None:
-        parser.error('give an install folder with --install')
+        parser.error('choose an install folder')
+    if os.name != 'nt':
+        parser.error('This release requires Windows.')
     try:
-        return play_install(layout, Path(script).resolve(), options.emulator, options.fullscreen,
-                            options.no_update_art, ports, resolution=options.resolution, name=options.name)
+        return play_install(layout, Path(script).resolve(), options.fullscreen,
+                            options.no_update_art, ports, options.resolution, name)
     except KeyboardInterrupt:
         return 130
-    except (OSError, ValueError) as error:
+    except (OSError, ValueError, subprocess.SubprocessError) as error:
         print(f'play: {error}', file=sys.stderr)
         return 1
+
+
+def main():
+    parser = argparse.ArgumentParser(usage='%(prog)s {setup,play} <install> [options]', allow_abbrev=False)
+    parser.add_argument('action', choices=('setup', 'play'))
+    parser.add_argument('install', type=Path)
+    options, args = parser.parse_known_args()
+    if os.name != 'nt':
+        parser.error('This release requires Windows.')
+    if options.action == 'setup':
+        return setup_cli(options.install, args)
+    try:
+        install = options.install.resolve(strict=True)
+        record = json.loads((install / 'data/games' / TITLE / 'game.json').read_text(encoding='utf-8'))
+        layout = SimpleNamespace(install=install, base=record['base']['path'],
+                                 work=install / 'data/profiles/default/server', logs=install / 'data/logs')
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        print(f'play: could not read the game record: {error}', file=sys.stderr)
+        return 1
+    return play_cli(layout, Path(__file__).with_name('olserver.py'), args, (10000, 10080))
+
+
+if __name__ == '__main__':
+    sys.exit(main())

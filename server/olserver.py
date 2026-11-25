@@ -496,14 +496,37 @@ def migrate_local_team(state):
     return True
 
 
+# A progress file that exists but cannot be read is never treated as "no progress": the next save
+# would replace the player's collection with an almost empty file. Another program (a virus scanner,
+# a backup) can hold the file for a moment, so the read is retried briefly first.
+STATE_READ_TRIES = 5
+STATE_READ_PAUSE = 0.05
+
+
+class StateUnreadable(Exception):
+    """The progress file exists but could not be read; it has been left untouched."""
+
+
 def load_state():
-    try:
-        with open(STATE_FILE, encoding='utf-8') as f:
-            state = json.load(f)
-    except (OSError, ValueError):
-        return {}
-    if not isinstance(state, dict):
-        return {}
+    failure = None
+    for attempt in range(STATE_READ_TRIES):
+        try:
+            with open(STATE_FILE, encoding='utf-8') as f:
+                state = json.load(f)
+        except FileNotFoundError:
+            return {}                   # a first run
+        except (OSError, ValueError, RecursionError) as error:
+            failure = error
+            if attempt + 1 < STATE_READ_TRIES:
+                time.sleep(STATE_READ_PAUSE)
+            continue
+        if isinstance(state, dict):
+            break
+        failure = ValueError('it does not hold a progress record')
+    else:
+        raise StateUnreadable(
+            'The progress file %s exists but cannot be read (%s). It was left untouched. Close other '
+            'programs that may be using it, or restore a backup, then start again.' % (STATE_FILE, failure))
     if migrate_local_team(state):
         save_state(state)
     return state
@@ -6044,7 +6067,10 @@ EMPTY_MARKET_REPLIES = {
 }
 DISABLED = (('marketplace.', 'The Community Market is not part of the local server.'),
             ('arena_tutorial.marketplace.', 'The Community Market is not part of the local server.'))
-NOT_OFFERED = ('arena_matchups.',)   # arena_matchups.list answered empty crashed run 93 (read at 0x18 after the reply)
+# arena_matchups.list answered empty crashed run 93 (read at 0x18 after the reply). Storylines: on the empty
+# storylines_main.view reply the game asked the web for an empty address and crashed (read at 0x168, guest
+# offset 0xce0b0e); the mode's missions and videos are not on the local server.
+NOT_OFFERED = ('arena_matchups.', 'storylines_main.')
 
 
 class PackDraw(NamedTuple):
@@ -7782,6 +7808,10 @@ async def handle(reader, writer, log, opts, counter=[0]):
                     log(f'[c{cid}] reply for {req["name"]} failed: {e!r}')
                     if req['name'] == 'mlb_game.view_post_game':
                         text, kind = POST_GAME_FALLBACK, 'required post_game fallback'
+                    elif type(e).__name__ == 'StateUnreadable':     # by name: the class is new after a code reload
+                        text = envelope(status=1, message='Your progress file could not be read. Close the game '
+                                                          'and check your progress after restarting.')
+                        kind = 'refused: progress unreadable'
                     else:
                         text, kind = EMPTY_XML, 'empty after an error'
                 if _reload['note']:
@@ -8275,11 +8305,19 @@ def main():
                     save_state(state)
                 elif not os.path.exists(STATE_FILE):
                     save_state(state)
+            except StateUnreadable as error:
+                sys.exit(str(error))
             except (OSError, ValueError, KeyError, struct.error) as error:
                 sys.exit(f'cannot prepare disc roster: {error}')
+        try:
+            load_state()                # before any listener: an unreadable progress file stops the start
+        except StateUnreadable as error:
+            sys.exit(str(error))
         build_content(log)
         try:
             log(f'cards: collection "{COLLECTION}", {len(cards())} cards with a roster player')
+        except StateUnreadable as error:
+            sys.exit(str(error))
         except Exception as e:  # the snapshot or the roster may be absent; the server still runs
             log(f'cards: none ({type(e).__name__}: {e})')
 
