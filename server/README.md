@@ -12,17 +12,17 @@ python olserver.py import-cards --install <install folder> --pictures   optional
 
 ## Manual mode (no launcher)
 
-Run these commands from the packaged server folder. Use `python3` on Linux and the bundled interpreter on Windows.
+Extract the whole native portable ZIP into a new folder on 64-bit Windows. From that folder, use the Windows wrappers to stage the bundled runtime and set up a fresh install from unpacked game folders. See the ZIP's `manual/README.txt` for details.
 
 ```text
-python olserver.py setup --install <install> --base <unpacked 1.00 folder> [--update <unpacked 1.21 folder>]
-python olserver.py import-cards --install <install> --pictures
-python olserver.py play --install <install> --emulator <path to shadPS4> [--fullscreen] [--no-update-art] [--resolution 720|1080] [--name <player name>]
+manual\setup.cmd <install> <unpacked 1.00 folder> [unpacked 1.21 folder]
+manual\import-cards.cmd <install>
+manual\play.cmd <install> [--fullscreen] [--resolution 720|1080] [--name <player name>]
 ```
 
-Importing cards is optional. Setup verifies the executables and writes a launcher-compatible install record. Play starts the server, then the emulator, and shuts down the session on emulator exit or Ctrl+C. Saves and logs stay in the install. Linux users supply a build from the emulator repository's `release` branch.
+Importing cards is optional. Setup verifies the game files and writes an install record the launcher can use. Play prepares the game files on first launch, starts the server and then the native engine, and shuts down the session when the game exits or you press Ctrl+C. The Linux wrappers are retired for this release.
 
-Play defaults to 1080p. `--resolution 720` or `--resolution 1080` sets both internal and window dimensions. `--name "Player One"` updates the primary local player's name. Omit it to preserve the current name.
+Play defaults to a 1080p window. Use `--resolution 720` for a 720p window or `--fullscreen` to use the desktop dimensions. `--name "Player One"` sets the local player name, which defaults to `Player`. Diamond Dynasty shows the server's fixed account name.
 
 ## Running it for an install
 
@@ -31,12 +31,13 @@ With `--install` the server uses the layout the launcher creates and nothing els
 | What | Where |
 |---|---|
 | The game folders | read from `data/games/CUSA35521/game.json`, the record the launcher writes at setup |
-| State, certificates and keys, content cache | `data/profiles/default/server/` |
+| Game saves and settings | `data/profiles/default/engine/` |
+| Diamond Dynasty progress, certificates and keys, content cache | `data/profiles/default/server/` |
 | Optional special-card import | `data/import-cache/` |
 | Logs | `data/logs/` |
 | Reply files and the message table | `replies/` and `tables/` beside `olserver.py` |
 
-A missing record, a game folder that has moved, or missing reply files or table stop it with a one-line message. `run` creates the certificates on first use. The emulator is then started with `--show23-local-ca` pointing at `ca.pem` in the server data folder.
+A missing record, a game folder that has moved, or missing reply files or table stop it with a one-line message. `run` creates the certificates on first use. Play passes the engine the path to the install's `ca.pem`.
 
 Without `--install` the file uses the folder layout of the development tree it was written in; that mode is for development only.
 
@@ -45,6 +46,8 @@ Without `--install` the file uses the folder layout of the development tree it w
 In an install the cards come from the game folder: on first start (or with `build-roster`) the server reads the roster files of the base game and writes the player records, looks, pitch data and one base card per player (2,790 Live cards) into the install's server data folder, with an index of the player pictures found in the base game and, if set up, the 1.21 update. A new player starts with a full 26-man squad of Common cards and 5,000 Stubs; the rest are earned with packs, exchanges and programs.
 
 `import-cards` is the optional special-card import the launcher's **Import special cards** button runs. It asks the publisher's public website for the card list (165 pages, at least 750 ms apart, generic user agent, retries with backoff) and, with `--pictures`, only the pictures neither game edition has. Pages and pictures go to `data/import-cache/<date>/`; an interrupted import resumes, and the server uses the newest complete one at its next start. Special cards are matched to roster players by name, team, jersey numbers, handedness, birthplace, size and age; about 1,775 are accepted and about 211 left out as unclear. Their designed art comes from the game folders by item id where present, otherwise from the imported picture (PNG and JPEG are converted to WebP when Pillow is available). An import also makes 40 event packs available in the shop (Chase Packs, Diamond Duos and the Lou Gehrig Day pack); an event pack appears only when all its featured cards were matched. Choice packs are not supported. Exit codes: 0 success, 2 network failure after retries, 1 anything else.
+
+The special-card import has yet to be retested on the native engine.
 
 ## What is here
 
@@ -65,6 +68,8 @@ Comments in the handlers cite the place in the game executable where a value is 
 ## Rules the handlers follow
 
 - An unknown request gets a valid, empty answer, never an error.
+- Storylines is unavailable on the local server. It returns an unavailable message so the game can handle the request without crashing.
 - A change to the player's state and the reward that goes with it are saved in one write.
+- If an existing progress file cannot be read, the server retries briefly and leaves it intact if the read still fails.
 - A request that arrives twice has its effect once.
 - Nothing that is the only way to earn something is one-time or capped.

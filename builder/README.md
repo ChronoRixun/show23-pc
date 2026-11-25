@@ -1,49 +1,42 @@
 # Builder and launcher
 
-The launcher lives in its own repository. This file records the design so that the pieces written elsewhere fit it. Where the launcher has since settled a point differently, the note at the end says so.
-
-The builder will be the first-run flow of the launcher, which lives in its own repository and is based on an existing launcher; see [`docs/launcher.md`](../docs/launcher.md) for that, for update channels and for mods. This page covers what the builder does with the player's game.
+The builder is the **Set up** flow in the Windows launcher. This page covers what it does with the player's game. See [`docs/launcher.md`](../docs/launcher.md) for updates and mods.
 
 ## What the player does
 
-1. Unzip the release, start the launcher, choose an install folder.
-2. Point it at their base game: a package file or an already unpacked folder. Optionally add the 1.21 update package.
-3. The launcher shows the title, version and the disk space needed, checks the input, unpacks into a staging folder, verifies the result and only then adopts it. A cancelled or failed import can simply be run again.
-4. Press Play. The launcher creates the certificate authority for this install on first use, starts the local server, waits until it answers, starts the emulator, and stops both when the game exits.
+1. Extract the native portable ZIP into a new folder, run `show23-pc.exe` and choose **Set up**.
+2. Select the 1.00 base game as a package or an unpacked folder. Optionally add the 1.21 update in the same form for card pictures.
+3. Choose a fresh install folder. The launcher checks the input, verifies any unpacked files and stages the bundled engine and server into the install. A cancelled or failed setup can be run again.
+4. Press **Play**. The first launch prepares the base game files and can take a few minutes. The launcher generates the install's certificate authority if needed, starts the local server and waits until it is ready, then starts the native engine. The local server stops when the game exits.
 
 ## Checks before anything is unpacked or started
 
 - The package or folder is the supported title (`CUSA35521`), base game for the base input, update for the update input.
-- The version is one this release supports (1.00; 1.21 when its support is finished).
-- The game executable matches a known checksum. Features that depend on fixed places in the executable are only enabled for a matching one.
+- The base game is version 1.00 and plays as 1.00. If supplied, the update is version 1.21.
+- The game executable matches a known checksum.
 - There is enough free space, and no file would be written outside the staging folder.
 
 ## Install layout
 
 ```text
 <install>/
-  Launcher.exe
-  runtime/<release>/emulator/        emulator build for this release
+  runtime/<release>/emulator/        native game engine for this release
   runtime/<release>/server/          the local server
-  runtime/<release>/tools/
-  licenses/  manifests/
-  data/games/CUSA35521/base/         the player's game, unpacked
-  data/games/CUSA35521/update/       the 1.21 update, if supplied
-  data/profiles/default/user/        emulator saves, settings, input, caches
+  runtime/<release>/tools/profile/   game profile
+  manifests/                         game and active runtime records
+  data/games/CUSA35521/game.json     recorded locations of the game folders
+  data/games/CUSA35521/base/         the base game, if unpacked during setup
+  data/games/CUSA35521/update/       the update, if unpacked during setup
+  data/engine-cache/CUSA35521/       prepared boot and content files
+  data/profiles/default/engine/     game saves and settings
   data/profiles/default/server/      server state, this install's certificates
   data/import-cache/                 optional website import
-  data/logs/
+  data/logs/                        preparation, engine, server and import logs
 ```
 
-`runtime/` is replaced by an update; `data/` belongs to the player and is never touched by one.
+`emulator/` is the retained component directory name for the native engine. The portable launcher sits in the separate ZIP extraction folder. Back up `data/profiles/` and `manifests/` to keep your progress and runtime records.
 
-## Open points
-
-- Whether a release should bundle a package unpacker (0.1.0 does not).
-- Whether the launcher is a small windowed program or a console program for the first release.
-
-## Settled since
+## How setup uses the game files
 
 - The launcher ships no package unpacker and embeds no unpacking code or keys. It takes an unpacked game folder, or a package file together with an unpacker program the player supplies (`orbis-unpkg.exe` or `ps4-pkg-tool.exe`), which it runs after showing its path and asking once. A package is unpacked into a staging folder, verified, and moved into `data/games/CUSA35521/base` and `update`.
 - An unpacked folder is used where it is. The launcher verifies it and records its location in `data/games/CUSA35521/game.json`; it does not copy the game into `data/games/` and never writes inside the game folder.
-- The launcher is a windowed program.

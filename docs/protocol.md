@@ -2,9 +2,11 @@
 
 These are the facts the local server is built on. They were worked out by observing what the game sends to a server on the same machine and by reading how the game parses the answers.
 
+Release 0.2.0 uses the native engine and the same local server protocol.
+
 ## Transport
 
-- TLS on port 10000. The game checks the server certificate against a list of authorities it carries; in local mode the emulator makes it trust the per-install authority instead.
+- TLS on port 10000. The game checks the server certificate against a list of authorities it carries. The native engine uses the per-install authority for the local server, as the emulator did in 0.1.x.
 - Inside TLS, messages travel in chunks; a chunk can be compressed.
 - A message is `[u32 total length, including these 8 bytes][u32 type id][body]`, little-endian.
 - A string is a `u32` length and, if not empty, the length again as a base-128 varint and then the bytes. A block of bytes is a `u32` length and the bytes.
