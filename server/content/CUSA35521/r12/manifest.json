@@ -1,12 +1,14 @@
 {
-  "schema_version": 10,
+  "schema_version": 12,
   "title": "CUSA35521",
-  "revision": "r10",
+  "revision": "r12",
   "files": [
     "missions.json",
     "programs.json",
     "moments.json",
     "conquest.json",
-    "showdowns.json"
+    "showdowns.json",
+    "season_path.json",
+    "choice_packs.json"
   ]
 }

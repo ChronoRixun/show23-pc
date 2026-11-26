@@ -1,0 +1,1016 @@
+[
+  {
+    "id": 514001,
+    "name": "Pennant Chase Choice Pack",
+    "description": "Local choice pack. Choose one player from 3 fixed options.",
+    "texture": "CPACK_PENNANTCHASE",
+    "source": "update",
+    "cost": 1500,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          60081,
+          60082,
+          60083
+        ]
+      }
+    ]
+  },
+  {
+    "id": 514003,
+    "name": "April Monthly Awards 95 Choice Pack",
+    "description": "Local choice pack. Choose one player from 5 fixed options.",
+    "texture": "CPACK_MONTHLYAWARDS_APRIL_95",
+    "source": "update",
+    "cost": 1500,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          57867,
+          57873,
+          57876,
+          57874,
+          57879
+        ]
+      }
+    ]
+  },
+  {
+    "id": 514004,
+    "name": "April Monthly Awards 97 Choice Pack",
+    "description": "Local choice pack. Choose one player from 6 fixed options.",
+    "texture": "CPACK_MONTHLYAWARDS_APRIL_97",
+    "source": "update",
+    "cost": 1500,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          57877,
+          57865,
+          57864,
+          57872,
+          57868,
+          57870
+        ]
+      }
+    ]
+  },
+  {
+    "id": 514005,
+    "name": "May Monthly Awards 95 Choice Pack",
+    "description": "Local choice pack. Choose one player from 6 fixed options.",
+    "texture": "CPACK_MONTHLYAWARDS_MAY_95",
+    "source": "update",
+    "cost": 1500,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          58507,
+          58519,
+          58506,
+          58514,
+          58509,
+          58517
+        ]
+      }
+    ]
+  },
+  {
+    "id": 514006,
+    "name": "May Monthly Awards 97 Choice Pack",
+    "description": "Local choice pack. Choose one player from 6 fixed options.",
+    "texture": "CPACK_MONTHLYAWARDS_MAY_97",
+    "source": "update",
+    "cost": 1500,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          58516,
+          58534,
+          58520,
+          58512,
+          58513,
+          58511
+        ]
+      }
+    ]
+  },
+  {
+    "id": 514007,
+    "name": "Season 4 XP Boss Choice Pack",
+    "description": "Local choice pack. Choose one player from 5 fixed options.",
+    "texture": "CPACK_XP4_BOSS",
+    "source": "update",
+    "cost": 1500,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          59469,
+          59497,
+          59686,
+          59685,
+          59687
+        ]
+      }
+    ]
+  },
+  {
+    "id": 514008,
+    "name": "Set 4 Collection Choice Pack",
+    "description": "Local choice pack. Choose one player from 3 fixed options.",
+    "texture": "CPACK_COLLECT_SET4",
+    "source": "update",
+    "cost": 1500,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          59650,
+          59651,
+          59470
+        ]
+      }
+    ]
+  },
+  {
+    "id": 514009,
+    "name": "Set 5 Collection Choice Pack",
+    "description": "Local choice pack. Choose one player from 3 fixed options.",
+    "texture": "CPACK_COLLECT_SET5",
+    "source": "update",
+    "cost": 1500,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          60574,
+          60575,
+          60455
+        ]
+      }
+    ]
+  },
+  {
+    "id": 514010,
+    "name": "Around The World Choice Pack 3",
+    "description": "Local choice pack. Choose one player from 8 fixed options.",
+    "texture": "CPACK_AROUNDTHEWORLD_3",
+    "source": "update",
+    "cost": 1500,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          56661,
+          56660,
+          56425,
+          56435,
+          56658,
+          56627,
+          56444,
+          56445
+        ]
+      }
+    ]
+  },
+  {
+    "id": 514011,
+    "name": "Welcome to My Show Pack 2 Choice Pack",
+    "description": "Local choice pack. Choose one player from 9 fixed options.",
+    "texture": "CPACK_MYSHOW_2",
+    "source": "update",
+    "cost": 1500,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          56610,
+          56583,
+          56580,
+          56614,
+          56600,
+          56599,
+          56603,
+          56601,
+          56596
+        ]
+      }
+    ]
+  },
+  {
+    "id": 514012,
+    "name": "Home Run Derby Choice Pack 1 (Retro Home Run Derby)",
+    "description": "Local choice pack. Choose one player from 8 fixed options.",
+    "texture": "CPACK_RETROHRD_01",
+    "source": "update",
+    "cost": 1500,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          56826,
+          56827,
+          56828,
+          56822,
+          56823,
+          56825,
+          56824,
+          56821
+        ]
+      }
+    ]
+  },
+  {
+    "id": 514013,
+    "name": "MLB All-Star Game Choice Pack 1 (Retro All-Star Game)",
+    "description": "Local choice pack. Choose one player from 8 fixed options.",
+    "texture": "CPACK_RETROASG_01",
+    "source": "update",
+    "cost": 1500,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          56967,
+          56968,
+          56969,
+          56962,
+          56966,
+          56964,
+          56963,
+          56965
+        ]
+      }
+    ]
+  },
+  {
+    "id": 514014,
+    "name": "Alter Ego Choice Pack 1",
+    "description": "Local choice pack. Choose one player from 8 fixed options.",
+    "texture": "CPACK_ALTEREGO_01",
+    "source": "update",
+    "cost": 1500,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          57717,
+          57715,
+          57716,
+          57710,
+          57439,
+          57712,
+          57713,
+          57714
+        ]
+      }
+    ]
+  },
+  {
+    "id": 514015,
+    "name": "Alter Ego Choice Pack 3",
+    "description": "Local choice pack. Choose one player from 8 fixed options.",
+    "texture": "CPACK_ALTEREGO_03",
+    "source": "update",
+    "cost": 1500,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          57732,
+          57731,
+          57730,
+          57729,
+          57728,
+          57727,
+          57435,
+          57725
+        ]
+      }
+    ]
+  },
+  {
+    "id": 514016,
+    "name": "Captains Choice Pack Set 2",
+    "description": "Local choice pack. Choose one player from 8 fixed options.",
+    "texture": "CPACK_CAPTAINS_SET2",
+    "source": "update",
+    "cost": 1500,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          58123,
+          57343,
+          58124,
+          58127,
+          58125,
+          58126,
+          58121,
+          58254
+        ]
+      }
+    ]
+  },
+  {
+    "id": 514017,
+    "name": "Number Retirement Choice Pack",
+    "description": "Local choice pack. Choose one player from 8 fixed options.",
+    "texture": "CPACK_NUMBERRETIREMENT",
+    "source": "update",
+    "cost": 1500,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          59361,
+          59360,
+          59359,
+          59366,
+          59365,
+          59364,
+          59363,
+          59362
+        ]
+      }
+    ]
+  },
+  {
+    "id": 514018,
+    "name": "Great Race of '98 Choice Pack",
+    "description": "Local choice pack. Choose one player from 8 fixed options.",
+    "texture": "CPACK_GR98",
+    "source": "update",
+    "cost": 1500,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          59912,
+          59911,
+          59913,
+          59914,
+          59915,
+          59916,
+          59917,
+          59918
+        ]
+      }
+    ]
+  },
+  {
+    "id": 514019,
+    "name": "2023 Finest Choice Pack",
+    "description": "Local choice pack. Choose one player from 5 fixed options.",
+    "texture": "CPACK_2023FINEST_01",
+    "source": "update",
+    "cost": 1500,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          60460,
+          60699,
+          60691,
+          60697,
+          60701
+        ]
+      }
+    ]
+  },
+  {
+    "id": 514101,
+    "name": "Diamond Duos 01 Choice Pack",
+    "description": "Local choice pack. Choose one of the two guaranteed featured players.",
+    "texture": "CPACK_DIAMONDDUOS_01",
+    "source": "update",
+    "cost": 2000,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          56442,
+          56443
+        ]
+      }
+    ]
+  },
+  {
+    "id": 514102,
+    "name": "Diamond Duos 02 Choice Pack",
+    "description": "Local choice pack. Choose one of the two guaranteed featured players.",
+    "texture": "CPACK_DIAMONDDUOS_02",
+    "source": "update",
+    "cost": 2000,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          56700,
+          56343
+        ]
+      }
+    ]
+  },
+  {
+    "id": 514103,
+    "name": "Diamond Duos 03 Choice Pack",
+    "description": "Local choice pack. Choose one of the two guaranteed featured players.",
+    "texture": "CPACK_DIAMONDDUOS_03",
+    "source": "update",
+    "cost": 2000,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          56702,
+          56701
+        ]
+      }
+    ]
+  },
+  {
+    "id": 514104,
+    "name": "Diamond Duos 04 Choice Pack",
+    "description": "Local choice pack. Choose one of the two guaranteed featured players.",
+    "texture": "CPACK_DIAMONDDUOS_04",
+    "source": "update",
+    "cost": 2000,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          56704,
+          56703
+        ]
+      }
+    ]
+  },
+  {
+    "id": 514105,
+    "name": "Diamond Duos 05 Choice Pack",
+    "description": "Local choice pack. Choose one of the two guaranteed featured players.",
+    "texture": "CPACK_DIAMONDDUOS_05",
+    "source": "update",
+    "cost": 2000,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          56707,
+          56705
+        ]
+      }
+    ]
+  },
+  {
+    "id": 514106,
+    "name": "Diamond Duos 06 Choice Pack",
+    "description": "Local choice pack. Choose one of the two guaranteed featured players.",
+    "texture": "CPACK_DIAMONDDUOS_06",
+    "source": "update",
+    "cost": 2000,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          56719,
+          56718
+        ]
+      }
+    ]
+  },
+  {
+    "id": 514107,
+    "name": "Diamond Duos 07 Choice Pack",
+    "description": "Local choice pack. Choose one of the two guaranteed featured players.",
+    "texture": "CPACK_DIAMONDDUOS_07",
+    "source": "update",
+    "cost": 2000,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          56730,
+          56729
+        ]
+      }
+    ]
+  },
+  {
+    "id": 514108,
+    "name": "Diamond Duos 08 Choice Pack",
+    "description": "Local choice pack. Choose one of the two guaranteed featured players.",
+    "texture": "CPACK_DIAMONDDUOS_08",
+    "source": "update",
+    "cost": 2000,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          56731,
+          56733
+        ]
+      }
+    ]
+  },
+  {
+    "id": 514109,
+    "name": "Diamond Duos 09 Choice Pack",
+    "description": "Local choice pack. Choose one of the two guaranteed featured players.",
+    "texture": "CPACK_DIAMONDDUOS_09",
+    "source": "update",
+    "cost": 2000,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          56734,
+          56732
+        ]
+      }
+    ]
+  },
+  {
+    "id": 514110,
+    "name": "Diamond Duos 10 Choice Pack",
+    "description": "Local choice pack. Choose one of the two guaranteed featured players.",
+    "texture": "CPACK_DIAMONDDUOS_10",
+    "source": "update",
+    "cost": 2000,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          57417,
+          57414
+        ]
+      }
+    ]
+  },
+  {
+    "id": 514111,
+    "name": "Diamond Duos 11 Choice Pack",
+    "description": "Local choice pack. Choose one of the two guaranteed featured players.",
+    "texture": "CPACK_DIAMONDDUOS_11",
+    "source": "update",
+    "cost": 2000,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          57410,
+          57409
+        ]
+      }
+    ]
+  },
+  {
+    "id": 514112,
+    "name": "Diamond Duos 12 Choice Pack",
+    "description": "Local choice pack. Choose one of the two guaranteed featured players.",
+    "texture": "CPACK_DIAMONDDUOS_12",
+    "source": "update",
+    "cost": 2000,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          57419,
+          57415
+        ]
+      }
+    ]
+  },
+  {
+    "id": 514113,
+    "name": "Diamond Duos 13 Choice Pack",
+    "description": "Local choice pack. Choose one of the two guaranteed featured players.",
+    "texture": "CPACK_DIAMONDDUOS_13",
+    "source": "update",
+    "cost": 2000,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          57416,
+          57412
+        ]
+      }
+    ]
+  },
+  {
+    "id": 514114,
+    "name": "Diamond Duos 14 Choice Pack",
+    "description": "Local choice pack. Choose one of the two guaranteed featured players.",
+    "texture": "CPACK_DIAMONDDUOS_14",
+    "source": "update",
+    "cost": 2000,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          57849,
+          56615
+        ]
+      }
+    ]
+  },
+  {
+    "id": 514115,
+    "name": "Diamond Duos 15 Choice Pack",
+    "description": "Local choice pack. Choose one of the two guaranteed featured players.",
+    "texture": "CPACK_DIAMONDDUOS_15",
+    "source": "update",
+    "cost": 2000,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          57907,
+          57906
+        ]
+      }
+    ]
+  },
+  {
+    "id": 514117,
+    "name": "Diamond Duos 17 Choice Pack",
+    "description": "Local choice pack. Choose one of the two guaranteed featured players.",
+    "texture": "CPACK_DIAMONDDUOS_17",
+    "source": "update",
+    "cost": 2000,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          57911,
+          57910
+        ]
+      }
+    ]
+  },
+  {
+    "id": 514118,
+    "name": "Diamond Duos 18 Choice Pack",
+    "description": "Local choice pack. Choose one of the two guaranteed featured players.",
+    "texture": "CPACK_DIAMONDDUOS_18",
+    "source": "update",
+    "cost": 2000,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          57913,
+          57912
+        ]
+      }
+    ]
+  },
+  {
+    "id": 514119,
+    "name": "Diamond Duos 19 Choice Pack",
+    "description": "Local choice pack. Choose one of the two guaranteed featured players.",
+    "texture": "CPACK_DIAMONDDUOS_19",
+    "source": "update",
+    "cost": 2000,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          57915,
+          57914
+        ]
+      }
+    ]
+  },
+  {
+    "id": 514120,
+    "name": "Diamond Duos 20 Choice Pack",
+    "description": "Local choice pack. Choose one of the two guaranteed featured players.",
+    "texture": "CPACK_DIAMONDDUOS_20",
+    "source": "update",
+    "cost": 2000,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          57917,
+          57916
+        ]
+      }
+    ]
+  },
+  {
+    "id": 514123,
+    "name": "Diamond Duos 23 Choice Pack",
+    "description": "Local choice pack. Choose one of the two guaranteed featured players.",
+    "texture": "CPACK_DIAMONDDUOS_23",
+    "source": "update",
+    "cost": 2000,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          57921,
+          57920
+        ]
+      }
+    ]
+  },
+  {
+    "id": 514124,
+    "name": "Diamond Duos 24 Choice Pack",
+    "description": "Local choice pack. Choose one of the two guaranteed featured players.",
+    "texture": "CPACK_DIAMONDDUOS_24",
+    "source": "update",
+    "cost": 2000,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          57437,
+          58381
+        ]
+      }
+    ]
+  },
+  {
+    "id": 514125,
+    "name": "Diamond Duos 25 Choice Pack",
+    "description": "Local choice pack. Choose one of the two guaranteed featured players.",
+    "texture": "CPACK_DIAMONDDUOS_25",
+    "source": "update",
+    "cost": 2000,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          58383,
+          58382
+        ]
+      }
+    ]
+  },
+  {
+    "id": 514126,
+    "name": "Diamond Duos 26 Choice Pack",
+    "description": "Local choice pack. Choose one of the two guaranteed featured players.",
+    "texture": "CPACK_DIAMONDDUOS_26",
+    "source": "update",
+    "cost": 2000,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          59217,
+          59230
+        ]
+      }
+    ]
+  },
+  {
+    "id": 514127,
+    "name": "Diamond Duos 27 Choice Pack",
+    "description": "Local choice pack. Choose one of the two guaranteed featured players.",
+    "texture": "CPACK_DIAMONDDUOS_27",
+    "source": "update",
+    "cost": 2000,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          59231,
+          59232
+        ]
+      }
+    ]
+  },
+  {
+    "id": 514128,
+    "name": "Diamond Duos 28 Choice Pack",
+    "description": "Local choice pack. Choose one of the two guaranteed featured players.",
+    "texture": "CPACK_DIAMONDDUOS_28",
+    "source": "update",
+    "cost": 2000,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          58810,
+          59249
+        ]
+      }
+    ]
+  },
+  {
+    "id": 514129,
+    "name": "Diamond Duos 29 Choice Pack",
+    "description": "Local choice pack. Choose one of the two guaranteed featured players.",
+    "texture": "CPACK_DIAMONDDUOS_29",
+    "source": "update",
+    "cost": 2000,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          59377,
+          59378
+        ]
+      }
+    ]
+  },
+  {
+    "id": 514130,
+    "name": "Diamond Duos 30 Choice Pack",
+    "description": "Local choice pack. Choose one of the two guaranteed featured players.",
+    "texture": "CPACK_DIAMONDDUOS_30",
+    "source": "update",
+    "cost": 2000,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          59380,
+          58910
+        ]
+      }
+    ]
+  },
+  {
+    "id": 514131,
+    "name": "Diamond Duos 31 Choice Pack",
+    "description": "Local choice pack. Choose one of the two guaranteed featured players.",
+    "texture": "CPACK_DIAMONDDUOS_31",
+    "source": "update",
+    "cost": 2000,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          59379,
+          59381
+        ]
+      }
+    ]
+  },
+  {
+    "id": 514132,
+    "name": "Diamond Duos 32 Choice Pack",
+    "description": "Local choice pack. Choose one of the two guaranteed featured players.",
+    "texture": "CPACK_DIAMONDDUOS_32",
+    "source": "update",
+    "cost": 2000,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          59383,
+          59382
+        ]
+      }
+    ]
+  },
+  {
+    "id": 514133,
+    "name": "Diamond Duos 33 Choice Pack",
+    "description": "Local choice pack. Choose one of the two guaranteed featured players.",
+    "texture": "CPACK_DIAMONDDUOS_33",
+    "source": "update",
+    "cost": 2000,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          58909,
+          59384
+        ]
+      }
+    ]
+  },
+  {
+    "id": 514134,
+    "name": "Diamond Duos 34 Choice Pack",
+    "description": "Local choice pack. Choose one of the two guaranteed featured players.",
+    "texture": "CPACK_DIAMONDDUOS_34",
+    "source": "update",
+    "cost": 2000,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          59370,
+          59495
+        ]
+      }
+    ]
+  },
+  {
+    "id": 514135,
+    "name": "Diamond Duos 35 Choice Pack",
+    "description": "Local choice pack. Choose one of the two guaranteed featured players.",
+    "texture": "CPACK_DIAMONDDUOS_35",
+    "source": "update",
+    "cost": 2000,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          59920,
+          59919
+        ]
+      }
+    ]
+  },
+  {
+    "id": 514136,
+    "name": "Diamond Duos 36 Choice Pack",
+    "description": "Local choice pack. Choose one of the two guaranteed featured players.",
+    "texture": "CPACK_DIAMONDDUOS_36",
+    "source": "update",
+    "cost": 2000,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          59922,
+          59923
+        ]
+      }
+    ]
+  },
+  {
+    "id": 514137,
+    "name": "Diamond Duos 37 Choice Pack",
+    "description": "Local choice pack. Choose one of the two guaranteed featured players.",
+    "texture": "CPACK_DIAMONDDUOS_37",
+    "source": "update",
+    "cost": 2000,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          59921,
+          59924
+        ]
+      }
+    ]
+  },
+  {
+    "id": 514138,
+    "name": "Diamond Duos 38 Choice Pack",
+    "description": "Local choice pack. Choose one of the two guaranteed featured players.",
+    "texture": "CPACK_DIAMONDDUOS_38",
+    "source": "update",
+    "cost": 2000,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          39280,
+          51449
+        ]
+      }
+    ]
+  },
+  {
+    "id": 514139,
+    "name": "Diamond Duos 39 Choice Pack",
+    "description": "Local choice pack. Choose one of the two guaranteed featured players.",
+    "texture": "CPACK_DIAMONDDUOS_39",
+    "source": "update",
+    "cost": 2000,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          60382,
+          60383
+        ]
+      }
+    ]
+  },
+  {
+    "id": 514140,
+    "name": "Diamond Duos 40 Choice Pack",
+    "description": "Local choice pack. Choose one of the two guaranteed featured players.",
+    "texture": "CPACK_DIAMONDDUOS_40",
+    "source": "update",
+    "cost": 2000,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          60432,
+          59373
+        ]
+      }
+    ]
+  }
+]

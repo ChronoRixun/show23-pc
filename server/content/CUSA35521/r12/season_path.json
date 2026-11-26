@@ -1,0 +1,520 @@
+{
+  "reward_revision": "r11",
+  "bonus_step": 25000,
+  "tiers": [
+    {
+      "level": 1,
+      "threshold": 0,
+      "reward": {
+        "kind": "card",
+        "item_id": 54341,
+        "uuid": "acb40c8a57d50781194e37be2a94b3d5",
+        "fallback": {
+          "kind": "stubs",
+          "amount": 500
+        }
+      }
+    },
+    {
+      "level": 2,
+      "threshold": 2500,
+      "reward": {
+        "kind": "stubs",
+        "amount": 300
+      }
+    },
+    {
+      "level": 3,
+      "threshold": 5000,
+      "reward": {
+        "kind": "card",
+        "item_id": 56140,
+        "uuid": "71db2e20bffbd595a26ec4e7f8b99227",
+        "fallback": {
+          "kind": "stubs",
+          "amount": 500
+        }
+      }
+    },
+    {
+      "level": 4,
+      "threshold": 7500,
+      "reward": {
+        "kind": "pack",
+        "product_id": 510001,
+        "fallback": {
+          "kind": "stubs",
+          "amount": 150
+        }
+      }
+    },
+    {
+      "level": 5,
+      "threshold": 10000,
+      "reward": {
+        "kind": "card",
+        "item_id": 54284,
+        "uuid": "6fdf51ecb22f365cc01cbf187ce3353f",
+        "fallback": {
+          "kind": "stubs",
+          "amount": 500
+        }
+      }
+    },
+    {
+      "level": 6,
+      "threshold": 12500,
+      "reward": {
+        "kind": "stubs",
+        "amount": 350
+      }
+    },
+    {
+      "level": 7,
+      "threshold": 15000,
+      "reward": {
+        "kind": "card",
+        "item_id": 56441,
+        "uuid": "98403012368e5539c01fa886f1634169",
+        "fallback": {
+          "kind": "stubs",
+          "amount": 750
+        }
+      }
+    },
+    {
+      "level": 8,
+      "threshold": 17500,
+      "reward": {
+        "kind": "card",
+        "item_id": 54313,
+        "uuid": "33c8c59cdc20e0e78feb6bdc1028c0e7",
+        "fallback": {
+          "kind": "stubs",
+          "amount": 500
+        }
+      }
+    },
+    {
+      "level": 9,
+      "threshold": 20000,
+      "reward": {
+        "kind": "pack",
+        "product_id": 510006,
+        "fallback": {
+          "kind": "stubs",
+          "amount": 600
+        }
+      }
+    },
+    {
+      "level": 10,
+      "threshold": 22500,
+      "reward": {
+        "kind": "card",
+        "item_id": 54344,
+        "uuid": "8d3c396c1e9f2d8988c9e164f895232d",
+        "fallback": {
+          "kind": "stubs",
+          "amount": 500
+        }
+      }
+    },
+    {
+      "level": 11,
+      "threshold": 25000,
+      "reward": {
+        "kind": "stubs",
+        "amount": 400
+      }
+    },
+    {
+      "level": 12,
+      "threshold": 27500,
+      "reward": {
+        "kind": "card",
+        "item_id": 54345,
+        "uuid": "1edee226a3ec95d234dbb32fc8b782a2",
+        "fallback": {
+          "kind": "stubs",
+          "amount": 500
+        }
+      }
+    },
+    {
+      "level": 13,
+      "threshold": 30000,
+      "reward": {
+        "kind": "card",
+        "item_id": 54441,
+        "uuid": "bab3c15be68a63cee20e82494a0a887f",
+        "fallback": {
+          "kind": "stubs",
+          "amount": 500
+        }
+      }
+    },
+    {
+      "level": 14,
+      "threshold": 32500,
+      "reward": {
+        "kind": "card",
+        "item_id": 54285,
+        "uuid": "aa0c1c360585020e8fb2d9f34fa25e7b",
+        "fallback": {
+          "kind": "stubs",
+          "amount": 500
+        }
+      }
+    },
+    {
+      "level": 15,
+      "threshold": 35000,
+      "reward": {
+        "kind": "pack",
+        "product_id": 510021,
+        "fallback": {
+          "kind": "stubs",
+          "amount": 800
+        }
+      }
+    },
+    {
+      "level": 16,
+      "threshold": 37500,
+      "reward": {
+        "kind": "card",
+        "item_id": 54314,
+        "uuid": "9a6425cb36dd69d7db5d71a90194436f",
+        "fallback": {
+          "kind": "stubs",
+          "amount": 500
+        }
+      }
+    },
+    {
+      "level": 17,
+      "threshold": 40000,
+      "reward": {
+        "kind": "stubs",
+        "amount": 450
+      }
+    },
+    {
+      "level": 18,
+      "threshold": 42500,
+      "reward": {
+        "kind": "card",
+        "item_id": 54286,
+        "uuid": "e74ffccbab44ed6be7f6167684652aaa",
+        "fallback": {
+          "kind": "stubs",
+          "amount": 500
+        }
+      }
+    },
+    {
+      "level": 19,
+      "threshold": 45000,
+      "reward": {
+        "kind": "pack",
+        "product_id": 510027,
+        "fallback": {
+          "kind": "stubs",
+          "amount": 800
+        }
+      }
+    },
+    {
+      "level": 20,
+      "threshold": 47500,
+      "reward": {
+        "kind": "card",
+        "item_id": 54315,
+        "uuid": "297cd8900d7c36de492d67cc2886e76f",
+        "fallback": {
+          "kind": "stubs",
+          "amount": 750
+        }
+      }
+    },
+    {
+      "level": 21,
+      "threshold": 50000,
+      "reward": {
+        "kind": "card",
+        "item_id": 59588,
+        "uuid": "73d863c1aefd803e74b72b4d244f7828",
+        "fallback": {
+          "kind": "stubs",
+          "amount": 750
+        }
+      }
+    },
+    {
+      "level": 22,
+      "threshold": 52500,
+      "reward": {
+        "kind": "stubs",
+        "amount": 500
+      }
+    },
+    {
+      "level": 23,
+      "threshold": 55000,
+      "reward": {
+        "kind": "card",
+        "item_id": 58776,
+        "uuid": "5c3f4e8fbf5a96a3fea58f30d976848e",
+        "fallback": {
+          "kind": "stubs",
+          "amount": 1000
+        }
+      }
+    },
+    {
+      "level": 24,
+      "threshold": 57500,
+      "reward": {
+        "kind": "pack",
+        "product_id": 512001,
+        "fallback": {
+          "kind": "stubs",
+          "amount": 1500
+        }
+      }
+    },
+    {
+      "level": 25,
+      "threshold": 60000,
+      "reward": {
+        "kind": "card",
+        "item_id": 58777,
+        "uuid": "ea48666e1a067bf8fea7683f2d81f265",
+        "fallback": {
+          "kind": "stubs",
+          "amount": 1000
+        }
+      }
+    },
+    {
+      "level": 26,
+      "threshold": 62500,
+      "reward": {
+        "kind": "pack",
+        "product_id": 510023,
+        "fallback": {
+          "kind": "stubs",
+          "amount": 900
+        }
+      }
+    },
+    {
+      "level": 27,
+      "threshold": 65000,
+      "reward": {
+        "kind": "card",
+        "item_id": 58781,
+        "uuid": "014da5b73b920833ca827999c0462030",
+        "fallback": {
+          "kind": "stubs",
+          "amount": 1000
+        }
+      }
+    },
+    {
+      "level": 28,
+      "threshold": 67500,
+      "reward": {
+        "kind": "stubs",
+        "amount": 600
+      }
+    },
+    {
+      "level": 29,
+      "threshold": 70000,
+      "reward": {
+        "kind": "card",
+        "item_id": 58775,
+        "uuid": "f51f6d9168f47abcd7ad25afe829c0c7",
+        "fallback": {
+          "kind": "stubs",
+          "amount": 1000
+        }
+      }
+    },
+    {
+      "level": 30,
+      "threshold": 72500,
+      "reward": {
+        "kind": "card",
+        "item_id": 56358,
+        "uuid": "ed565472d8ce021500229c77a0f731a1",
+        "fallback": {
+          "kind": "stubs",
+          "amount": 1000
+        }
+      }
+    },
+    {
+      "level": 31,
+      "threshold": 75000,
+      "reward": {
+        "kind": "card",
+        "item_id": 58779,
+        "uuid": "20045f22a9073479fe2e07d78bb87cc4",
+        "fallback": {
+          "kind": "stubs",
+          "amount": 1000
+        }
+      }
+    },
+    {
+      "level": 32,
+      "threshold": 77500,
+      "reward": {
+        "kind": "pack",
+        "product_id": 513003,
+        "fallback": {
+          "kind": "stubs",
+          "amount": 1100
+        }
+      }
+    },
+    {
+      "level": 33,
+      "threshold": 80000,
+      "reward": {
+        "kind": "card",
+        "item_id": 58780,
+        "uuid": "be9e0dd298dcf4979ea1dd3d226e0bfa",
+        "fallback": {
+          "kind": "stubs",
+          "amount": 1000
+        }
+      }
+    },
+    {
+      "level": 34,
+      "threshold": 82500,
+      "reward": {
+        "kind": "stubs",
+        "amount": 750
+      }
+    },
+    {
+      "level": 35,
+      "threshold": 85000,
+      "reward": {
+        "kind": "card",
+        "item_id": 58778,
+        "uuid": "7626051f62ed396b34abd92fc91a7814",
+        "fallback": {
+          "kind": "stubs",
+          "amount": 1000
+        }
+      }
+    },
+    {
+      "level": 36,
+      "threshold": 87500,
+      "reward": {
+        "kind": "pack",
+        "product_id": 511001,
+        "fallback": {
+          "kind": "stubs",
+          "amount": 1000
+        }
+      }
+    },
+    {
+      "level": 37,
+      "threshold": 90000,
+      "reward": {
+        "kind": "card",
+        "item_id": 58782,
+        "uuid": "d637dca8c61547167d887daeec510c16",
+        "fallback": {
+          "kind": "stubs",
+          "amount": 1000
+        }
+      }
+    },
+    {
+      "level": 38,
+      "threshold": 92500,
+      "reward": {
+        "kind": "stubs",
+        "amount": 1000
+      }
+    },
+    {
+      "level": 39,
+      "threshold": 95000,
+      "reward": {
+        "kind": "card",
+        "item_id": 56662,
+        "uuid": "198271ab5e4be000a01629484af17363",
+        "fallback": {
+          "kind": "stubs",
+          "amount": 1000
+        }
+      }
+    },
+    {
+      "level": 40,
+      "threshold": 97500,
+      "reward": {
+        "kind": "card",
+        "item_id": 56325,
+        "uuid": "624d41a9dca174f3b96b197de9f6a6fa",
+        "fallback": {
+          "kind": "stubs",
+          "amount": 1500
+        }
+      }
+    }
+  ],
+  "bonus": [
+    {
+      "kind": "stubs",
+      "amount": 750
+    },
+    {
+      "kind": "pack",
+      "product_id": 510001,
+      "fallback": {
+        "kind": "stubs",
+        "amount": 150
+      }
+    },
+    {
+      "kind": "pack",
+      "product_id": 510027,
+      "fallback": {
+        "kind": "stubs",
+        "amount": 800
+      }
+    },
+    {
+      "kind": "stubs",
+      "amount": 1000
+    },
+    {
+      "kind": "pack",
+      "product_id": 510003,
+      "fallback": {
+        "kind": "stubs",
+        "amount": 650
+      }
+    },
+    {
+      "kind": "pack",
+      "product_id": 511001,
+      "fallback": {
+        "kind": "stubs",
+        "amount": 1000
+      }
+    }
+  ]
+}

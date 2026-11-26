@@ -562,34 +562,114 @@ class PathTier(NamedTuple):
     threshold: int
     stubs: int
     pack_id: int
+    card: dict | None = None
+    claim: str = 'reward'
 
 
-PATH_TIERS = tuple(
+LEGACY_PATH_TIERS = tuple(
     PathTier(level, (level - 1) * PATH_STEP, 0 if level % 5 == 0 else 200,
              510003 if level == PATH_LEVELS else 510001 if level % 5 == 0 else 0)
     for level in range(1, PATH_LEVELS + 1)
 )
 
 
+class SeasonPath(NamedTuple):
+    revision: str
+    tiers: tuple
+    bonus: tuple
+
+
+def effective_season_path():
+    """Resolve exact editions and usable packs before presenting or paying a tier."""
+    path = active_title_content().season_path
+    if path is None:
+        return SeasonPath('', LEGACY_PATH_TIERS, ())
+    cards_by_id = {card['item_id']: card for card in all_cards()}
+    art = player_art()['override'] if cards_by_id else {}
+    imported = imported_pack_cards()
+    usable_packs = {}
+
+    def resolve(reward, level, threshold):
+        kind = reward['kind']
+        if kind == 'stubs':
+            return PathTier(level, threshold, reward['amount'], 0)
+        if kind == 'card':
+            item_id = reward['item_id']
+            card = cards_by_id.get(item_id)
+            handle, art_id = art.get(item_id, ('', 0))
+            if (card and card['uuid'] == reward['uuid'] and art_id == item_id
+                    and handle and handle != 'ACTIONGENERIC'):
+                return PathTier(level, threshold, 0, 0, card)
+        else:
+            pack_id = reward['product_id']
+            if pack_id not in usable_packs:
+                pack = SHOP_PACKS[pack_id]
+                usable_packs[pack_id] = (shop_picture_available(pack)
+                                         and shop_reward_pools(pack, imported) is not None)
+            if usable_packs[pack_id]:
+                return PathTier(level, threshold, 0, pack_id)
+        return PathTier(level, threshold, reward['fallback']['amount'], 0, claim='substitute')
+
+    tiers = tuple(resolve(tier['reward'], tier['level'], tier['threshold']) for tier in path.tiers)
+    bonus = tuple(resolve(reward, index, BONUS_STEP) for index, reward in enumerate(path.bonus, 1))
+    return SeasonPath(path.revision, tiers, bonus)
+
+
 def program_tickets(profile):
     return max(0, profile.get('program_tickets', 0))
 
 
-def grant_program_tiers(state, tickets):
+def grant_card_copies(state, card, amount):
+    gains = state.setdefault('pack_shop', {}).setdefault('gained_cards', {})
+    gains[card['uuid']] = gains.get(card['uuid'], 0) + amount
+
+
+def grant_path_reward(state, profile, tier):
+    if tier.card is not None:
+        grant_card_copies(state, tier.card, 1)
+    elif tier.pack_id:
+        grant_owned_pack(state.setdefault('pack_shop', {}), tier.pack_id)
+    else:
+        profile['stubs'] = profile.get('stubs', 0) + tier.stubs
+
+
+def path_claims(profile, season):
+    return set(profile.get('program_reward_claims', {}).get(season.revision, ()))
+
+
+def path_tier_claimed(tier, claims):
+    return f'{tier.level}:reward' in claims or f'{tier.level}:{tier.claim}' in claims
+
+
+def grant_program_tiers(state, tickets, season=None):
     """Grant eligible tiers before persisting rewards and their claim IDs together."""
+    if season is None:
+        season = effective_season_path()
     profile = state.setdefault('profile', {})
     claimed = set(profile.get('program_tier_claims', ()))
-    eligible = [tier for tier in PATH_TIERS if tier.threshold <= tickets and tier.level not in claimed]
-    if not eligible:
-        return False
-    for tier in eligible:
-        if tier.pack_id:
-            grant_owned_pack(state.setdefault('pack_shop', {}), tier.pack_id)
-        else:
-            profile['stubs'] = profile.get('stubs', 0) + tier.stubs
+    claims = path_claims(profile, season)
+    changed = False
+    for tier in season.tiers:
+        paid = path_tier_claimed(tier, claims) if season.revision else tier.level in claimed
+        if tier.threshold > tickets or paid:
+            continue
+        grant_path_reward(state, profile, tier)
+        claims.add(f'{tier.level}:{tier.claim}')
         claimed.add(tier.level)
-    profile['program_tier_claims'] = sorted(claimed)
-    return True
+        changed = True
+    if changed:
+        profile['program_tier_claims'] = sorted(claimed)
+        if season.revision:
+            profile.setdefault('program_reward_claims', {})[season.revision] = sorted(claims)
+    if season.bonus:
+        earned = max(0, (tickets - PATH_TOTAL) // BONUS_STEP)
+        paid = profile.get('program_bonus_claims', {}).get(season.revision, 0)
+        for index in range(paid, earned):
+            grant_path_reward(state, profile, season.bonus[index % len(season.bonus)])
+        if earned > paid:
+            profile.setdefault('program_bonus_claims', {})[season.revision] = earned
+            changed = True
+    return changed
 
 
 def program_fields(profile, *, available=True):
@@ -643,7 +723,18 @@ def program_pack_fields(pack_id):
                 item_label_aaadeb49z9__=pack.name)  # script 0xf1697e59
 
 
+def program_card_item(card, quantity, *, tag='item'):
+    item = ET.fromstring(shop_revealed_card(card, quantity, is_new=False))
+    item.tag = tag
+    item.set('item_label_aaadeb49z9__', card['name'])
+    ET.SubElement(item, 'item_exclusives')
+    return item
+
+
 def program_item(parent, tier, *, tag='item'):
+    if tier.card is not None:
+        parent.append(program_card_item(tier.card, 1, tag=tag))
+        return
     fields = program_pack_fields(tier.pack_id) if tier.pack_id else dict(
         id=0, item_id=0, type_id=-1, name='Stubs', description='Stubs credited to your wallet.',
         quantity=0, rank=0, rarity_id=0, texture_name='', item_label_aaadeb49z9__='Stubs')
@@ -656,17 +747,18 @@ def program_extra(parent, tag, amount):
 
 
 def program_tier_row(parent, tier, tickets, claimed):
-    is_pack = bool(tier.pack_id)
-    name = SHOP_PACKS[tier.pack_id].name if is_pack else 'Stubs'
-    row = mini_node(parent, 'reward', id=tier.pack_id, level=tier.level, name=name,
-                    type_id=4 if is_pack else -1, tickets_required=tier.threshold, cur_val=tickets,
+    item_id, name, type_id = (tier.card['item_id'], tier.card['name'], 0) if tier.card is not None else (
+        (tier.pack_id, SHOP_PACKS[tier.pack_id].name, 4) if tier.pack_id else (0, 'Stubs', -1))
+    has_item = type_id >= 0
+    row = mini_node(parent, 'reward', id=item_id, level=tier.level, name=name,
+                    type_id=type_id, tickets_required=tier.threshold, cur_val=tickets,
                     start_of_stage=0, no_sell=1, is_featured=0,
-                    display_index=0 if is_pack else 1, label_index=1 if is_pack else 2,
+                    display_index=0 if has_item else 1, label_index=1 if has_item else 2,
                     is_claimed=int(claimed), status_index=int(claimed),
                     stage_level_9irt____=tier.level,  # script 0x86784c76
                     reward_status_aafaaa9agx_5=tier.threshold)  # script 0xbb1f070a
     program_item(row, tier)
-    # The label template binds extra[0].amount even when it picks the pack name.
+    # The label template binds extra[0].amount even when it picks the card or pack name.
     program_extra(ET.SubElement(row, 'extras'), 'extra', tier.stubs)
     return row
 
@@ -692,13 +784,16 @@ def program_view(params):
     state = load_state() if available else {}
     profile = state.get('profile', {})
     tickets = program_tickets(profile)
+    season = effective_season_path() if available else SeasonPath('', (), ())
     # Reconcile existing saves and never consume the pending delta before view_post_game.
-    if available and grant_program_tiers(state, tickets):
+    if available and grant_program_tiers(state, tickets, season):
         save_state(state)
         profile = state['profile']
     response = ET.Element('response')
     # Program_IsComplete (0xf0e522) uses max_program_tickets on detail.
     # total_program_tickets is the separate progress-list field (0x9c3f32).
+    # Program_CheckForReward (0xf0e980) takes True as a request to enter the
+    # native bonus transition (UI 0x359990). We settle bonus rewards in the save.
     program = mini_node(response, 'program', max_program_tickets=PATH_TOTAL,
                         max_bonus_tickets=BONUS_STEP, has_unlimited_reward='False',
                         just_completed_program='False', **program_fields(profile, available=available))
@@ -707,12 +802,22 @@ def program_view(params):
         program_daily_goals(stage, profile)
     rewards = ET.SubElement(program, 'rewards')
     if available:
-        claimed = set(profile.get('program_tier_claims', ()))
-        for tier in PATH_TIERS:
-            program_tier_row(rewards, tier, min(tickets, PATH_TOTAL), tier.level in claimed)
+        claims = path_claims(profile, season)
+        legacy_claims = set(profile.get('program_tier_claims', ()))
+        for tier in season.tiers:
+            paid = path_tier_claimed(tier, claims) if season.revision else tier.level in legacy_claims
+            program_tier_row(rewards, tier, min(tickets, PATH_TOTAL), paid)
     unlimited = ET.SubElement(program, 'unlimited_rewards')
-    for _ in range(6):  # Indexed texture paths 0x360670–0x3608b0.
-        mini_node(unlimited, 'unlimited_reward', texture_name='')
+    if season.bonus:
+        paid = profile.get('program_bonus_claims', {}).get(season.revision, 0)
+        for offset in range(len(season.bonus)):  # Indexed texture paths 0x360670–0x3608b0.
+            reward = season.bonus[(paid + offset) % len(season.bonus)]
+            pack = SHOP_PACKS.get(reward.pack_id)
+            mini_node(unlimited, 'unlimited_reward', texture_name=pack.texture if pack else '',
+                      name=pack.name if pack else 'Stubs', amount=reward.stubs, type_id=4 if pack else -1)
+    else:
+        for _ in range(6):
+            mini_node(unlimited, 'unlimited_reward', texture_name='')
     return mini_xml(response)
 
 
@@ -737,9 +842,14 @@ def program_list(params):
     if fields:
         program = mini_node(programs, 'program', **fields, featured_label_rtay_8i_='Tier Rewards')
         featured = ET.SubElement(program, 'featured_items')
-        for pack_id in (510001, 510003):
-            item = mini_node(featured, 'featured_item', **program_pack_fields(pack_id))
-            ET.SubElement(item, 'item_exclusives')
+        season = effective_season_path()
+        if season.revision:
+            items = [tier for tier in season.tiers if tier.card is not None or tier.pack_id]
+            for tier in (items[:1] + items[-1:] if len(items) > 1 else items):
+                program_item(featured, tier, tag='featured_item')
+        else:
+            for pack_id in (510001, 510003):
+                program_item(featured, PathTier(0, 0, 0, pack_id), tag='featured_item')
     return mini_xml(response)
 
 
@@ -748,7 +858,7 @@ def add_bonus_xp(params):
     return '<response><bonus_xp amount="0"/></response>'
 
 
-MISSION_CONTENT_DIR = Path(HERE) / 'content' / 'CUSA35521' / 'r10'
+MISSION_CONTENT_DIR = Path(HERE) / 'content' / 'CUSA35521' / 'r12'
 DAILY_GOAL_GROUP_ID = 730000
 MISSION_REROLL_FLAG = 'reward_flag_ab_dkxi'  # 0x35fa44, hash 0xbc667a79 gates Get New Mission
 # Type-0 detail indexes the global slot vector. Keep one small ordered board.
@@ -784,6 +894,8 @@ class TitleContent(NamedTuple):
     conquest: dict
     showdowns: dict
     moment_groups: dict
+    season_path: SeasonPath | None = None
+    choice_packs: dict | None = None
 
 
 # Ordinary Moment stats: batting R (0xae1005), HR (0xae12ab), OUTS (0xae14fd),
@@ -834,8 +946,8 @@ def load_title_content(directory):
     if not isinstance(manifest, dict) or manifest.keys() != {'schema_version', 'title', 'revision', 'files'}:
         raise invalid('manifest.json must contain schema_version, title, revision and files')
     version = manifest['schema_version']
-    if type(version) is not int or not 1 <= version <= 10:
-        raise invalid('manifest.json schema_version must be an integer from 1 through 10')
+    if type(version) is not int or not 1 <= version <= 12:
+        raise invalid('manifest.json schema_version must be an integer from 1 through 12')
     if manifest['title'] != 'CUSA35521' or manifest['revision'] != directory.name:
         raise invalid(f'manifest.json must identify title CUSA35521 and revision {directory.name}')
     expected_files = {'missions.json'} if version == 1 else {'missions.json', 'programs.json'}
@@ -845,6 +957,10 @@ def load_title_content(directory):
         expected_files.add('conquest.json')
     if version >= 6:
         expected_files.add('showdowns.json')
+    if version >= 11:
+        expected_files.add('season_path.json')
+    if version >= 12:
+        expected_files.add('choice_packs.json')
     files = manifest['files']
     if (not isinstance(files, list) or len(files) != len(expected_files)
             or any(not isinstance(name, str) for name in files) or set(files) != expected_files):
@@ -934,7 +1050,101 @@ def load_title_content(directory):
     showdowns = (validate_showdown_content(read_json('showdowns.json'), programs, moments, directory.name, invalid,
                                            multiple=version >= 8)
                  if version >= 6 else {})
-    return TitleContent(mission_index, programs, moments, situations, conquest, showdowns, groups)
+    season = validate_season_path(read_json('season_path.json'), invalid) if version >= 11 else None
+    choices = validate_choice_packs(read_json('choice_packs.json'), invalid) if version >= 12 else None
+    return TitleContent(mission_index, programs, moments, situations, conquest, showdowns, groups, season, choices)
+
+
+def validate_choice_packs(products, invalid):
+    if not isinstance(products, list) or not products:
+        raise invalid('choice_packs.json must contain a nonempty list of products')
+    index = {}
+    textures = set()
+    for number, product in enumerate(products, 1):
+        label = f'choice_packs.json product {number}'
+        if not content_record(product, {'id', 'name', 'description', 'cost', 'texture', 'source', 'rounds'}):
+            raise invalid(f'{label} has invalid fields')
+        product_id = product['id']
+        if not content_positive(product_id) or product_id in SHOP_PACKS or product_id in index:
+            raise invalid(f'{label} needs a unique positive product ID')
+        if not all(content_text(product[key]) for key in ('name', 'description', 'texture')):
+            raise invalid(f'{label} needs valid text')
+        texture = product['texture']
+        if (not re.fullmatch(r'CPACK_[A-Z0-9_]+', texture) or texture in textures
+                or product['source'] not in ('base', 'update')):
+            raise invalid(f'{label} needs a unique choice-pack texture and an art source')
+        if type(product['cost']) is not int or not 0 <= product['cost'] <= 0x7fffffff:
+            raise invalid(f'{label} needs a nonnegative Stubs price')
+        rounds = product['rounds']
+        if not isinstance(rounds, list) or not 1 <= len(rounds) <= 12:
+            raise invalid(f'{label} needs 1 to 12 rounds')
+        for round_number, row in enumerate(rounds, 1):
+            if not content_record(row, {'picks', 'options'}):
+                raise invalid(f'{label} round {round_number} must contain picks and options')
+            picks, options = row['picks'], row['options']
+            if (not isinstance(options, list) or not 1 <= len(options) <= 12
+                    or not all(content_positive(item_id) for item_id in options)
+                    or len(options) != len(set(options))):
+                raise invalid(f'{label} round {round_number} needs distinct positive card IDs')
+            if not content_positive(picks) or picks > len(options):
+                raise invalid(f'{label} round {round_number} cannot require more picks than options')
+        if sum(row['picks'] for row in rounds) > 50:
+            raise invalid(f'{label} exceeds 50 total picks')
+        index[product_id] = product
+        textures.add(texture)
+    return index
+
+
+def validate_season_path(data, invalid):
+    if not content_record(data, {'reward_revision', 'bonus_step', 'tiers', 'bonus'}):
+        raise invalid('season_path.json must contain reward_revision, bonus_step, tiers and bonus')
+    revision, tiers, bonus = data['reward_revision'], data['tiers'], data['bonus']
+    if not isinstance(revision, str) or not re.fullmatch(r'r[1-9][0-9]*', revision):
+        raise invalid('season_path.json reward_revision must identify a reward revision')
+    if type(data['bonus_step']) is not int or data['bonus_step'] != BONUS_STEP:
+        raise invalid(f'season_path.json bonus_step must be {BONUS_STEP}')
+    if not isinstance(tiers, list) or len(tiers) != PATH_LEVELS:
+        raise invalid(f'season_path.json tiers must contain {PATH_LEVELS} rows')
+    if not isinstance(bonus, list) or len(bonus) != 6:
+        raise invalid('season_path.json bonus must contain six rewards')
+
+    def valid_stubs(reward):
+        return (content_record(reward, {'kind', 'amount'}) and reward['kind'] == 'stubs'
+                and content_positive(reward['amount']))
+
+    card_ids = set()
+
+    def validate_reward(reward, label, *, allow_card):
+        kind = reward.get('kind') if isinstance(reward, dict) else None
+        if valid_stubs(reward):
+            return
+        if not isinstance(reward, dict) or not valid_stubs(reward.get('fallback')):
+            raise invalid(f'season_path.json {label} must have positive Stubs or a valid item with a Stubs fallback')
+        if kind == 'pack' and content_record(reward, {'kind', 'product_id', 'fallback'}):
+            if content_positive(reward['product_id']) and reward['product_id'] in SHOP_PACKS:
+                return
+            raise invalid(f'season_path.json {label} references an unknown pack product')
+        if allow_card and kind == 'card' and content_record(reward, {'kind', 'item_id', 'uuid', 'fallback'}):
+            item_id = reward['item_id']
+            if not content_positive(item_id) or reward['uuid'] != hashlib.md5(str(item_id).encode('ascii'),
+                                                                              usedforsecurity=False).hexdigest():
+                raise invalid(f'season_path.json {label} must identify a card by its item ID and edition UUID')
+            if item_id in card_ids:
+                raise invalid(f'season_path.json {label} repeats a card edition')
+            card_ids.add(item_id)
+            return
+        raise invalid(f'season_path.json {label} has an unsupported reward')
+
+    for level, tier in enumerate(tiers, 1):
+        required = (level - 1) * PATH_STEP
+        if (not content_record(tier, {'level', 'threshold', 'reward'})
+                or type(tier['level']) is not int or tier['level'] != level
+                or type(tier['threshold']) is not int or tier['threshold'] != required):
+            raise invalid(f'season_path.json tier {level} must require {required} tickets')
+        validate_reward(tier['reward'], f'tier {level}', allow_card=True)
+    for index, reward in enumerate(bonus, 1):
+        validate_reward(reward, f'bonus {index}', allow_card=False)
+    return SeasonPath(revision, tuple(tiers), tuple(bonus))
 
 
 def validate_mission_options(mission, label, invalid):
@@ -1616,10 +1826,7 @@ def affinity_view(division):
         row.set('status_index', str(int(points >= threshold)))
         if card is not None:
             row.remove(row.find('item'))
-            item = ET.fromstring(shop_revealed_card(card, amount, is_new=False))
-            item.set('item_label_aaadeb49z9__', card['name'])
-            ET.SubElement(item, 'item_exclusives')
-            row.insert(0, item)
+            row.insert(0, program_card_item(card, amount))
             for key, value in dict(id=card['item_id'], type_id=0, name=card['name'],
                                    display_index=0, label_index=1).items():
                 row.set(key, str(value))
@@ -1706,8 +1913,7 @@ def affinity_grant_tiers(state, division, points):
             if card is None:
                 profile['stubs'] = profile.get('stubs', 0) + AFFINITY_CARD_FALLBACK_STUBS
             else:
-                gains = state.setdefault('pack_shop', {}).setdefault('gained_cards', {})
-                gains[card['uuid']] = gains.get(card['uuid'], 0) + amount
+                grant_card_copies(state, card, amount)
         else:
             profile['stubs'] = profile.get('stubs', 0) + amount
         claimed.add(reward)
@@ -2140,19 +2346,20 @@ def view_post_game(params):
     before = program_tickets(p)
     after = before + earned
     p['program_tickets'], p['last_game_tickets'], p['pending_xp'] = after, earned, 0
-    grant_program_tiers(state, after)
+    season = effective_season_path()
+    grant_program_tiers(state, after, season)
     response = ET.Element('response')
     post = mini_node(response, 'post_game', earned_tickets=earned)
     ET.SubElement(post, 'rewards')
     program = mini_node(post, 'program', ticket_earned=min(after, PATH_TOTAL), total_tickets=PATH_TOTAL,
                         **program_fields(p))
-    for tier in PATH_TIERS:
+    for tier in season.tiers:
         mini_node(program, 'reward_data', level=tier.level, tickets_required=tier.threshold)
-    crossed = [tier for tier in PATH_TIERS if before < tier.threshold <= after]
+    crossed = [tier for tier in season.tiers if before < tier.threshold <= after]
     for tier in crossed[:8]:  # 0xbfcfff and 0xbfd238 populate only eight per-row display selectors.
         row = mini_node(program, 'xp_reward', level=tier.level, tickets_required=tier.threshold)
         extras = ET.SubElement(row, 'extra_reward')
-        if tier.pack_id:
+        if tier.pack_id or tier.card is not None:
             program_item(ET.SubElement(row, 'reward'), tier)
         else:
             program_extra(extras, 'reward', tier.stubs)
@@ -3063,10 +3270,15 @@ def captain_ids(report):
 
 
 def captain_tiers_xml(kind, status):
+    # CaptainTierBoosts reads req_str[0] (UI hash 0xdf011103) for each tier's fraction and checkbox.
+    # The checkbox marks a met requirement, including in an unassigned Captain's preview.
+    count = status['count']
     tiers = ''.join(
-        '<attr_boosts tier="%d" required="%d" boost="%d" is_active="%d">%s</attr_boosts>'
+        '<attr_boosts tier="%d" required="%d" boost="%d" is_active="%d">%s'
+        '<req_str progress="%d" desc="%d" active="%d"/></attr_boosts>'
         % (i + 1, need, CAPTAIN_BOOST[i], int(status['tier'] == i + 1),
-           ''.join('<attr_boost name="%s" value="%d"/>' % (label, CAPTAIN_BOOST[i]) for _, label in CAPTAIN_ATTRS[kind]))
+           ''.join('<attr_boost name="%s" value="%d"/>' % (label, CAPTAIN_BOOST[i]) for _, label in CAPTAIN_ATTRS[kind]),
+           count, need, int(count >= need))
         for i, need in enumerate(CAPTAIN_TIERS[kind]))
     current = ''.join('<attr_boost name="%s" value="%d"/>' % (label, status['boost'] if status['tier'] else -1)
                       for _, label in CAPTAIN_ATTRS[kind])
@@ -7861,6 +8073,7 @@ class PackDraw(NamedTuple):
     kind: str = 'Player'
     item_id: int = 0
     minimum_rarity: str = ''
+    minimum_ovr: int = 0
 
 
 class ShopPack(NamedTuple):
@@ -7874,6 +8087,7 @@ class ShopPack(NamedTuple):
     featured_slot: int = -1
     description: str = ''
     legacy_chase: bool = False
+    allow_partial_features: bool = False
 
 
 # Names, prices and contents are local inventions except where the disc supplies a label.
@@ -8010,21 +8224,46 @@ for _number, _pair in enumerate(_DUOS_UUIDS, 1):
         f'Diamond Duos {_number:02d}', f'PACK_DIAMONDDUOS_{_number:02d}', 'update', 1500,
         (PackDraw(3), PackDraw(1, rarity='Diamond')), _pair, .10,
         description='Three players plus a Diamond. 10% chance the Diamond is {featured}.',
+        allow_partial_features=True,
     )
 SHOP_PACKS.update({
     513001: ShopPack('Kaiju Takeover Show Pack', 'PACK_THESHOW_KAIJUTAKEOVER', 'update', 450,
                      (PackDraw(4), PackDraw(1, kind='Equipment')), _KAIJU_UUIDS, .01, -2,
-                     'Four players and one equipment item. 1% chance the last player is a featured Kaiju card.'),
+                     'Four players and one equipment item. 1% chance the last player is a featured Kaiju card.',
+                     allow_partial_features=True),
     513002: ShopPack('Jumbo Kaiju Takeover Pack', 'PACK_JUMBO_THESHOW_KAIJUTAKEOVER', 'update', 1250,
                      (PackDraw(40), PackDraw(1, minimum_rarity='Gold')), _KAIJU_UUIDS, 1/6,
-                     description='Forty players plus a Gold or better. One in six chance the last player is a featured Kaiju card.'),
+                     description='Forty players plus a Gold or better. One in six chance the last player is a featured Kaiju card.',
+                     allow_partial_features=True),
     513003: ShopPack('Pennant Chase Pack', 'PACK_PENNANTCHASE', 'update', 450,
                      (PackDraw(1),), _PENNANT_UUIDS, 1/6,
                      description='One player. One in six chance of a featured Awards card.'),
     513004: ShopPack('Lou Gehrig Day Pack', 'PACK_GEHRIG', 'update', 450,
                      (PackDraw(1),), ('b6bffc020e2140d7ea2a41cb95f6f195',), 1,
                      description='One guaranteed Incognito Lou Gehrig (The Iron Horse).'),
+    # Six published Career Tribute headliners, using the local Diamond Headliner draw layout and price.
+    513005: ShopPack('Career Tribute Pack', 'PACK_CAREERTRIBUTE', 'update', 900,
+                     (PackDraw(3), PackDraw(1, rarity='Diamond')),
+                     ('19a4516a42ef71c7f399b2af7f839188', 'f4f2bdc71b9cb4bc59f2e15e910568a3',
+                      'b395da6a793cdd8e9e8d9b3aa5921ace', '6e0b4ddb9f9bea023d5e1074b1d1ca82',
+                      '14258a58715128abae1cb7d513da1ef4', '68c65932168bf9c9824ce31801b6596c'), 1,
+                     description='Local Career Tribute pack. Three Live Series players and one of six '
+                                 'equally likely 99 OVR headliners: {featured}.'),
+    513006: ShopPack('Diamond Topper', 'PACK_DIAMOND_TOPPER', 'update', 900,
+                     (PackDraw(1, rarity='Diamond'),),
+                     description='Local Diamond Topper. One random Live Series Diamond.'),
+    513007: ShopPack('90+ Live Series Pack', 'PACK_LIVE_DIAMOND_90+', 'update', 1000,
+                     (PackDraw(1, rarity='Diamond', minimum_ovr=90),),
+                     description='Local 90+ pack. One random Live Series Diamond rated 90 OVR or higher.'),
 })
+
+for _number, (_item, _name) in enumerate(
+        ((60736, 'Wade Boggs'), (60737, 'Bill Mazeroski'), (60738, 'Lee Smith')), 1):
+    _uuid = hashlib.md5(str(_item).encode('ascii'), usedforsecurity=False).hexdigest()
+    SHOP_PACKS[513007 + _number] = ShopPack(
+        f'Finders Keepers Pack {_number}', 'PACK_DIAMONDDREAM', 'base', 1000, (PackDraw(1),), (_uuid,), 1,
+        description=f'Local Finders Keepers pack with one guaranteed 99 OVR Finest {_name}.',
+    )
 
 PACK_WEIGHTS = {'Common': 45, 'Bronze': 32, 'Silver': 16, 'Gold': 6, 'Diamond': 1}
 PACK_RANDOM = random.SystemRandom()  # tests replace this with a seeded random.Random
@@ -8040,7 +8279,33 @@ def imported_pack_cards():
 
 
 def pack_featured_cards(pack, imported):
-    return tuple(imported[uuid] for uuid in pack.featured_uuids if uuid in imported)
+    available = tuple(imported[uuid] for uuid in pack.featured_uuids if uuid in imported)
+    if len(available) == len(pack.featured_uuids) or (available and pack.allow_partial_features):
+        return available
+    return None
+
+
+def choice_pack_products():
+    return active_title_content().choice_packs or {}
+
+
+def choice_card_catalogue(item_ids):
+    """A choice is available only with its playable edition and its own card picture."""
+    candidates = {card['item_id']: card for card in all_cards() if card['item_id'] in item_ids}
+    art = player_art()['override'] if candidates else {}
+    resolved = {}
+    for item_id, card in candidates.items():
+        handle, art_id = art.get(item_id, ('', 0))
+        uuid = hashlib.md5(str(item_id).encode('ascii'), usedforsecurity=False).hexdigest()
+        if (card.get('uuid') == uuid and card.get('roster_player_id', 0) > 0
+                and card.get('display_position') in FIELD_NUMBER and art_id == item_id
+                and handle and handle != 'ACTIONGENERIC'):
+            resolved[item_id] = card
+    return resolved
+
+
+def choice_pack_options(pack):
+    return {item_id for row in pack['rounds'] for item_id in row['options']}
 
 
 @lru_cache(maxsize=2)
@@ -8049,7 +8314,7 @@ def shop_pack_art(update_dir):
     imported = imported_pack_cards()
     for pid, pack in SHOP_PACKS.items():
         if pack.featured_uuids:
-            if len(pack_featured_cards(pack, imported)) != len(pack.featured_uuids):
+            if pack_featured_cards(pack, imported) is None:
                 continue
         elif pack.source != 'update':
             continue  # ordinary base pictures are already mounted by the client
@@ -8064,6 +8329,25 @@ def shop_pack_art(update_dir):
         if data[:4] == b'RIFF' and data[8:12] == b'WEBP':
             if register_picture(registry, pack.texture, pid, f'pack-{pid}', data):
                 registry['names'].add(pack.texture)
+    choices = choice_pack_products()
+    if choices:
+        options = {item for pack in choices.values() for item in choice_pack_options(pack)}
+        catalogue = choice_card_catalogue(options)
+        for pid, pack in choices.items():
+            if not choice_pack_options(pack) <= catalogue.keys():
+                continue
+            root = update_dir if pack['source'] == 'update' else LAYOUT.base
+            if root is None:
+                continue
+            texture = pack['texture']
+            try:
+                with open(Path(root, 'CROSS', 'LIVE', texture + '.WEBP'), 'rb') as source:
+                    data = source.read(512 * 1024 + 1)
+            except OSError:
+                continue
+            if (data[:4] == b'RIFF' and data[8:12] == b'WEBP'
+                    and register_picture(registry, texture, pid, f'pack-{pid}', data)):
+                registry['names'].add(texture)
     return registry
 
 
@@ -8082,7 +8366,10 @@ def shop_description(pack, rewards):
     if pack.description:
         featured = rewards[1] if rewards else ()
         label = ' or '.join(card['name'].strip() for card in featured) or 'a featured player'
-        return pack.description.format(featured=label)
+        description = pack.description.format(featured=label)
+        if featured and pack.allow_partial_features and len(featured) < len(pack.featured_uuids):
+            description += f' Local pool: {len(featured)} of {len(pack.featured_uuids)} featured editions available.'
+        return description
     first = pack.draws[0]
     count = sum(draw.count for draw in pack.draws)
     if first.kind != 'Player':
@@ -8115,6 +8402,15 @@ def shop_picture_available(pack):
     return os.path.isfile(os.path.join(LAYOUT.base, 'CROSS', 'LIVE', pack.texture + '.WEBP'))
 
 
+def shop_product(parent, product_id, name, description, texture, cost):
+    product = mini_node(parent, 'product', id=product_id, name=name, description=description,
+                        texture_name=texture, cost=cost, display_cost=cost,
+                        time_remaining=0, purchase_limit=0, purchase_limit_used=0,
+                        purchase_limit_tab=0, quantity_remaining=2147483647, odds_valid=0)
+    ET.SubElement(product, 'item_exclusives')
+    return product
+
+
 def shop_shelf(product_id=0):
     response = ET.Element('response')
     products = ET.SubElement(response, 'products')
@@ -8129,15 +8425,17 @@ def shop_shelf(product_id=0):
         rewards = shop_reward_pools(pack, imported)
         if rewards is None:
             continue
-        cost = str(pack.cost)
-        product = ET.SubElement(
-            products, 'product', id=str(pid), name=pack.name, description=shop_description(pack, rewards),
-            texture_name=pack.texture, cost=cost, display_cost=cost,
-            # Keep the display operands present. Zero hides the limit panel by inference.
-            time_remaining='0', purchase_limit='0', purchase_limit_used='0',
-            purchase_limit_tab='0', quantity_remaining='2147483647', odds_valid='0',
-        )
-        ET.SubElement(product, 'item_exclusives')
+        shop_product(products, pid, pack.name, shop_description(pack, rewards), pack.texture, pack.cost)
+    choices = [pack for pid, pack in choice_pack_products().items()
+               if pack['cost'] > 0 and (not product_id or pid == product_id)]
+    if choices:
+        faces = shop_pack_art(UPDATE_DIR)['names']
+        options = {item for pack in choices for item in choice_pack_options(pack)}
+        available = choice_card_catalogue(options)
+        for pack in choices:
+            if pack['texture'] in faces and choice_pack_options(pack) <= available.keys():
+                shop_product(products, pack['id'], pack['name'], pack['description'], pack['texture'],
+                             pack['cost']).set('item_type_id', '6')
     return ET.tostring(response, encoding='unicode')
 
 
@@ -8145,7 +8443,18 @@ def shop_owned_packs(shop):
     response = ET.Element('response')
     items = ET.SubElement(response, 'items')
     descriptions = {}
+    choices = choice_pack_products()
     for item_id, product_id in shop.get('owned_packs', {}).items():
+        choice = choices.get(product_id)
+        if choice is not None:
+            texture = choice['texture'] if choice['texture'] in shop_pack_art(UPDATE_DIR)['names'] else 'PACK_THESHOW'
+            item = mini_node(items, 'item', id=item_id, item_id=item_id, type_id=6, quantity=1,
+                             rarity_id=RARITY_ID['Diamond'], anim_index=0, item_draft_pack_id=item_id,
+                             name=choice['name'], texture_name=texture, description=choice['description'],
+                             odds_valid=0, no_sell=1, quantity_tab_index=0, is_live_set=0, captain=0,
+                             captained=0, has_rank_change=0, in_squad=0, set_name='')
+            ET.SubElement(item, 'item_exclusives')
+            continue
         pack = SHOP_PACKS[product_id]
         if product_id not in descriptions:
             descriptions[product_id] = shop_description(pack, shop_reward_pools(pack))
@@ -8166,7 +8475,7 @@ def shop_reward_pools(pack, imported=None):
     featured = ()
     if pack.featured_uuids:
         featured = pack_featured_cards(pack, imported_pack_cards() if imported is None else imported)
-        if len(featured) != len(pack.featured_uuids):
+        if featured is None:
             return None
     aliases = {'CWS': 'CHW', 'WSH': 'WAS'}
     for draw in pack.draws:
@@ -8177,6 +8486,7 @@ def shop_reward_pools(pack, imported=None):
                 and card['roster_player_id'] > 0 and card['team_id'] >= 0 and card['display_position'] in FIELD_NUMBER
                 and (not draw.rarity or card['rarity'] == draw.rarity)
                 and (not draw.minimum_rarity or RARITY_ID[card['rarity']] >= RARITY_ID[draw.minimum_rarity])
+                and (not draw.minimum_ovr or card['ovr'] >= draw.minimum_ovr)
                 and (not draw.item_id or card['item_id'] == draw.item_id)
                 and (not draw.teams or aliases.get(card.get('team_short_name'), card.get('team_short_name')) in draw.teams)
             ]
@@ -8223,8 +8533,8 @@ def shop_draw_rewards(pack, pools, featured):
     return rewards
 
 
-def shop_purchase_receipt(receipt_id):
-    return f'<response><purchase uuid="{receipt_id}" item_type_id="4"/></response>'
+def shop_purchase_receipt(receipt_id, item_type=4):
+    return f'<response><purchase uuid="{receipt_id}" item_type_id="{item_type}"/></response>'
 
 
 def save_shop_state(state, shop):
@@ -8246,24 +8556,31 @@ def grant_owned_pack(shop, product_id):
 
 def shop_buy(state, shop, query):
     pid = shop_number(query, 'product_id')
-    if (pid not in SHOP_PACKS or SHOP_PACKS[pid].cost <= 0
-            or (pid in LEGACY_EVENT_PRODUCTS and imported_pack_cards())):
+    pack = SHOP_PACKS.get(pid)
+    choice = None if pack else choice_pack_products().get(pid)
+    cost = pack.cost if pack else choice['cost'] if choice else 0
+    if cost <= 0 or (pid in LEGACY_EVENT_PRODUCTS and imported_pack_cards()):
         raise ShopRefusal('That pack is unavailable on the local server.')
     if shop_number(query, 'quantity') != 1:
         raise ShopRefusal('Buy one pack at a time.')
-    pack = SHOP_PACKS[pid]
     profile = state.setdefault('profile', {})
     balance = profile.get('stubs', 0)
-    if balance < pack.cost:
+    if balance < cost:
         raise ShopRefusal('Not enough Stubs for this pack. Play games to earn Stubs.')
-    if not shop_picture_available(pack) or shop_reward_pools(pack) is None:
+    if choice:
+        options = choice_pack_options(choice)
+        available = (choice['texture'] in shop_pack_art(UPDATE_DIR)['names']
+                     and options <= choice_card_catalogue(options).keys())
+    else:
+        available = shop_picture_available(pack) and shop_reward_pools(pack) is not None
+    if not available:
         raise ShopRefusal('That pack is unavailable with the local catalogue or pack art.')
     receipt_id = str(uuid4())
     grant_owned_pack(shop, pid)
-    shop.setdefault('purchases', {})[receipt_id] = None
-    profile['stubs'] = balance - pack.cost
+    shop.setdefault('purchases', {})[receipt_id] = 6 if choice else None
+    profile['stubs'] = balance - cost
     save_shop_state(state, shop)
-    return shop_purchase_receipt(receipt_id)
+    return shop_purchase_receipt(receipt_id, 6 if choice else 4)
 
 
 def shop_revealed_card(card, quantity, *, is_new):
@@ -8291,6 +8608,8 @@ def shop_open(state, shop, query):
     owned = shop.get('owned_packs', {})
     if item_id not in owned:
         raise ShopRefusal('That pack is not in your inventory.')
+    if owned[item_id] in choice_pack_products():
+        raise ShopRefusal('Open that choice pack from the choice screen.')
     pack = SHOP_PACKS[owned[item_id]]
     pack_pools = shop_reward_pools(pack)
     if pack_pools is None:
@@ -8329,6 +8648,101 @@ def shop_open(state, shop, query):
     return reply
 
 
+def choice_draft_xml(state, rounds, previous, catalogue, round_index):
+    complete = round_index == len(rounds)
+    response = ET.Element('response')
+    draft = mini_node(response, 'draft', round_current=min(round_index + 1, len(rounds)), round_total=len(rounds),
+                      picks_total=0 if complete else rounds[round_index]['picks'])
+    current = ET.SubElement(draft, 'picks_current')
+    awarded = ET.SubElement(draft, 'picks_previous')
+    quantities = {card['item_id']: card['quantity'] for card in cards(state)}
+    pending = Counter(previous)
+
+    def add(parent, item_id, n, selected):
+        quantity = quantities.get(item_id, 0)
+        row = ET.fromstring(shop_revealed_card(catalogue[item_id], quantity + n, is_new=not quantity))
+        row.set('pick_index', str(int(selected)))
+        row.set('slot_type_name', 'Player')  # DP_DATA_PICK_CURRENT is the selected item at UI 0x6449d0.
+        parent.append(row)
+
+    if not complete:
+        for item_id in rounds[round_index]['options']:
+            add(current, item_id, pending[item_id], False)
+    for item_id in previous:
+        add(awarded, item_id, pending[item_id], True)
+    return mini_xml(response)
+
+
+def shop_choice_open(state, shop, query):
+    item_id = str(shop_number(query, 'item_id'))
+    drafts = shop.get('choice_drafts', {})
+    if item_id in drafts:
+        saved = drafts[item_id]
+        return saved['open_reply'] if 'rounds' in saved else saved['receipts'][-1]['reply']
+    product = choice_pack_products().get(shop.get('owned_packs', {}).get(item_id))
+    if product is None:
+        raise ShopRefusal('That choice pack is not in your inventory.')
+    options = choice_pack_options(product)
+    catalogue = choice_card_catalogue(options)
+    if not options <= catalogue.keys():
+        raise ShopRefusal('Install the required card catalogue and art to open this choice pack.')
+    rounds = product['rounds']
+    reply = choice_draft_xml(state, rounds, [], catalogue, 0)
+    shop.setdefault('choice_drafts', {})[item_id] = {'rounds': rounds, 'receipts': [], 'open_reply': reply}
+    save_shop_state(state, shop)
+    return reply
+
+
+def shop_choice_submit(state, shop, query):
+    item_id = str(shop_number(query, 'item_draft_pack_id'))
+    round_index = shop_number(query, 'current_round')  # Native reply reader subtracts 1 from round_current.
+    raw = query.get('item_pick_ids')
+    if not isinstance(raw, str) or not re.fullmatch(r'[0-9]{1,10}(?:,[0-9]{1,10}){0,11}', raw):
+        raise ShopRefusal('The choice pack needs a comma-separated list of selected cards.')
+    picked = sorted(map(int, raw.split(',')))
+    draft = shop.get('choice_drafts', {}).get(item_id)
+    if draft is None:
+        raise ShopRefusal('Open this choice pack before submitting picks.')
+    receipts = draft['receipts']
+    if round_index < len(receipts):
+        receipt = receipts[round_index]
+        if picked == receipt['picks']:
+            return receipt['reply']
+        raise ShopRefusal('Picks for that round have already been saved.')
+    rounds = draft.get('rounds')
+    owned = shop.get('owned_packs', {})
+    if item_id not in owned or not rounds or round_index != len(receipts):
+        raise ShopRefusal('Select cards for the current round of your choice pack.')
+    options = rounds[round_index]['options']
+    if len(picked) != rounds[round_index]['picks'] or len(set(picked)) != len(picked) or not set(picked) <= set(options):
+        raise ShopRefusal('Choose the required number of distinct cards offered in this round.')
+    # Retain the offer order for display. Receipt comparison accepts any ordering of the same picks.
+    selected = [item for receipt in receipts for item in receipt['selected']]
+    round_picks = [item for item in options if item in picked]
+    selected.extend(round_picks)
+    next_round = round_index + 1
+    required = set(selected)
+    complete = next_round == len(rounds)
+    if not complete:
+        required.update(rounds[next_round]['options'])
+    catalogue = choice_card_catalogue(required)
+    if not required <= catalogue.keys():
+        raise ShopRefusal('Install the required card catalogue and art to continue this choice pack.')
+    # Both open and submit use 0xe5b0f0. At completion, 0xe5bd20 tests
+    # picks_total == 0 and the completed screen draws picks_previous.
+    reply = choice_draft_xml(state, rounds, selected, catalogue, next_round)
+    receipts.append({'picks': picked, 'selected': round_picks, 'reply': reply})
+    if complete:
+        for card_id, count in Counter(selected).items():
+            grant_card_copies(state, catalogue[card_id], count)
+        del owned[item_id]
+        shop['choice_drafts'][item_id] = {'receipts': receipts}
+    else:
+        draft['open_reply'] = reply
+    save_shop_state(state, shop)
+    return reply
+
+
 def shop_reply(name, params):
     if name == 'show_shop_product.view_platform_products':
         return envelope('<response><products/><redeemables/></response>'), 'made'
@@ -8339,10 +8753,11 @@ def shop_reply(name, params):
     # no pack although one was owned.
     if name in ('inventory.view_packs', 'arena_tutorial.inventory.view_packs'):
         return envelope(shop_owned_packs(load_state().get('pack_shop', {}))), 'made'
-    if name in ('inventory.draft_pack_open', 'inventory.draft_pack_submit_picks', 'inventory.quick_sell'):
+    if name == 'inventory.quick_sell':
         return envelope(status=1, message='This inventory action is unavailable on the local server.'), 'refused'
     if not (name.startswith('show_shop_product.')
-            or name in ('inventory.open_pack', 'arena_tutorial.inventory.open_pack')):
+            or name in ('inventory.open_pack', 'arena_tutorial.inventory.open_pack',
+                        'inventory.draft_pack_open', 'inventory.draft_pack_submit_picks')):
         return None
     try:
         query = params_of(params)
@@ -8361,11 +8776,15 @@ def shop_reply(name, params):
             inner = shop_buy(state, shop, query)
         elif name in ('inventory.open_pack', 'arena_tutorial.inventory.open_pack'):
             inner = shop_open(state, shop, query)
+        elif name == 'inventory.draft_pack_open':
+            inner = shop_choice_open(state, shop, query)
+        elif name == 'inventory.draft_pack_submit_picks':
+            inner = shop_choice_submit(state, shop, query)
         elif name == 'show_shop_product.purchase_complete':
             receipt_id = query.get('purchase_uuid')
             if not isinstance(receipt_id, str) or receipt_id not in shop.get('purchases', {}):
                 raise ShopRefusal(EARN_STUBS_TEXT)
-            inner = shop_purchase_receipt(receipt_id)
+            inner = shop_purchase_receipt(receipt_id, shop['purchases'][receipt_id] or 4)
         elif name == 'show_shop_product.redeem_all':
             # Sign-in checks for pending platform grants. Local packs are credited during buy.
             inner = '<response><purchases/></response>'
