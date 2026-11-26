@@ -1,7 +1,7 @@
 {
-  "schema_version": 13,
+  "schema_version": 15,
   "title": "CUSA35521",
-  "revision": "r14",
+  "revision": "r19",
   "files": [
     "missions.json",
     "programs.json",
@@ -9,6 +9,7 @@
     "conquest.json",
     "showdowns.json",
     "season_path.json",
-    "choice_packs.json"
+    "choice_packs.json",
+    "team_affinity.json"
   ]
 }

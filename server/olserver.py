@@ -564,6 +564,8 @@ class PathTier(NamedTuple):
     pack_id: int
     card: dict | None = None
     claim: str = 'reward'
+    xp: int = 0
+    inventory_item: ET.Element | None = None
 
 
 LEGACY_PATH_TIERS = tuple(
@@ -715,13 +717,20 @@ def program_goal(program, tickets, *, available=True, maximum=PATH_TOTAL, goal_n
 
 def program_pack_fields(pack_id):
     pack = SHOP_PACKS.get(pack_id)
-    if pack is None:
+    bundle = SHOP_BUNDLES.get(pack_id)
+    if bundle is not None:
+        name, texture = bundle.name, f'BOX{bundle.count:02d}_THESHOW'
+        description = f'Contains {bundle.count} The Show Packs and a bonus pack.'
+        item_type, rarity = 4, 0
+    elif pack is None:
         choice = choice_pack_products()[pack_id]
         name, description, texture = (choice[key] for key in ('name', 'description', 'texture'))
         item_type, rarity = 6, RARITY_ID['Diamond']
     else:
         name, description, texture = pack.name, shop_description(pack, None), pack.texture
         item_type, rarity = 4, max(RARITY_ID.get(draw.rarity, 0) for draw in pack.draws)
+        if pack_id == SHOW_PACK:
+            name, description = SHOW_PACK_PROGRAM_NAME, '4 Live Series players.'
     return dict(id=pack_id, item_id=pack_id, type_id=item_type, name=name, description=description,
                 texture_name=texture, quantity=1, rank=0, rarity_id=rarity,
                 no_sell=1, odds_valid=0, item_draft_pack_id=0, anim_index=0,
@@ -741,9 +750,15 @@ def program_item(parent, tier, *, tag='item'):
     if tier.card is not None:
         parent.append(program_card_item(tier.card, 1, tag=tag))
         return
+    if tier.inventory_item is not None:
+        parent.append(ET.Element(tag, tier.inventory_item.attrib))
+        ET.SubElement(parent[-1], 'item_exclusives')
+        return
+    currency = 'XP' if tier.xp and not tier.stubs else 'Stubs'
     fields = program_pack_fields(tier.pack_id) if tier.pack_id else dict(
-        id=0, item_id=0, type_id=-1, name='Stubs', description='Stubs credited to your wallet.',
-        quantity=0, rank=0, rarity_id=0, texture_name='', item_label_aaadeb49z9__='Stubs')
+        id=0, item_id=0, type_id=-1, name=currency,
+        description='XP credited to your profile.' if currency == 'XP' else 'Stubs credited to your wallet.',
+        quantity=0, rank=0, rarity_id=0, texture_name='', item_label_aaadeb49z9__=currency)
     item = mini_node(parent, tag, **fields)
     ET.SubElement(item, 'item_exclusives')
 
@@ -752,14 +767,28 @@ def program_extra(parent, tag, amount):
     mini_node(parent, tag, amount=amount, type_index=STUBS_EXTRA_TYPE, label='Stubs')
 
 
+def program_choice_preview(pack_id):
+    pack = choice_pack_products().get(int(pack_id))
+    if pack is None:
+        return ()
+    try:
+        rounds, catalogue = choice_pack_offer(pack, require_complete=False)
+    except ShopRefusal:
+        return ()
+    return [catalogue[item] for item in rounds[0]['options'] if item in catalogue]
+
+
 def program_tier_row(parent, tier, tickets, claimed):
     if tier.card is not None:
         item_id, name, type_id = tier.card['item_id'], tier.card['name'], 0
+    elif tier.inventory_item is not None:
+        item_id, name, type_id = (tier.inventory_item.get(key) for key in ('id', 'name', 'type_id'))
+        type_id = int(type_id)
     elif tier.pack_id:
         fields = program_pack_fields(tier.pack_id)
         item_id, name, type_id = fields['id'], fields['name'], fields['type_id']
     else:
-        item_id, name, type_id = 0, 'Stubs', -1
+        item_id, name, type_id = 0, 'XP' if tier.xp and not tier.stubs else 'Stubs', -1
     has_item = type_id >= 0
     row = mini_node(parent, 'reward', id=item_id, level=tier.level, name=name,
                     type_id=type_id, tickets_required=tier.threshold, cur_val=tickets,
@@ -769,8 +798,24 @@ def program_tier_row(parent, tier, tickets, claimed):
                     stage_level_9irt____=tier.level,  # script 0x86784c76
                     reward_status_aafaaa9agx_5=tier.threshold)  # script 0xbb1f070a
     program_item(row, tier)
+    if type_id == 6:
+        exclusives = row.find('item/item_exclusives')
+        exclusives.extend(program_card_item(card, 1, tag='item_exclusive')
+                          for card in program_choice_preview(item_id))
+    elif os.environ.get('OLSERVER_PREVIEW_INDEX_PROBE') == '1':
+        # Count Live Series Bryce Harpers and subtract 1 to read the zero-based reward index modulo 5.
+        marker = next((card for card in all_cards() if card.get('roster_player_id') == 14580
+                       and card.get('series') in ('Live', 'Live Series')), None)
+        if marker is not None:
+            exclusives = row.find('item/item_exclusives')
+            marker_count = (len(parent) - 1) % 5 + 1
+            exclusives.extend(program_card_item(marker, 1, tag='item_exclusive') for _ in range(marker_count))
     # The label template binds extra[0].amount even when it picks the card or pack name.
-    program_extra(ET.SubElement(row, 'extras'), 'extra', tier.stubs)
+    extras = ET.SubElement(row, 'extras')
+    if tier.stubs or not tier.xp:
+        program_extra(extras, 'extra', tier.stubs)
+    if tier.xp:
+        mini_node(extras, 'extra', amount=tier.xp, type_index=1, label='XP')
     return row
 
 
@@ -780,11 +825,16 @@ def program_view(params):
     BROWSER_MOMENT_CONTEXT.set(())
     query = params_of(params)
     program_id = query.get('program_id', 0) if isinstance(query, dict) else None
+    tracks = active_title_content().team_affinity
+    track_index = affinity_index(program_id, AFFINITY_PROGRAM_BASE, AFFINITY_PROGRAM_COUNT)
+    legacy_club = affinity_index(program_id, AFFINITY_LEGACY_PROGRAM_BASE, len(MLB_TEAMS))
+    if tracks and (track_index is not None or legacy_club is not None):
+        track_id = AFFINITY_PROGRAM_BASE + (track_index if track_index is not None else legacy_club // 5)
+        return seasonal_affinity_view(tracks[track_id])
     division = affinity_index(program_id, AFFINITY_PROGRAM_BASE, len(AFFINITY_DIVISIONS))
     if division is None:
-        club = affinity_index(program_id, AFFINITY_LEGACY_PROGRAM_BASE, len(MLB_TEAMS))
-        if club is not None:
-            division = club // 5
+        if legacy_club is not None:
+            division = legacy_club // 5
     if division is not None:
         return affinity_view(division)
     programs = active_title_content().programs
@@ -824,8 +874,12 @@ def program_view(params):
         for offset in range(len(season.bonus)):  # Indexed texture paths 0x360670–0x3608b0.
             reward = season.bonus[(paid + offset) % len(season.bonus)]
             pack = SHOP_PACKS.get(reward.pack_id)
-            mini_node(unlimited, 'unlimited_reward', texture_name=pack.texture if pack else '',
-                      name=pack.name if pack else 'Stubs', amount=reward.stubs, type_id=4 if pack else -1)
+            if pack:
+                name = SHOW_PACK_PROGRAM_NAME if reward.pack_id == SHOW_PACK else pack.name
+                mini_node(unlimited, 'unlimited_reward', texture_name=pack.texture,
+                          name=name, amount=reward.stubs, type_id=4)
+            else:
+                mini_node(unlimited, 'unlimited_reward', texture_name='', name='Stubs', amount=reward.stubs, type_id=-1)
     else:
         for _ in range(6):
             mini_node(unlimited, 'unlimited_reward', texture_name='')
@@ -835,9 +889,14 @@ def program_view(params):
 def program_list(params):
     query = params_of(params)
     group = str(query.get('program_group_id', 10000)) if isinstance(query, dict) else ''
+    club = affinity_index(group, AFFINITY_CLUB_GROUP_BASE, len(MLB_TEAMS))
+    if group == '10002' or club is not None:
+        tracks = active_title_content().team_affinity
+        if tracks:
+            return seasonal_affinity_list(tracks.values() if club is None else
+                                          (tracks[AFFINITY_PROGRAM_BASE + club // 5],))
     if group == '10002':
         return affinity_list(range(len(AFFINITY_DIVISIONS)))
-    club = affinity_index(group, AFFINITY_CLUB_GROUP_BASE, len(MLB_TEAMS))
     if club is not None:
         return affinity_list((club // 5,))
     authored = [program for program in active_title_content().programs.values()
@@ -869,13 +928,15 @@ def add_bonus_xp(params):
     return '<response><bonus_xp amount="0"/></response>'
 
 
-MISSION_CONTENT_DIR = Path(HERE) / 'content' / 'CUSA35521' / 'r14'
+MISSION_CONTENT_DIR = Path(HERE) / 'content' / 'CUSA35521' / 'r19'
 DAILY_GOAL_GROUP_ID = 730000
 MISSION_REROLL_FLAG = 'reward_flag_ab_dkxi'  # 0x35fa44, hash 0xbc667a79 gates Get New Mission
 # Type-0 detail indexes the global slot vector. Keep one small ordered board.
 DAILY_SLOT_LIMIT = 10
 MISSION_MODES = (3, 6, 8)  # Play vs. CPU, Mini Seasons, Conquest
-CARD_MISSION_SERIES = ('Live Series', 'Monthly Awards', 'Topps Now', 'World Baseball Classic', 'Awards')
+CARD_MISSION_SERIES = ('Live Series', 'Monthly Awards', 'Topps Now', 'World Baseball Classic', 'Awards',
+                       'Charisma', 'Kaiju', 'Incognito', 'Snapshot', "Great Race of '98", 'Captain',
+                       '2023 All-Star', '2023 Draft', '2023 Home Run Derby', '2023 Postseason', '2023 Finest')
 # Each tuple holds the display unit followed by the team/card stats to sum.
 STAT_MISSIONS = {
     'hits': ('Hits', 'hits'),
@@ -890,6 +951,10 @@ STAT_MISSIONS = {
     'walks': ('Walks', 'walks'),
     'doubles': ('Doubles', 'doubles'),
     'triples': ('Triples', 'triples'),
+    'total_bases': ('TB', 'total_bases'),
+    'pitching_outs': ('IP', 'pitching_outs'),
+    'saves': ('Saves', 'saves'),
+    'parallel_xp': ('PXP', 'parallel_xp'),
 }
 
 
@@ -907,6 +972,7 @@ class TitleContent(NamedTuple):
     moment_groups: dict
     season_path: SeasonPath | None = None
     choice_packs: dict | None = None
+    team_affinity: dict | None = None
 
 
 # Ordinary Moment stats: batting R (0xae1005), HR (0xae12ab), OUTS (0xae14fd),
@@ -957,8 +1023,8 @@ def load_title_content(directory):
     if not isinstance(manifest, dict) or manifest.keys() != {'schema_version', 'title', 'revision', 'files'}:
         raise invalid('manifest.json must contain schema_version, title, revision and files')
     version = manifest['schema_version']
-    if type(version) is not int or not 1 <= version <= 13:
-        raise invalid('manifest.json schema_version must be an integer from 1 through 13')
+    if type(version) is not int or not 1 <= version <= 15:
+        raise invalid('manifest.json schema_version must be an integer from 1 through 15')
     if manifest['title'] != 'CUSA35521' or manifest['revision'] != directory.name:
         raise invalid(f'manifest.json must identify title CUSA35521 and revision {directory.name}')
     expected_files = {'missions.json'} if version == 1 else {'missions.json', 'programs.json'}
@@ -972,6 +1038,8 @@ def load_title_content(directory):
         expected_files.add('season_path.json')
     if version >= 12:
         expected_files.add('choice_packs.json')
+    if version >= 14:
+        expected_files.add('team_affinity.json')
     files = manifest['files']
     if (not isinstance(files, list) or len(files) != len(expected_files)
             or any(not isinstance(name, str) for name in files) or set(files) != expected_files):
@@ -1008,12 +1076,16 @@ def load_title_content(directory):
             fields |= {'modes'}
             if isinstance(mission, dict):
                 fields |= mission.keys() & {'card_filter', 'min_margin'}
+                if version >= 15:
+                    fields |= mission.keys() & {'single_game'}
         if not content_record(mission, fields):
             raise invalid(f'{label} must contain {", ".join(sorted(fields))}')
         for field in ('id', 'target', 'slot_id') if 'slot_id' in fields else ('id', 'target'):
             if not content_positive(mission[field]):
                 raise invalid(f'{label} {field} must be a positive integer within signed 32-bit range')
-        if 'xp' in fields and not content_positive(mission['xp']):
+        no_mission_xp = (version >= 15 and mission.get('shows_in') == ['program']
+                         and type(mission.get('xp')) is int and mission['xp'] == 0)
+        if 'xp' in fields and not (content_positive(mission['xp']) or no_mission_xp):
             raise invalid(f'{label} xp must be a positive integer within signed 32-bit range')
         mission_id = mission['id']
         if mission_id in mission_index:
@@ -1033,6 +1105,8 @@ def load_title_content(directory):
             raise invalid(f'{label} has an unsupported evaluator')
         if version >= 3:
             validate_mission_options(mission, label, invalid)
+            if evaluator == 'pitching_outs' and mission['target'] % 3:
+                raise invalid(f'{label} innings targets must be whole innings expressed as outs')
         if mission['cadence'] != 'permanent':
             raise invalid(f'{label} cadence must be permanent')
         if 'reward' in fields:
@@ -1051,11 +1125,17 @@ def load_title_content(directory):
                                    if version >= 4 else ({}, {}, {}))
     browser_moments = {mid for mid, moment in moments.items()
                        if moment['set_id'] in groups.get(moment['group_id'], {}).get('sets', {})}
-    choices = (validate_choice_packs(read_json('choice_packs.json'), invalid, program_rewards=version >= 13)
-               if version >= 12 else None)
+    affinity, affinity_products = (validate_affinity_content(read_json('team_affinity.json'), invalid)
+                                   if version >= 14 else (None, []))
+    choices = None
+    if version >= 12:
+        products = read_json('choice_packs.json')
+        if isinstance(products, list):
+            products.extend(affinity_products)
+        choices = validate_choice_packs(products, invalid, program_rewards=version >= 13)
     programs = (validate_authored_programs(read_json('programs.json'), mission_index, invalid,
                                            moments if version >= 4 else None, browser_moments=browser_moments,
-                                           reward_packs=choices if version >= 13 else None)
+                                           reward_packs=choices if version >= 13 else None, expanded=version >= 15)
                 if version >= 2 else {})
     if moments.keys() & (mission_index.keys() | programs.keys()):
         raise invalid('moments.json moment ids cannot reuse a mission or program id')
@@ -1065,7 +1145,8 @@ def load_title_content(directory):
                                            multiple=version >= 8)
                  if version >= 6 else {})
     season = validate_season_path(read_json('season_path.json'), invalid) if version >= 11 else None
-    return TitleContent(mission_index, programs, moments, situations, conquest, showdowns, groups, season, choices)
+    return TitleContent(mission_index, programs, moments, situations, conquest, showdowns, groups,
+                        season, choices, affinity)
 
 
 def validate_choice_packs(products, invalid, *, program_rewards=False):
@@ -1077,11 +1158,11 @@ def validate_choice_packs(products, invalid, *, program_rewards=False):
         label = f'choice_packs.json product {number}'
         fields = {'id', 'name', 'description', 'cost', 'texture', 'source', 'rounds'}
         if program_rewards and isinstance(product, dict):
-            fields |= product.keys() & {'partial_pool', 'affinity_division'}
+            fields |= product.keys() & {'partial_pool', 'affinity_division', 'exact_pool'}
         if not content_record(product, fields):
             raise invalid(f'{label} has invalid fields')
         product_id = product['id']
-        if not content_positive(product_id) or product_id in SHOP_PACKS or product_id in index:
+        if not content_positive(product_id) or product_id in SHOP_PACKS or product_id in SHOP_BUNDLES or product_id in index:
             raise invalid(f'{label} needs a unique positive product ID')
         if not all(content_text(product[key]) for key in ('name', 'description', 'texture')):
             raise invalid(f'{label} needs valid text')
@@ -1094,6 +1175,8 @@ def validate_choice_packs(products, invalid, *, program_rewards=False):
             raise invalid(f'{label} needs a valid choice-pack texture and art source')
         if 'partial_pool' in product and (product['partial_pool'] is not True or product['cost']):
             raise invalid(f'{label} partial_pool requires a reward-only pack')
+        if 'exact_pool' in product and (product['exact_pool'] is not True or not product.get('partial_pool')):
+            raise invalid(f'{label} exact_pool requires a partial reward-only pack')
         if 'affinity_division' in product:
             division = product['affinity_division']
             if (type(division) is not int or not 0 <= division < len(AFFINITY_DIVISIONS)
@@ -1186,13 +1269,24 @@ def validate_mission_options(mission, label, invalid):
             raise invalid(f'{label} win_margin needs a positive min_margin')
     elif 'min_margin' in mission:
         raise invalid(f'{label} min_margin is only valid for win_margin')
+    if 'single_game' in mission and (mission['single_game'] is not True or evaluator not in STAT_MISSIONS
+                                     or evaluator == 'parallel_xp' or mission['shows_in'] != ['program']):
+        raise invalid(f'{label} single_game requires a program-only game statistic')
     if 'card_filter' in mission:
         filters = mission['card_filter']
         if (len(STAT_MISSIONS.get(evaluator, ())) <= 1 or not isinstance(filters, dict)
-                or not filters or filters.keys() - {'series', 'club'}):
-            raise invalid(f'{label} card_filter needs a card statistic and series, club, or both')
-        if 'series' in filters and filters['series'] not in CARD_MISSION_SERIES:
-            raise invalid(f'{label} card_filter has an unknown series')
+                or not filters or filters.keys() - {'series', 'club', 'item_ids'}):
+            raise invalid(f'{label} card_filter needs a card statistic and a series, club or item list')
+        if 'series' in filters:
+            series = filters['series']
+            choices = series if isinstance(series, list) else [series]
+            if not choices or any(value not in CARD_MISSION_SERIES for value in choices):
+                raise invalid(f'{label} card_filter has an unknown series')
+        if 'item_ids' in filters:
+            ids = filters['item_ids']
+            if (not isinstance(ids, list) or not ids or not all(content_positive(item) for item in ids)
+                    or len(set(ids)) != len(ids)):
+                raise invalid(f'{label} card_filter needs distinct player item IDs')
         if 'club' in filters and filters['club'] not in tuple(team[0] for team in MLB_TEAMS):
             raise invalid(f'{label} card_filter has an unknown club')
 
@@ -1305,7 +1399,39 @@ def validate_moment_groups(groups, moments, invalid):
     return index
 
 
-def validate_authored_programs(programs, missions, invalid, moments=None, *, browser_moments=(), reward_packs=None):
+def validate_expanded_reward(reward, known_packs, label, invalid):
+    if not isinstance(reward, dict):
+        raise invalid(f'{label} needs a reward object')
+    kind = reward.get('kind')
+    common = {'kind', 'stubs', 'xp'}
+    if any(not content_positive(reward[key]) for key in ('stubs', 'xp') if key in reward):
+        raise invalid(f'{label} XP and Stubs extras must be positive integers')
+    if kind == 'currency':
+        if not reward.keys() <= common or not (reward.get('stubs') or reward.get('xp')):
+            raise invalid(f'{label} currency reward needs XP or Stubs')
+    elif kind == 'pack':
+        products = reward.get('products')
+        quantity = reward.get('quantity', 1)
+        if (not reward.keys() <= common | {'products', 'quantity', 'name', 'texture'}
+                or not isinstance(products, list) or not 1 <= len(products) <= 50
+                or any(not content_positive(pid) or pid not in known_packs for pid in products)
+                or len(set(products)) != len(products) or not content_positive(quantity) or quantity > 50
+                or 'name' in reward and not content_text(reward['name'])
+                or 'texture' in reward and (not isinstance(reward['texture'], str)
+                                              or not re.fullmatch(r'[A-Z0-9_]+', reward['texture']))):
+            raise invalid(f'{label} pack reward needs known products, a valid quantity and valid preview fields')
+    elif kind in ('card', 'Equipment', 'Unlockable'):
+        required = {'kind', 'uuid'} | ({'item_id'} if kind == 'card' else set())
+        if (not required <= reward.keys() <= required | common
+                or not isinstance(reward['uuid'], str) or not re.fullmatch(r'[0-9a-f]{32}', reward['uuid'])
+                or kind == 'card' and not content_positive(reward['item_id'])):
+            raise invalid(f'{label} item reward needs an exact edition or inventory UUID')
+    else:
+        raise invalid(f'{label} has an unknown reward kind')
+
+
+def validate_authored_programs(programs, missions, invalid, moments=None, *, browser_moments=(), reward_packs=None,
+                               expanded=False):
     if not isinstance(programs, list) or not programs:
         raise invalid('programs.json must contain a nonempty list of programs')
     index = {}
@@ -1315,12 +1441,19 @@ def validate_authored_programs(programs, missions, invalid, moments=None, *, bro
               'repeat', 'total_points', 'stages', 'tiers'}
     for position, program in enumerate(programs, 1):
         label = f'programs.json program {position}'
-        if not content_record(program, fields):
+        optional = program.keys() & {'parallel_goals', 'legacy_thresholds'} if expanded and isinstance(program, dict) else set()
+        if not content_record(program, fields | optional):
             raise invalid(f'{label} must contain {", ".join(sorted(fields))}')
+        parallel = program.get('parallel_goals', False)
+        legacy = program.get('legacy_thresholds', [])
+        if ('parallel_goals' in optional and parallel is not True or not isinstance(legacy, list)
+                or any(not content_positive(value) for value in legacy) or sorted(set(legacy)) != legacy
+                or legacy and not parallel):
+            raise invalid(f'{label} needs parallel goals and increasing legacy claim thresholds')
         program_id = program['id']
         if (not content_positive(program_id) or program_id == PROGRAM_ID or program_id in index
                 or affinity_index(program_id, AFFINITY_LEGACY_PROGRAM_BASE, len(MLB_TEAMS)) is not None
-                or affinity_index(program_id, AFFINITY_PROGRAM_BASE, len(AFFINITY_DIVISIONS)) is not None):
+                or affinity_index(program_id, AFFINITY_PROGRAM_BASE, AFFINITY_PROGRAM_COUNT) is not None):
             raise invalid(f'{label} has an invalid, reserved or duplicate program id')
         groups = program['list_groups']
         if (not isinstance(groups, list) or not groups
@@ -1383,8 +1516,8 @@ def validate_authored_programs(programs, missions, invalid, moments=None, *, bro
                     raise invalid(f'{label} moment_goal group id conflicts with a stage')
                 stage_ids.add(link['group_id'])
                 linked_moments.add(mid)
-        if total != points:
-            raise invalid(f'{label} total_points must equal the sum of goal points')
+        if total > points or not parallel and total != points:
+            raise invalid(f'{label} total_points must equal the sum of goal points or cap parallel goals')
         referenced.update(goal_ids)
         tiers = program['tiers']
         if not isinstance(tiers, list) or not tiers:
@@ -1396,6 +1529,10 @@ def validate_authored_programs(programs, missions, invalid, moments=None, *, bro
                 raise invalid(f'{label} tier thresholds must be positive and strictly increasing up to total_points')
             previous = tier['threshold']
             reward = tier['reward']
+            if parallel:
+                validate_expanded_reward(reward, SHOP_PACKS.keys() | SHOP_BUNDLES.keys() | (reward_packs or {}).keys(),
+                                         label, invalid)
+                continue
             kind = reward.get('kind') if isinstance(reward, dict) else None
             if kind == 'stubs' and content_record(reward, {'kind', 'amount'}) and content_positive(reward['amount']):
                 continue
@@ -1415,6 +1552,8 @@ def validate_authored_programs(programs, missions, invalid, moments=None, *, bro
             raise invalid(f'{label} tier must award positive Stubs or an owned pack product')
         if previous != total:
             raise invalid(f'{label} last tier threshold must equal total_points')
+        if not set(legacy) <= {tier['threshold'] for tier in tiers}:
+            raise invalid(f'{label} legacy claim thresholds must exist in the new track')
         index[program_id] = program
     if any('program' in mission['shows_in'] and mid not in referenced for mid, mission in missions.items()):
         raise invalid('missions.json has a mission with program placement and no program goal reference')
@@ -1443,6 +1582,8 @@ def mission_count(counters, key):
 
 
 def mission_unit(mission):
+    if mission['evaluator'] == 'pitching_outs' and mission.get('card_filter'):
+        return 'Innings'
     return STAT_MISSIONS.get(mission['evaluator'], ('Games',))[0]
 
 
@@ -1508,13 +1649,53 @@ def authored_program_status(program, saved, missions):
                 points += goal['points']
             else:
                 current_stage = min(current_stage, index)
-    return points, current_stage
+    total = program['total_points']
+    return min(total, points), len(program['stages']) if points >= total else current_stage
 
 
-def authored_program_tiers(program):
-    for level, tier in enumerate(program['tiers'], 1):
-        reward = tier['reward']
-        yield PathTier(level, tier['threshold'], reward.get('amount', 0), reward.get('product_id', 0))
+def authored_reward_tier(level, definition):
+    reward = definition['reward']
+    kind = reward['kind']
+    stubs = reward.get('stubs', reward.get('amount', 0))
+    xp = reward.get('xp', 0)
+    threshold = definition['threshold']
+    if kind == 'card':
+        item_id = reward['item_id']
+        card = card_by_id(item_id)
+        if card and card['uuid'] == reward['uuid']:
+            handle, art_id = player_art()['override'].get(item_id, ('', 0))
+            if handle and handle != 'ACTIONGENERIC' and art_id == item_id:
+                return PathTier(level, threshold, stubs, 0, card, xp=xp)
+        stubs += AFFINITY_CARD_FALLBACK_STUBS
+    elif kind in ('Equipment', 'Unlockable'):
+        item = next((item for item in inventory_data()['catalogue'].get(kind, ())
+                     if item['uuid'] == reward['uuid']), None)
+        if item:
+            face = equip_face(kind, item, quantity=1, no_sell=1)
+            if face is not None:
+                texture = face.get('texture_name') or face.get('texture_name_lg') or face.get('texture_name_sm')
+                if texture:
+                    face.attrib.update(texture_name=texture, item_label_aaadeb49z9__=face.get('name'))
+                    return PathTier(level, threshold, stubs, 0, xp=xp, inventory_item=face)
+        stubs += AFFINITY_CARD_FALLBACK_STUBS
+    packs = reward.get('products') or (reward.get('product_id', 0),)
+    return PathTier(level, threshold, stubs, packs[0], xp=xp)
+
+
+def authored_pack_preview(item, reward):
+    item.set('quantity', str(reward.get('quantity', 1)))
+    if name := reward.get('name'):
+        item.attrib.update(name=name, item_label_aaadeb49z9__=name, description=name)
+    if texture := reward.get('texture'):
+        item.set('texture_name', texture)
+
+
+def authored_claim_thresholds(program, saved):
+    if 'claimed_thresholds' in saved:
+        return set(saved['claimed_thresholds'])
+    legacy = program.get('legacy_thresholds', ())
+    return {legacy[level - 1] for level in saved.get('claimed_tiers', ())
+            if type(level) is int and 1 <= level <= len(legacy)}
 
 
 def authored_texture(key):
@@ -1526,8 +1707,8 @@ def authored_texture(key):
 
 def authored_program_fields(program, saved, missions):
     points, current = authored_program_status(program, saved, missions)
-    tiers = tuple(authored_program_tiers(program))
-    reached = sum(tier.threshold <= points for tier in tiers)
+    tiers = program['tiers']
+    reached = sum(tier['threshold'] <= points for tier in tiers)
     next_level = min(len(tiers), reached + 1)
     total = program['total_points']
     fields = program_fields({})
@@ -1540,7 +1721,7 @@ def authored_program_fields(program, saved, missions):
                   max_tickets=total, percent_complete=points * 100 // total, is_complete=int(points == total),
                   current_stage=min(current, len(program['stages']) - 1),
                   current_level=max(1, reached), next_level=next_level,
-                  xp_to_next_level=tiers[next_level - 1].threshold - points,
+                  xp_to_next_level=tiers[next_level - 1]['threshold'] - points,
                   xp_earned=points, xp_earned_apao34n_=points, reward_unlocks_aaaa0aaa_yvx=reached,
                   # The native loop check reads this threshold (0xf0e842).
                   # FRONTEND 0x3617bd still uses a literal /25,000 caption.
@@ -1563,7 +1744,8 @@ def authored_program_goals(parent, program, saved, missions, current_stage, *, i
                       if 6 in missions[goal['mission_id']].get('modes', ())}
         mode = mini_mode if mini_goals else cpu_mode
         where = 'the modes listed on each goal' if 0 < len(mini_goals) < len(definition['goals']) else mode
-        stage = mini_node(stages, 'stage', stage=index, is_unlocked=int(index <= current_stage))
+        stage = mini_node(stages, 'stage', stage=index,
+                          is_unlocked=int(program.get('parallel_goals') or index <= current_stage))
         goals = mini_node(stage, 'goals', id=definition['id'], name=definition['name'],
                           description=f'Complete {definition["name"]} goals in {where}.',
                           type=2, is_group=1, is_complete=1, type_tab=0, tickets=0, mode_name=mode)
@@ -1578,11 +1760,12 @@ def authored_program_goals(parent, program, saved, missions, current_stage, *, i
             xp = authored_goal_xp(mission)
             if xp:
                 description += f' Reward: {xp} XP.'
+            display_scale = 3 if mission['evaluator'] == 'pitching_outs' else 1
             row = mini_node(goals, 'goal', id=mission['id'], type=2, type_tab=0,
                             mode_name=mini_mode if mission['id'] in mini_goals else cpu_mode,
                             name=mission['name'], description=description,
-                            is_complete=complete, tickets=goal['points'], progress_current=current,
-                            progress_max=target, mission_criteria_id=0, preview_count=0,
+                            is_complete=complete, tickets=goal['points'], progress_current=current // display_scale,
+                            progress_max=target // display_scale, mission_criteria_id=0, preview_count=0,
                             stat=mission_unit(mission))
             ET.SubElement(row, 'items')
             if not complete:
@@ -1616,9 +1799,16 @@ def authored_program_view(program):
     row = mini_node(response, 'program', **fields)
     authored_program_goals(row, program, saved, missions, fields['current_stage'], include_moments=True)
     rewards = ET.SubElement(row, 'rewards')
-    claimed = set(saved.get('claimed_tiers', ()))
-    for tier in authored_program_tiers(program):
-        program_tier_row(rewards, tier, fields['tickets_earned'], tier.level in claimed)
+    parallel = program.get('parallel_goals')
+    claimed = authored_claim_thresholds(program, saved) if parallel else set(saved.get('claimed_tiers', ()))
+    for level, definition in enumerate(program['tiers'], 1):
+        tier = authored_reward_tier(level, definition)
+        reward_row = program_tier_row(rewards, tier, fields['tickets_earned'],
+                                      (tier.threshold if parallel else level) in claimed)
+        if tier.pack_id and parallel:
+            item = reward_row.find('item')
+            authored_pack_preview(item, definition['reward'])
+            reward_row.set('name', item.get('name'))
     unlimited = ET.SubElement(row, 'unlimited_rewards')
     for _ in range(6):
         mini_node(unlimited, 'unlimited_reward', texture_name='')
@@ -1637,12 +1827,15 @@ def authored_program_list(programs):
         fields = authored_program_fields(program, authored_program_state(profile, program), missions)
         row = mini_node(rows, 'program', **fields, featured_label_rtay_8i_='Tier Rewards')
         featured = ET.SubElement(row, 'featured_items')
-        tiers = tuple(authored_program_tiers(program))
-        previews = [tier for tier in tiers if tier.pack_id] or list(tiers)
+        tiers = list(enumerate(program['tiers'], 1))
+        previews = [(level, tier) for level, tier in tiers if tier['reward']['kind'] == 'pack'] or tiers
         while len(previews) < 2:
             previews.append(previews[0])
-        for tier in previews[:2]:
+        for level, definition in previews[:2]:
+            tier = authored_reward_tier(level, definition)
             program_item(featured, tier, tag='featured_item')
+            if tier.pack_id and program.get('parallel_goals'):
+                authored_pack_preview(featured[-1], definition['reward'])
     return mini_xml(response)
 
 
@@ -1652,6 +1845,7 @@ AFFINITY_LEGACY_PROGRAM_BASE = 20000
 AFFINITY_CLUB_GROUP_BASE = 10030
 AFFINITY_DIVISIONS = ('AL East', 'AL Central', 'AL West', 'NL East', 'NL Central', 'NL West')
 AFFINITY_SEASON = 5
+AFFINITY_PROGRAM_COUNT = AFFINITY_SEASON * len(AFFINITY_DIVISIONS)
 AFFINITY_ART_BASE = 520100
 AFFINITY_GAME_CREDITS = 1
 AFFINITY_WIN_BONUS = 1
@@ -1754,20 +1948,21 @@ def affinity_art_name(division, season):
 
 @lru_cache(maxsize=2)
 def affinity_tile_art(update_dir):
-    """Register the six stock division tiles without creating files."""
+    """Register the stock division tiles without creating files."""
     registry = {'entries': [], 'files': {}, 'names': set()}
     if update_dir is None:
         return registry
     directory = os.path.join(update_dir, 'CROSS', 'LIVE')
-    for division in range(len(AFFINITY_DIVISIONS)):
-        name = affinity_art_name(division, AFFINITY_SEASON)
+    for index in range(AFFINITY_PROGRAM_COUNT):
+        season, division = divmod(index, len(AFFINITY_DIVISIONS))
+        name = affinity_art_name(division, AFFINITY_SEASON - season)
         try:
             with open(os.path.join(directory, name + '.WEBP'), 'rb') as source:
                 data = source.read(512 * 1024 + 1)
         except OSError:
             continue
         if data[:4] == b'RIFF' and data[8:12] == b'WEBP':
-            if register_picture(registry, name, AFFINITY_ART_BASE + division, f'affinity-{division}', data):
+            if register_picture(registry, name, AFFINITY_ART_BASE + index, f'affinity-{index}', data):
                 registry['names'].add(name)
     return registry
 
@@ -1863,21 +2058,15 @@ def affinity_view(division):
         if kind == 'card' and card is None:
             stubs = AFFINITY_CARD_FALLBACK_STUBS
         paid = key in claimed
-        row = program_tier_row(rewards, PathTier(level, threshold, stubs, pack_id), points, paid)
+        row = program_tier_row(rewards, PathTier(level, threshold, stubs, pack_id, card), points, paid)
         # A migrated payout can already be paid even when its new stop is ahead.
         row.set('status_index', str(int(points >= threshold)))
-        if card is not None:
-            row.remove(row.find('item'))
-            row.insert(0, program_card_item(card, amount))
-            for key, value in dict(id=card['item_id'], type_id=0, name=card['name'],
-                                   display_index=0, label_index=1).items():
-                row.set(key, str(value))
-        elif kind == 'xp':
+        if kind == 'xp':
             row.set('name', 'XP')
             row.find('item').set('item_label_aaadeb49z9__', 'XP')
             extra = row.find('extras/extra')
             extra.attrib.update(amount=str(amount), type_index='1', label='XP')
-        elif kind == 'pack':
+        elif kind == 'pack' or card is not None:
             row.find('item').set('quantity', str(amount))
     unlimited = ET.SubElement(program, 'unlimited_rewards')
     for _ in range(6):
@@ -1887,9 +2076,13 @@ def affinity_view(division):
 
 def affinity_list(divisions):
     state = load_state()
+    return affinity_list_reply([(affinity_fields(state, division), affinity_pack_id(division))
+                                for division in divisions])
+
+
+def affinity_list_reply(rows):
     response = ET.Element('response')
-    rows = [(division, affinity_fields(state, division)) for division in divisions]
-    first = rows[0][1]
+    first = rows[0][0]
     mini_node(response, 'active_program', id=first['id'], name_short=first['name_short'],
               texture_name=first['texture_name'])
     # FRONTEND 0x7410a8 BranchValue selects TeamProgramList with decimal mode 0.
@@ -1899,11 +2092,11 @@ def affinity_list(divisions):
     # Keep the Program detail attributes on program.view.
     list_fields = ('id', 'name', 'name_short', 'subtitle', 'texture_name', 'percent_complete',
                    'is_complete', 'tickets_earned', 'max_tickets')
-    for division, fields in rows:
+    for fields, featured_pack in rows:
         program = mini_node(programs, 'program', **{name: fields[name] for name in list_fields},
                             featured_label_rtay_8i_='Division Rewards')
         featured = ET.SubElement(program, 'featured_items')
-        for pack_id in (affinity_pack_id(division), 510001):
+        for pack_id in (featured_pack, 510001):
             item = mini_node(featured, 'featured_item', **program_pack_fields(pack_id))
             ET.SubElement(item, 'item_exclusives')
     return mini_xml(response)
@@ -1911,10 +2104,17 @@ def affinity_list(divisions):
 
 def affinity_home_panel(state):
     panel = ET.Element('TeamAffinity')
+    tracks = active_title_content().team_affinity
     for division, name in enumerate(AFFINITY_DIVISIONS):
-        points = min(affinity_division_points(state, division), AFFINITY_DIVISION_CAP)
-        mini_node(panel, 'program', name_short=name, tickets_earned=points, max_tickets=AFFINITY_DIVISION_CAP,
-                  affinity_percent_aaaaaaahpal_=points * 100 // AFFINITY_DIVISION_CAP)  # script 0xea787a3a
+        if tracks:
+            track = tracks[AFFINITY_PROGRAM_BASE + division]
+            _, points, _ = seasonal_affinity_position(state, track)
+            cap = AFFINITY_LAP_TA
+        else:
+            points = min(affinity_division_points(state, division), AFFINITY_DIVISION_CAP)
+            cap = AFFINITY_DIVISION_CAP
+        mini_node(panel, 'program', name_short=name, tickets_earned=points, max_tickets=cap,
+                  affinity_percent_aaaaaaahpal_=points * 100 // cap)  # script 0xea787a3a
     return ET.tostring(panel, encoding='unicode')
 
 
@@ -1933,15 +2133,18 @@ def affinity_upload_clubs(state, record):
     setup, _affinity_lineup = _affinity_lineup, None
     if setup and setup[0] == ids:
         return setup[1]
-    return affinity_squad_clubs(current_squad(state.get('squad') or default_squad()))
+    return affinity_squad_clubs(current_squad(active_saved_squad(state) or default_squad()))
 
 
-def affinity_grant_tiers(state, division, points):
+def affinity_grant_tiers(state, division, points, *, replace_legacy_pack=True):
     affinity = state.get('team_affinity', {})
     key = str(division)
     claimed = affinity_claims(affinity, division)
     for _, threshold, reward, kind, amount, target in affinity_tiers(division):
-        upgraded = reward.startswith('pack:') and 'pack' in claimed
+        previously_paid = reward.startswith('pack:') and 'pack' in claimed
+        if previously_paid and not replace_legacy_pack:
+            continue
+        upgraded = previously_paid and replace_legacy_pack
         if reward in claimed or (points < threshold and not upgraded):
             continue
         profile = state.setdefault('profile', {})
@@ -1989,6 +2192,427 @@ def affinity_record_game(state, receipt, clubs, won):
         affinity_grant_tiers(state, division, affinity_division_points(state, division))
 
 
+# Seasonal Team Affinity uses the same wire paths as the older six-tile revision.
+AFFINITY_LAP_TA = 150000
+AFFINITY_LAP_STOPS = 31
+AFFINITY_CHOICE_BASE = 518000
+AFFINITY_ROLES = ('boss', 'secondary', 'captain')
+AFFINITY_PACK_REWARDS = {'show': 510001, 'unlock': 510043, 'ballin': 510005, 'box': 510001}
+AFFINITY_STAT_FIELDS = {
+    'H': ('batting', ('hits',)), 'HR': ('batting', ('home_runs',)),
+    'XBH': ('batting', ('doubles', 'triples', 'home_runs')),
+    'TB': ('batting', ('hits', 'doubles', 'triples', 'home_runs')),
+    'R': ('batting', ('runs',)), 'RBI': ('batting', ('rbi',)), 'SB': ('batting', ('stolen_bases',)),
+    'OUTS': ('pitching', ('pitching_outs',)), 'RA': ('pitching', ('runs_allowed',)),
+    'K': ('pitching', ('pitching_strikeouts',)),
+}
+AFFINITY_STAT_NAMES = {
+    'H': 'hits', 'HR': 'home runs', 'XBH': 'extra-base hits', 'TB': 'total bases',
+    'R': 'runs', 'RBI': 'RBI', 'SB': 'stolen bases', 'OUTS': 'pitching outs', 'K': 'strikeouts',
+}
+
+
+class AffinityTask(NamedTuple):
+    id: int
+    kind: str
+    name: str
+    description: str
+    target: int
+    ta: int
+    items: tuple = ()
+    club: int | None = None
+    player: str = ''
+    goals: tuple = ()
+
+
+class AffinityTrack(NamedTuple):
+    id: int
+    season: int
+    division: int
+    tiers: tuple
+    choices: dict
+    groups: dict
+    voucher_ta: int
+
+
+def affinity_choice_definition(season, division, series, role, product_id, editions):
+    region = AFFINITY_DIVISIONS[division]
+    suffix = region.replace(' ', '').upper()
+    labels = {
+        'boss': (f'Season {season} {region} Boss Choice Pack', 'BOSS'),
+        'captain': (f'Season {season} {region} Captain Choice Pack', 'CAPTAIN'),
+        'secondary': (f'{series} {region} Choice Pack', {1: 'HENCHMEN', 2: 'FUTURESTARS', 5: 'RETRO'}.get(season)),
+    }
+    label, key = labels[role]
+    texture = f'CPACK_TA{season}_{key}_{suffix}' if key else 'CPACK_DIAMOND_CLASSICS'
+    picks = 2 if season == 1 and role == 'secondary' else 1
+    return dict(id=product_id, name=label, description=f'Choose {picks} player item(s).',
+                cost=0, texture=texture,
+                source='base' if role == 'captain' or (season == 1 and role == 'secondary') else 'update',
+                partial_pool=True, exact_pool=True,
+                rounds=[{'picks': min(picks, len(editions)), 'options': [row['item_id'] for row in editions]}])
+
+
+def affinity_moment_goal_text(goals):
+    return ' and '.join('allow no runs' if stat == 'RA' and count == 0 else
+                        f'allow no more than {count} runs' if stat == 'RA' else
+                        f'record {count} {AFFINITY_STAT_NAMES[stat]}' for stat, count in goals.items())
+
+
+def affinity_task_groups(season, division, series, team_pxp, pools, voucher_ta):
+    region = AFFINITY_DIVISIONS[division]
+    moments, captains, secondary, bosses = [], [], [], []
+    clubs = [
+        AffinityTask(610000 + club, 'PXP', f'REPEATABLE: {team_pxp:,} PXP with {MLB_TEAMS[club][2]}',
+                     f'Tally {team_pxp:,} Parallel XP (PXP) with {MLB_TEAMS[club][2]} player items.',
+                     team_pxp, 5000, club=club)
+        for club in affinity_division_clubs(division)
+    ]
+    for entry in pools['boss']:
+        moment = entry['moment']
+        goal_text = affinity_moment_goal_text(moment['goals'])
+        description = moment.get('description') or f'In one game with {moment["player"]}, {goal_text}.'
+        if 'adaptation' in moment:
+            description += ' ' + moment['adaptation']
+        moments.append(AffinityTask(620000 + entry['item_id'], 'moment', moment['title'],
+                                    description, 1, 1000 if season == 1 else 1500,
+                                    items=(entry['item_id'],), club=moment.get('team_id'),
+                                    player=_shot_part(moment['player']), goals=tuple(moment['goals'].items())))
+    for entry in pools['captain']:
+        stat, target = entry['stat'], entry['target']
+        captains.append(AffinityTask(entry['item_id'], stat, f'{stat} with Captain {entry["name"]}',
+                                     f'Tally {target} {AFFINITY_STAT_NAMES[stat]} with Captain {entry["name"]}.',
+                                     target, 3500, items=(entry['item_id'],)))
+    for role, tasks in (('secondary', secondary), ('boss', bosses)):
+        for entry in pools[role]:
+            label, target = f'{entry["series"]} {entry["name"]}', entry['target']
+            tasks.append(AffinityTask(entry['item_id'], 'PXP', f'{target} PXP with {label}',
+                                      f'Tally {target} Parallel XP (PXP) with {label}.',
+                                      target, 3500, items=(entry['item_id'],)))
+    bosses.insert(0, AffinityTask(630000 + division, 'PXP', f'REPEATABLE: PXP with {region} Bosses',
+                                  f'Tally 1,000 Parallel XP (PXP) with {region} Team Affinity Bosses.',
+                                  1000, 5000, items=tuple(entry['item_id'] for entry in pools['boss'])))
+    voucher = AffinityTask(640000 + division, 'voucher', 'REPEATABLE: Redeem 1 Mini Seasons Voucher',
+                           'Finish a Mini Seasons game to redeem a voucher in every division program.',
+                           1, voucher_ta)
+    return {f'{region} Moments': moments, 'Team Build PXP Missions': clubs, 'Captain Stat Missions': captains,
+            f'{series} PXP Missions': secondary, 'Incognito PXP Missions' if season == 2 else 'Boss PXP Missions': bosses,
+            'Mini Seasons Voucher Exchange': [voucher]}
+
+
+def validate_affinity_content(seasons, invalid):
+    if not isinstance(seasons, list) or len(seasons) != AFFINITY_SEASON:
+        raise invalid('team_affinity.json needs five seasons')
+    tracks, products = {}, []
+    for raw in seasons:
+        if not content_record(raw, {'season', 'series', 'team_pxp', 'voucher_ta', 'tiers', 'divisions'}):
+            raise invalid('team_affinity.json has an invalid season record')
+        season, series, team_pxp, voucher_ta, tiers, divisions = (
+            raw[key] for key in ('season', 'series', 'team_pxp', 'voucher_ta', 'tiers', 'divisions'))
+        if (not content_positive(season) or season > AFFINITY_SEASON or not content_text(series)
+                or not content_positive(team_pxp) or not content_positive(voucher_ta)):
+            raise invalid('team_affinity.json has invalid season settings')
+        if not isinstance(tiers, list) or len(tiers) != AFFINITY_LAP_STOPS:
+            raise invalid(f'Team Affinity Season {season} needs {AFFINITY_LAP_STOPS} reward stops')
+        previous = 0
+        for tier in tiers:
+            if (not isinstance(tier, dict) or not {'ta', 'reward'} <= tier.keys()
+                    or tier.keys() - {'ta', 'reward', 'stubs', 'xp'}
+                    or not content_positive(tier['ta']) or tier['ta'] <= previous
+                    or tier['reward'] not in (*AFFINITY_PACK_REWARDS, *AFFINITY_ROLES, 'division', 'stubs')
+                    or any(not content_positive(tier[key]) for key in tier.keys() & {'stubs', 'xp'})
+                    or (tier['reward'] == 'stubs' and 'stubs' not in tier)):
+                raise invalid(f'Team Affinity Season {season} has an invalid or unordered reward stop')
+            previous = tier['ta']
+        if tiers[0]['ta'] != 5000 or previous != AFFINITY_LAP_TA:
+            raise invalid(f'Team Affinity Season {season} has an invalid reward-track range')
+        if not isinstance(divisions, list) or len(divisions) != len(AFFINITY_DIVISIONS):
+            raise invalid(f'Team Affinity Season {season} needs six division programs')
+        for division, pools in enumerate(divisions):
+            label = f'Team Affinity Season {season} {AFFINITY_DIVISIONS[division]}'
+            index = (AFFINITY_SEASON - season) * len(AFFINITY_DIVISIONS) + division
+            track_id = AFFINITY_PROGRAM_BASE + index
+            if track_id in tracks or not content_record(pools, set(AFFINITY_ROLES)):
+                raise invalid(f'{label} has an invalid or duplicate division record')
+            choices, seen = {}, set()
+            for offset, role in enumerate(AFFINITY_ROLES):
+                entries = pools[role]
+                if not isinstance(entries, list) or not 1 <= len(entries) <= (10 if season == 1 and role == 'secondary' else 5):
+                    raise invalid(f'{label} has an invalid {role} pool size')
+                for entry in entries:
+                    fields = {'item_id', 'name', 'series', 'target'}
+                    fields |= {'moment'} if role == 'boss' else {'stat'} if role == 'captain' else set()
+                    if (not content_record(entry, fields) or not content_positive(entry['item_id'])
+                            or entry['item_id'] in seen or not content_text(entry['name'])
+                            or not content_text(entry['series']) or not content_positive(entry['target'])):
+                        raise invalid(f'{label} has an invalid or duplicate {role} edition')
+                    if role == 'captain' and entry['stat'] not in AFFINITY_STAT_NAMES:
+                        raise invalid(f'{label} captain mission has an unknown stat')
+                    if role == 'boss':
+                        moment = entry['moment']
+                        if (not isinstance(moment, dict) or not {'title', 'player', 'goals'} <= moment.keys()
+                                or moment.keys() - {'title', 'player', 'goals', 'description', 'adaptation', 'team_id'}
+                                or not all(content_text(moment[key]) for key in moment.keys() - {'goals', 'team_id'})
+                                or ('team_id' in moment and (type(moment['team_id']) is not int
+                                    or moment['team_id'] not in affinity_division_clubs(division)))
+                                or not isinstance(moment['goals'], dict) or not moment['goals']
+                                or set(moment['goals']) == {'RA'}
+                                or any(stat not in AFFINITY_STAT_FIELDS or type(amount) is not int
+                                       or not (0 if stat == 'RA' else 1) <= amount <= 999
+                                       for stat, amount in moment['goals'].items())):
+                            raise invalid(f'{label} has an invalid Moment')
+                    seen.add(entry['item_id'])
+                product_id = AFFINITY_CHOICE_BASE + index * len(AFFINITY_ROLES) + offset
+                products.append(affinity_choice_definition(season, division, series, role, product_id, entries))
+                choices[role] = product_id
+            groups = affinity_task_groups(season, division, series, team_pxp, pools, voucher_ta)
+            tracks[track_id] = AffinityTrack(track_id, season, division, tuple(tiers), choices, groups, voucher_ta)
+    return dict(sorted(tracks.items())), products
+
+
+def migrate_seasonal_affinity(state, tracks):
+    affinity = state.get('team_affinity', {})
+    legacy_fields = {'points', 'task_credits', 'claims', 'division_claims', 'bonus_cycles'}
+    if 'tracks' in affinity or not legacy_fields.intersection(affinity):
+        return False
+    rows = affinity.setdefault('tracks', {})
+    for division in range(len(AFFINITY_DIVISIONS)):
+        track = tracks[AFFINITY_PROGRAM_BASE + division]
+        points = affinity_division_points(state, division)
+        affinity_grant_tiers(state, division, points, replace_legacy_pack=False)
+        units = {}
+        for task in track.groups['Team Build PXP Missions']:
+            remaining = affinity_task_credits(state, task.club) % AFFINITY_TASK_CREDITS
+            if remaining:
+                units[str(task.id)] = remaining * task.target * 3 // AFFINITY_TASK_CREDITS
+        if points or units:
+            rows[str(track.id)] = dict(points=points, lap_offset=max(0, points - AFFINITY_LAP_TA),
+                                       paid=sum(tier['ta'] <= points for tier in track.tiers), units=units)
+    return True
+
+
+def seasonal_affinity_saved(state, track):
+    return state.get('team_affinity', {}).get('tracks', {}).get(str(track.id), {})
+
+
+def seasonal_affinity_position(state, track):
+    saved = seasonal_affinity_saved(state, track)
+    total = mission_count(saved, 'points')
+    effective = max(0, total - mission_count(saved, 'lap_offset'))
+    if track.season == AFFINITY_SEASON and 'tracks' not in state.get('team_affinity', {}):
+        total = affinity_division_points(state, track.division)
+        effective = min(total, AFFINITY_LAP_TA)
+    # At a lap boundary keep the last reward visible as complete until the next credit.
+    lap, into = divmod(max(0, effective - 1), AFFINITY_LAP_TA)
+    return total, into + 1 if effective else 0, lap
+
+
+def seasonal_affinity_fields(state, track):
+    total, points, lap = seasonal_affinity_position(state, track)
+    reached = sum(tier['ta'] <= points for tier in track.tiers)
+    next_level = min(AFFINITY_LAP_STOPS, reached + 1)
+    division = AFFINITY_DIVISIONS[track.division]
+    preferred = affinity_art_name(track.division, track.season)
+    texture = preferred if preferred in affinity_tile_art(UPDATE_DIR)['names'] else affinity_art_name(track.division, 1)
+    fields = program_fields({})
+    fields.update(id=track.id, name=f'{division} - Season {track.season}', name_short=division.upper(),
+                  subtitle=f'SEASON {track.season}', program_group_id=10002, texture_name=texture,
+                  description=f'Earn Team Affinity with {division} players. Reward track lap {lap + 1}.',
+                  tickets_earned=points, xp_earned=total, total_program_tickets=AFFINITY_LAP_TA,
+                  max_tickets=AFFINITY_LAP_TA, max_program_tickets=AFFINITY_LAP_TA,
+                  current_level=max(1, reached), next_level=next_level,
+                  xp_to_next_level=track.tiers[next_level - 1]['ta'] - points,
+                  percent_complete=points * 100 // AFFINITY_LAP_TA,
+                  is_complete=int(points == AFFINITY_LAP_TA), ui_type=2,
+                  max_bonus_tickets=BONUS_STEP, has_unlimited_reward='False', just_completed_program='False',
+                  xp_earned_apao34n_=points, reward_unlocks_aaaa0aaa_yvx=reached)
+    return fields
+
+
+def affinity_available_choices(track, reward_roles):
+    products = choice_pack_products()
+    pools = {role: products[track.choices[role]]['rounds'][0]['options'] for role in reward_roles}
+    ids = {item for items in pools.values() for item in items}
+    available = choice_card_catalogue(ids) if ids else {}
+    return {role: [available[item] for item in items if item in available] for role, items in pools.items()}
+
+
+def affinity_season_reward(track, tier, choices):
+    reward = tier['reward']
+    stubs = tier.get('stubs', 0)
+    pack_id, quantity = AFFINITY_PACK_REWARDS.get(reward, 0), 5 if reward == 'box' else 1
+    if reward == 'division':
+        pack_id = 510010 + track.division
+    elif reward in AFFINITY_ROLES:
+        if choices.get(reward):
+            pack_id = track.choices[reward]
+        else:
+            pack_id = 510010 + track.division
+    return pack_id, quantity, stubs, tier.get('xp', 0)
+
+
+def seasonal_affinity_goals(program, track, saved):
+    stage = mini_node(ET.SubElement(program, 'stages'), 'stage', stage=0, is_unlocked=1)
+    units = saved.get('units', {})
+    for index, (name, rows) in enumerate(track.groups.items(), 1):
+        modes = 'Mini Seasons' if rows[0].kind == 'voucher' else 'Play vs. CPU and Mini Seasons'
+        group = mini_node(stage, 'goals', id=index, name=name, description='Earn repeatable Team Affinity.',
+                          type=2, type_tab=0, is_group=1, is_complete=0, tickets=0, mode_name=modes)
+        for task in rows:
+            progress = mission_count(units, str(task.id))
+            if task.kind == 'PXP':
+                progress //= 3
+            label = 'GAME' if task.kind in ('moment', 'voucher') else task.kind
+            goal = mini_node(group, 'goal', id=task.id, type=2, type_tab=0, mode_name=modes,
+                             name=task.name, description=task.description, is_complete=0, tickets=task.ta,
+                             progress_current=progress, progress_max=task.target, mission_criteria_id=0,
+                             preview_count=0, stat=label)
+            ET.SubElement(goal, 'items')
+
+
+def seasonal_affinity_view(track):
+    state = load_state()
+    if migrate_seasonal_affinity(state, active_title_content().team_affinity):
+        save_state(state)
+    saved = seasonal_affinity_saved(state, track)
+    fields = seasonal_affinity_fields(state, track)
+    _, points, lap = seasonal_affinity_position(state, track)
+    response = ET.Element('response')
+    program = mini_node(response, 'program', **fields)
+    seasonal_affinity_goals(program, track, saved)
+    rewards = ET.SubElement(program, 'rewards')
+    choices = affinity_available_choices(track, AFFINITY_ROLES)
+    for level, tier in enumerate(track.tiers, 1):
+        pack_id, quantity, stubs, xp = affinity_season_reward(track, tier, choices)
+        paid = lap * AFFINITY_LAP_STOPS + level <= mission_count(saved, 'paid')
+        row = program_tier_row(rewards, PathTier(level, tier['ta'], stubs, pack_id), points, paid)
+        if pack_id:
+            item = row.find('item')
+            item.set('quantity', str(quantity))
+            if tier['reward'] == 'box':
+                name = 'The Show 5 Pack Box'
+                row.set('name', name)
+                item.attrib.update(name=name, texture_name='BOX05_THESHOW',
+                                   description='Contains 5 The Show Packs.', item_label_aaadeb49z9__=name)
+        if xp:
+            extras = row.find('extras')
+            extra = ET.SubElement(extras, 'extra') if stubs else extras.find('extra')
+            extra.attrib.update(amount=str(xp), type_index='1', label='XP')
+    unlimited = ET.SubElement(program, 'unlimited_rewards')
+    for _ in range(6):
+        mini_node(unlimited, 'unlimited_reward', texture_name='')
+    return mini_xml(response)
+
+
+def seasonal_affinity_list(tracks):
+    state = load_state()
+    if migrate_seasonal_affinity(state, active_title_content().team_affinity):
+        save_state(state)
+    return affinity_list_reply([(seasonal_affinity_fields(state, track), track.choices['boss'])
+                                for track in tracks])
+
+
+def affinity_stat(line, stat):
+    side, fields = AFFINITY_STAT_FIELDS[stat]
+    stats = line.get(side, {})
+    if any(field not in stats for field in fields):
+        return None
+    if stat == 'TB':
+        hits, doubles, triples, home_runs = (stats[field] for field in fields)
+        return hits + doubles + 2 * triples + 3 * home_runs
+    return sum(stats[field] for field in fields)
+
+
+def affinity_task_units(task, appearances, voucher):
+    if task.kind == 'voucher':
+        return int(voucher)
+    if task.kind == 'PXP':
+        return sum(pxp for item, card, _, pxp in appearances
+                   if (task.club is not None and card.get('team_id') == task.club) or item in task.items)
+    if task.kind != 'moment':
+        return sum(affinity_stat(line, task.kind) or 0 for item, _, line, _ in appearances if item in task.items)
+    if task.club is not None:
+        lines = [line for _, card, line, _ in appearances if card.get('team_id') == task.club]
+        return int(bool(lines) and all(sum(affinity_stat(line, stat) or 0 for line in lines) >= amount
+                                        for stat, amount in task.goals))
+    for item, card, line, _ in appearances:
+        if item not in task.items and _shot_part(card.get('name', '')) != task.player:
+            continue
+        measured = [(stat, affinity_stat(line, stat), amount) for stat, amount in task.goals]
+        if all(value is not None and (value <= amount if stat == 'RA' else value >= amount)
+               for stat, value, amount in measured):
+            return 1
+    return 0
+
+
+def seasonal_affinity_grant(state, track, saved):
+    effective = saved['points'] - mission_count(saved, 'lap_offset')
+    laps, points = divmod(effective, AFFINITY_LAP_TA)
+    settled = mission_count(saved, 'paid')
+    reached = laps * AFFINITY_LAP_STOPS + sum(tier['ta'] <= points for tier in track.tiers)
+    if settled >= reached:
+        return
+    tiers = [track.tiers[index % AFFINITY_LAP_STOPS] for index in range(settled, reached)]
+    choices = affinity_available_choices(track, {tier['reward'] for tier in tiers} & set(AFFINITY_ROLES))
+    for tier in tiers:
+        pack_id, quantity, stubs, xp = affinity_season_reward(track, tier, choices)
+        if pack_id:
+            shop = state.setdefault('pack_shop', {})
+            for _ in range(quantity):
+                grant_owned_pack(shop, pack_id)
+        if stubs or xp:
+            profile = state.setdefault('profile', {})
+            if stubs:
+                profile['stubs'] = profile.get('stubs', 0) + stubs
+            if xp:
+                queue_profile_xp(profile, min(xp, max(0, 0xffffffff - profile.get('xp', 0))))
+    saved['paid'] = reached
+
+
+def seasonal_affinity_record_game(state, receipt, record, awards, *, card_ids=None):
+    tracks = active_title_content().team_affinity
+    affinity = state.setdefault('team_affinity', {})
+    receipts = affinity.setdefault('game_receipts', {})
+    if receipt in receipts:
+        return
+    migrate_seasonal_affinity(state, tracks)
+    sides = [side for side in SUMMARY_SIDES if record['players'][side] == ACCOUNT_ID]
+    stats = (record.get('stats') or {}).get(sides[0]) if len(sides) == 1 else None
+    appearances = []
+    if stats:
+        pxp_by_card = {uuid: thirds for uuid, _, thirds, _ in awards}
+        for item, card in match_stat_cards(state, record, card_ids).items():
+            if card and item in stats['cards']:
+                appearances.append((item, card, stats['cards'][item], pxp_by_card.get(card.get('uuid'), 0)))
+    receipts[receipt] = affinity_card_clubs(card for _, card, _, _ in appearances
+                                           if type(card.get('team_id')) is int)
+    voucher = record['sub_mode'] == 6
+    if not appearances and not voucher:
+        return
+    rows = affinity.setdefault('tracks', {})
+    for track in tracks.values():
+        saved = rows.get(str(track.id), {})
+        points = 0
+        for tasks in track.groups.values():
+            for task in tasks:
+                earned = affinity_task_units(task, appearances, voucher)
+                if not earned:
+                    continue
+                key = str(task.id)
+                units = saved.setdefault('units', {})
+                target = task.target * (3 if task.kind == 'PXP' else 1)
+                cycles, remaining = divmod(mission_count(units, key) + earned, target)
+                if remaining:
+                    units[key] = remaining
+                else:
+                    units.pop(key, None)
+                points += cycles * task.ta
+        if saved or points:
+            saved['points'] = mission_count(saved, 'points') + points
+            rows[str(track.id)] = saved
+            seasonal_affinity_grant(state, track, saved)
+
+
 def cpu_upload_win(state, record):
     """Return the local result of a decisive, finished Play vs. CPU report."""
     if (not record['uuid'] or len(record['uuid']) > 128
@@ -2010,7 +2634,7 @@ def match_stat_cards(state, record, card_ids=None):
     if card_ids is None:
         ids = [record['ids'][side] for side in SUMMARY_SIDES]
         setup = _affinity_lineup
-        card_ids = setup[2] if setup and len(setup) == 3 and setup[0] == ids else squad_ids(state.get('squad') or {})
+        card_ids = setup[2] if setup and len(setup) == 3 and setup[0] == ids else squad_ids(active_saved_squad(state) or {})
     if not card_ids:
         return {}
     selected, cards = set(card_ids), {}
@@ -2023,6 +2647,19 @@ def match_stat_cards(state, record, card_ids=None):
     except (OSError, ValueError, KeyError, TypeError, struct.error):
         return {}
     return cards
+
+
+def mission_card_matches(card, filters):
+    if 'item_ids' in filters and card['item_id'] not in filters['item_ids']:
+        return False
+    if 'series' in filters:
+        series = 'Live Series' if card.get('series') == 'Live' else card.get('series')
+        wanted = filters['series']
+        if series not in (wanted if isinstance(wanted, list) else (wanted,)):
+            return False
+    club = card.get('team_id')
+    return ('club' not in filters or type(club) is int and 0 <= club < len(MLB_TEAMS)
+            and MLB_TEAMS[club][0] == filters['club'])
 
 
 def stat_mission_units(mission, stats, margin, cards):
@@ -2040,16 +2677,7 @@ def stat_mission_units(mission, stats, margin, cards):
     total = 0
     for item, line in stats['cards'].items():
         card = cards.get(item)
-        if not card:
-            continue
-        series = card.get('series')
-        if series == 'Live':
-            series = 'Live Series'
-        if 'series' in filters and filters['series'] != series:
-            continue
-        club = card.get('team_id')
-        if 'club' in filters and (type(club) is not int or not 0 <= club < len(MLB_TEAMS)
-                                  or MLB_TEAMS[club][0] != filters['club']):
+        if not card or not mission_card_matches(card, filters):
             continue
         total += sum(line['batting'].get(field, 0) + line['pitching'].get(field, 0) for field in fields)
     return total
@@ -2080,8 +2708,27 @@ def mission_game_credits(state, record, won, *, card_ids=None):
             amount = 1
         elif evaluator == 'cpu_game_won':
             amount = int(won)
+        elif evaluator == 'parallel_xp' or evaluator == 'saves' and not won:
+            continue
         else:
             amount = stat_mission_units(mission, stats, margin, cards) if stats is not None else 0
+        if amount and (not mission.get('single_game') or amount >= mission['target']):
+            credits[str(mission['id'])] = amount
+    return credits
+
+
+def pxp_mission_credits(mode, earned):
+    if not earned:
+        return {}
+    missions = [mission for mission in active_title_content().missions.values()
+                if mission['evaluator'] == 'parallel_xp' and mode in mission['modes']]
+    cards = ({card['uuid']: card for card in all_cards() if card['uuid'] in earned}
+             if any(mission.get('card_filter') for mission in missions) else {})
+    credits = {}
+    for mission in missions:
+        filters = mission.get('card_filter')
+        amount = sum(delta for uuid, delta in earned.items()
+                     if not filters or uuid in cards and mission_card_matches(cards[uuid], filters))
         if amount:
             credits[str(mission['id'])] = amount
     return credits
@@ -2108,6 +2755,8 @@ def settle_daily_missions(profile, credits):
 
 
 def grant_authored_tiers(state, program, saved, points, *, upgrades_only=False):
+    if program.get('parallel_goals'):
+        return grant_authored_thresholds(state, program, saved, points)
     claimed = set(saved.get('claimed_tiers', ()))
     pack_claims = saved.get('claimed_pack_rewards', {})
     changed = False
@@ -2137,6 +2786,42 @@ def grant_authored_tiers(state, program, saved, points, *, upgrades_only=False):
     return changed
 
 
+def grant_authored_thresholds(state, program, saved, points):
+    claimed = authored_claim_thresholds(program, saved)
+    changed = 'claimed_tiers' in saved
+    profile = state.setdefault('profile', {})
+    for level, definition in enumerate(program['tiers'], 1):
+        threshold, reward = definition['threshold'], definition['reward']
+        if threshold > points or threshold in claimed:
+            continue
+        tier = authored_reward_tier(level, definition)
+        if tier.card is not None:
+            grant_card_copies(state, tier.card, 1)
+        elif tier.inventory_item is not None:
+            items = state.setdefault('pack_shop', {}).setdefault('gained_items', {})
+            gains = items.setdefault(reward['kind'], {})
+            gains[reward['uuid']] = gains.get(reward['uuid'], 0) + 1
+        elif tier.pack_id:
+            shop = state.setdefault('pack_shop', {})
+            products = reward['products']
+            for _ in range(reward.get('quantity', 1)):
+                product = products[0] if len(products) == 1 else PACK_RANDOM.choice(products)
+                if product in SHOP_BUNDLES:
+                    grant_shop_bundle(shop, SHOP_BUNDLES[product])
+                else:
+                    grant_owned_pack(shop, product)
+        if tier.stubs:
+            profile['stubs'] = profile.get('stubs', 0) + tier.stubs
+        if tier.xp:
+            queue_profile_xp(profile, tier.xp)
+        claimed.add(threshold)
+        changed = True
+    if changed:
+        saved.pop('claimed_tiers', None)
+        saved['claimed_thresholds'] = sorted(claimed)
+    return changed
+
+
 def settle_authored_programs(state, credits, *, program_id=None):
     content = active_title_content()
     if not content.programs:
@@ -2150,26 +2835,30 @@ def settle_authored_programs(state, credits, *, program_id=None):
         # Apply replacements in the saved cycle before advancing into the next one.
         grant_authored_tiers(state, program, saved, points, upgrades_only=True)
         completed = current == len(program['stages'])
-        stage = program['stages'][0 if completed else current]
-        if not any(credits.get(str(goal['mission_id'])) for goal in stage['goals']):
+        parallel = program.get('parallel_goals')
+        if completed and parallel and program_id is not None:
+            continue
+        stages = program['stages'] if parallel else (program['stages'][0 if completed else current],)
+        goals = [goal for stage in stages for goal in stage['goals'] if credits.get(str(goal['mission_id']))]
+        if not goals:
             continue
         if completed or not saved:
             # Keep the completed stage and paid tiers visible until the next
             # game that advances the first stage. The cycle number is the prior paid watermark.
-            saved = {'cycle': saved.get('cycle', 0) + 1, 'units': {}, 'claimed_tiers': []}
+            claim_key = 'claimed_thresholds' if parallel else 'claimed_tiers'
+            saved = {'cycle': saved.get('cycle', 0) + 1, 'units': {}, claim_key: []}
             profile.setdefault('authored_programs', {})[key] = saved
         units = saved['units']
-        for goal in stage['goals']:
+        for goal in goals:
             mission = content.missions[goal['mission_id']]
             mid = str(mission['id'])
-            if mid in credits:
-                target = mission['target']
-                before = mission_count(units, mid)
-                after = min(target, before + credits[mid])
-                units[mid] = after
-                xp = authored_goal_xp(mission)
-                if xp and before < target == after:
-                    queue_profile_xp(profile, xp)
+            target = mission['target']
+            before = mission_count(units, mid)
+            after = min(target, before + credits[mid])
+            units[mid] = after
+            xp = authored_goal_xp(mission)
+            if xp and before < target == after:
+                queue_profile_xp(profile, xp)
         points, _ = authored_program_status(program, saved, content.missions)
         grant_authored_tiers(state, program, saved, points)
 
@@ -2196,7 +2885,7 @@ PXP_BATTING_RATES = (
 PXP_CARD_FIELDS = tuple('hits' if field == 'singles' else field for field, *_ in PXP_BATTING_RATES)
 PXP_MODIFIER_FIELDS = tuple('itemseq_skill_mod_' + skill for skill in ('rookie', 'veteran', 'allstar', 'hof', 'legend')) + (
     'itemseq_online_mod', 'itemseq_offline_mod')
-PXP_PITCHING_RATE_FIELDS = ('ip', 'w', 'so', 'qs', 's', 'h', 'cg', 'sho')
+PXP_PITCHING_RATES = dict(ip=40, w=20, so=10, qs=10, s=20, h=20, cg=25, sho=25)
 
 
 def parallel_editions(state):
@@ -2214,7 +2903,7 @@ def owned_parallel_levels(state, owned=None):
     if not editions:
         return {}
     if owned is None:
-        owned = cards(state)
+        owned = playable_cards(state)
     levels = {}
     for card in owned:
         uuid = card['uuid']
@@ -2234,8 +2923,8 @@ def parallel_item_seq(xp, level):
         fields[f'pxp_threshold_a_a_addrmz88{index}'] = threshold
     for _, amount, _, _, suffix in PXP_BATTING_RATES:
         fields[f'itemseq_xpmod_{suffix}'] = amount
-    for suffix in PXP_PITCHING_RATE_FIELDS:
-        fields[f'itemseq_xpmod_{suffix}'] = 0  # Numeric controls, pitching awards are pending verified rates.
+    for suffix, amount in PXP_PITCHING_RATES.items():
+        fields[f'itemseq_xpmod_{suffix}'] = amount
     return mini_xml(ET.Element('item_seq', {key: str(value) for key, value in fields.items()}))
 
 
@@ -2257,51 +2946,97 @@ def clear_parallel_xp_result(state):
     state.get('parallel_xp', {}).pop('latest', None)
 
 
-def settle_batting_pxp(state, record, won, receipt, *, card_ids=None):
-    clear_parallel_xp_result(state)
-    if (record['game_type'] != 'ARENA' or record['sub_mode'] not in (3, 6)
+def pitching_pxp(line, won):
+    """Return thirds of a PXP point from the validated compact lanes."""
+    outs = mission_count(line, 'pitching_outs')
+    strikeouts = mission_count(line, 'pitching_strikeouts')
+    if not (outs or strikeouts or line.get('pitching_appearances') == 1):
+        return 0, ''
+    thirds = outs * PXP_PITCHING_RATES['ip'] + 3 * strikeouts * PXP_PITCHING_RATES['so']
+    labels = []
+    if outs:
+        innings, remainder = divmod(outs, 3)
+        labels.append(f'{innings}.{remainder} IP')
+    if strikeouts:
+        labels.append(f'{strikeouts} K')
+    for field, suffix, label in (('pitching_wins', 'w', 'Win'), ('saves', 's', 'Save'),
+                                 ('complete_games', 'cg', 'Complete game'), ('shutouts', 'sho', 'Shutout')):
+        if line.get(field) == 1 and (won or suffix not in ('w', 's')):
+            thirds += 3 * PXP_PITCHING_RATES[suffix]
+            labels.append(label)
+    return thirds, ', '.join(labels)
+
+
+def measure_parallel_awards(state, record, won, *, card_ids=None):
+    """Measure before the game or a staged Conquest battle consumes the match context."""
+    if (record['game_type'] != 'ARENA' or record['sub_mode'] not in (3, 6, 8)
             or record['outcome'] != 'FINISHED' or not record.get('stats')):
-        return
+        return []
     sides = [side for side in SUMMARY_SIDES if record['players'][side] == ACCOUNT_ID]
     if len(sides) != 1:
-        return
+        return []
     lines = record['stats'][sides[0]]['cards']
     appearances = [card['batting'].get('plate_appearances') for card in lines.values()]
     if not won and (any(type(pa) is not int or pa < 0 for pa in appearances) or sum(appearances) < 8):
-        return
+        return []
     match_cards = match_stat_cards(state, record, card_ids)
     if not match_cards:
-        return
+        return []
     try:
-        owned = {card['uuid'] for card in cards(state) if card['quantity'] > 0}
+        owned = {card['uuid'] for card in playable_cards(state) if card['quantity'] > 0}
     except (OSError, ValueError, KeyError, TypeError, struct.error):
-        return   # A catalogue problem must not prevent the game from settling.
-    updates = []
+        return []   # A catalogue problem must not prevent the game from settling.
+    awards = []
     for item, line in lines.items():
         card = match_cards.get(item)
         if not card or card.get('uuid') not in owned:
             continue
-        earned, description = batting_pxp(line['batting'])
-        if not earned:
-            continue
+        batting, bat_text = batting_pxp(line['batting'])
+        pitching, pitch_text = pitching_pxp(line.get('pitching', {}), won)
+        thirds = 3 * batting + pitching
+        if thirds:
+            awards.append((card['uuid'], card['name'], thirds,
+                           ', '.join(text for text in (bat_text, pitch_text) if text)))
+    return awards
+
+
+def apply_parallel_awards(state, awards, mode, receipt):
+    clear_parallel_xp_result(state)
+    updates = []
+    deltas = {}
+    for uuid, name, thirds, description in awards:
         progress = state.setdefault('parallel_xp', {'rules_version': 1, 'cards': {}})
-        edition = progress['cards'].setdefault(card['uuid'], {'xp': 0, 'crossings': {}})
+        edition = progress['cards'].setdefault(uuid, {'xp': 0, 'crossings': {}})
+        carry = mission_count(edition, 'pitching_pxp_thirds') % 3
+        earned, remainder = divmod(carry + thirds, 3)
         before = mission_count(edition, 'xp')
         after = min(0x7fffffff, before + earned)
+        if remainder and after < 0x7fffffff:
+            edition['pitching_pxp_thirds'] = remainder
+        else:
+            edition.pop('pitching_pxp_thirds', None)
         if after <= before:
             continue
         edition['xp'] = after
+        deltas[uuid] = after - before
         for tier, threshold in enumerate(PXP_THRESHOLDS[1:], 1):
             if before < threshold <= after:
                 edition['crossings'].setdefault(str(tier), receipt)
         # The bar animates from the pre-game tier. At max, keep the last
         # positive span so the client's two bound operands never coincide.
         level = sum(before >= threshold for threshold in PXP_THRESHOLDS[1:-1])
-        updates.append(dict(name=card['name'], describe=description, delta_xp=after - before, after_xp=after,
+        updates.append(dict(name=name, describe=description, delta_xp=after - before, after_xp=after,
                             prev_level=PXP_THRESHOLDS[level], next_level=PXP_THRESHOLDS[level + 1],
                             prev_level_index=level, next_level_index=level + 1))
     if updates:
-        progress['latest'] = {'receipt': receipt, 'sub_mode': record['sub_mode'], 'updates': updates}
+        progress['latest'] = {'receipt': receipt, 'sub_mode': mode, 'updates': updates}
+    return deltas
+
+
+def settle_parallel_pxp(state, record, won, receipt, *, card_ids=None):
+    awards = measure_parallel_awards(state, record, won, card_ids=card_ids)
+    deltas = apply_parallel_awards(state, awards, record['sub_mode'], receipt)
+    return awards, pxp_mission_credits(record['sub_mode'], deltas)
 
 
 def remember_parallel_cpu_quit(state, record, data):
@@ -2325,7 +3060,7 @@ def remember_parallel_cpu_quit(state, record, data):
 
 def parallel_levelups(_params):
     # 0xbfd870 builds skill/mode lists from info and independently stashes
-    # the xp_updates vector. Step 1 only emits batting XP progress rows.
+    # the xp_updates vector.
     progress = load_state(migrate_team=False).get('parallel_xp', {})
     response = ET.Element('response')
     mini_node(response, 'info', levelup_trophy=0, **dict.fromkeys(PXP_MODIFIER_FIELDS, '1.0'))
@@ -2403,6 +3138,7 @@ def xp_grant_answer(body):
 
 
 def game_create(params, game_data=None):
+    global _affinity_lineup
     # 0x9e8460: keep the empty completion reply for mlb_game.create.
     if game_data is None:
         return '<response/>'
@@ -2427,8 +3163,13 @@ def game_create(params, game_data=None):
         if receipt in state.get('team_affinity', {}).get('game_receipts', {}):
             return '<response/>'
         credits = mission_game_credits(state, record, won)
-        settle_batting_pxp(state, record, won, receipt)  # Before affinity consumes the setup roster.
-        affinity_record_game(state, receipt, affinity_upload_clubs(state, record), won)
+        awards, pxp_credits = settle_parallel_pxp(state, record, won, receipt)
+        credits.update(pxp_credits)
+        if active_title_content().team_affinity:
+            seasonal_affinity_record_game(state, receipt, record, awards)
+            _affinity_lineup = None
+        else:
+            affinity_record_game(state, receipt, affinity_upload_clubs(state, record), won)
         settle_game_missions(state, credits)
     else:
         clear_parallel_xp_result(state)
@@ -2837,6 +3578,52 @@ def all_cards():
     return _all_cards
 
 
+@lru_cache(maxsize=8)
+def read_unlock_setting(path):
+    """Use one setting for this Play session, even while the launcher edits the next one."""
+    try:
+        with open(path, 'rb') as file:
+            raw = file.read(4097)
+        if len(raw) > 4096:
+            return False
+        settings = json.loads(raw.decode('utf-8'), object_pairs_hook=tuple)
+    except (OSError, ValueError, RecursionError):
+        return False
+    return (isinstance(settings, tuple) and len(settings) == 1
+            and settings[0][0] == 'unlock_all_cards' and settings[0][1] is True)
+
+
+def unlock_all_cards_enabled():
+    return read_unlock_setting(os.path.join(WORK, 'unlock-all-cards.json'))
+
+
+_playable_cards_cache = None
+
+
+def playable_cards(state=None):
+    """Overlay ownership for play. Purchases, collections and spending still use cards()."""
+    if not unlock_all_cards_enabled():
+        return cards(state)
+    global _playable_cards_cache
+    state = load_state() if state is None else state
+    base = base_cards()
+    catalogue = all_cards()
+    gains = state.get('pack_shop', {}).get('gained_cards', {})
+    spent = state.get('exchanges', {}).get('spent_cards', {})
+    if _playable_cards_cache:
+        old_base, old_catalogue, old_gains, old_spent, rows = _playable_cards_cache
+        if old_base is base and old_catalogue is catalogue and old_gains == gains and old_spent == spent:
+            return rows
+    quantities = {card['uuid']: card['quantity'] for card in base}
+    rows = []
+    for card in catalogue:
+        uuid = card['uuid']
+        quantity = max(1, quantities.get(uuid, 0) + gains.get(uuid, 0) - spent.get(uuid, 0))
+        rows.append(card if card['quantity'] == quantity else dict(card, quantity=quantity))
+    _playable_cards_cache = base, catalogue, dict(gains), dict(spent), rows
+    return rows
+
+
 ACTIONSHOT_DIR = os.path.join(LAYOUT.base, 'PS4', 'UI', 'ART', 'ACTIONSHOTS')
 # Programme pictures on the disc are <prefix>_<TEAM>_[n_]LAST_FIRST (GUESS from the badge names)
 SERIES_SHOT = {'All-Star': 'AS', 'Rookie': 'RC', 'Veteran': 'V', 'Breakout': 'B', '2nd Half Heroes': '2H', 'Postseason': 'P'}
@@ -2911,7 +3698,7 @@ def card_attrs(c, *, parallels=None, **extra):
 
 def pick_squad(pool=None):
     """Best card per fielding position, then bench, five starters and eight relievers."""
-    pool = cards() if pool is None else pool
+    pool = playable_cards() if pool is None else pool
     used = set()
 
     def take(test, count=1):
@@ -2949,19 +3736,27 @@ def card_by_id(item_id):
     return None
 
 
+def squad_storage_key(key='squad'):
+    return 'unlocked_' + key if unlock_all_cards_enabled() else key
+
+
+def active_saved_squad(state):
+    return state.get(squad_storage_key()) or state.get('squad')
+
+
 def squad_state():
     state = load_state()
-    sq = state.get('squad')
+    sq = active_saved_squad(state)
     if not sq:
         sq = default_squad()
-        if sq['lineup']:
+        if sq['lineup'] and not unlock_all_cards_enabled():
             state['squad'] = sq
             save_state(state)
     return sq
 
 
-def default_squad():
-    lineup, dh, bench, starters, relief = pick_squad()
+def default_squad(pool=None):
+    lineup, dh, bench, starters, relief = pick_squad(pool)
     order = sorted(lineup + dh, key=lambda c: -(c.get('contact_right', 0) + c.get('power_right', 0)))
     return {'lineup': [[c['item_id'], 9 if c in dh else FIELD_NUMBER.get(c['display_position'], 0)] for c in order],
             'bench': [c['item_id'] for c in bench], 'starters': [c['item_id'] for c in starters],
@@ -2990,14 +3785,14 @@ def _place(sq, group, slot):
     return places if 0 <= slot < len(places) else None
 
 
-def assign_squad_slot(sq, q):
+def assign_squad_slot(sq, q, *, owned_ids=None):
     group = q.get('type', 'lineup')
     try:
         slot, new_id = int(q.get('slot', -1)), int(q.get('item_mlb_player_id', -1))
     except (TypeError, ValueError):
         slot, new_id = -1, -1
     places = _place(sq, group, slot)
-    if places is not None and card_by_id(new_id):
+    if places is not None and (owned_ids is None or new_id in owned_ids) and card_by_id(new_id):
         old = places[slot][0] if group == 'lineup' else places[slot]
         # a card that already sits elsewhere in the squad changes places with the one it replaces
         for g in GROUPS:
@@ -3016,10 +3811,12 @@ def assign_squad_slot(sq, q):
 
 
 def squad_assign(params):
+    from copy import deepcopy
     state = load_state()
-    sq = squad_state()
-    if assign_squad_slot(sq, params_of(params)):
-        state['squad'] = sq
+    sq = deepcopy(active_saved_squad(state) or squad_state())
+    owned_ids = {c['item_id'] for c in playable_cards(state) if c['quantity'] > 0}
+    if assign_squad_slot(sq, params_of(params), owned_ids=owned_ids):
+        state[squad_storage_key()] = sq
         save_state(state)
     return view_lineup(params)
 
@@ -3050,10 +3847,11 @@ def swap_squad_slots(sq, q):
 
 
 def squad_swap(params):
+    from copy import deepcopy
     state = load_state()
-    sq = squad_state()
+    sq = deepcopy(active_saved_squad(state) or squad_state())
     if swap_squad_slots(sq, params_of(params)):
-        state['squad'] = sq
+        state[squad_storage_key()] = sq
         save_state(state)
     return view_lineup(params)
 
@@ -3091,7 +3889,7 @@ def filter_inventory(params, squad=None, *, state=None):
         return own if kind == 0 else (second and not own if kind == 1 else not own and not second)
     seen, pool = set(), []
     state = load_state() if state is None else state
-    owned = cards(state)
+    owned = playable_cards(state)
     for c in owned:
         if wanted(c) and c['name'] not in seen:        # one card per person, the best first
             seen.add(c['name'])
@@ -3136,8 +3934,11 @@ def view_item(params):
                   player_stats='255', is_active='true', type_id=0, has_actionshot='false')
     state = load_state(migrate_team=False)
     uuid = c['uuid']
-    if not any(owned['uuid'] == uuid and owned['quantity'] > 0 for owned in cards(state)):
+    owned = next((row for row in playable_cards(state) if row['uuid'] == uuid and row['quantity'] > 0), None)
+    if owned is None:
         return '<response><player %s/></response>' % card_attrs(c, **fields)
+    if unlock_all_cards_enabled():
+        c = owned
     xp = mission_count(parallel_editions(state).get(uuid), 'xp')
     level = parallel_level(xp)
     attrs = card_attrs(c, parallels={uuid: level}, seq_level=level, **fields)
@@ -3194,9 +3995,10 @@ def rarity_counts(params, squad=None, team=None):
     # has_curr_szn_squad, SQUAD rows with name, ovr, is_active, is_season_squad, season_name.
     # SQUAD_OPTIONS.EXISTING / NEW must both exist: an IF_Q_ELSE_INT reads OPT.VCOUNT of both.
     rows = []
+    pool = playable_cards()
     for i, pos in enumerate(POSAMT_ORDER):
         amounts = [0] * 5
-        for c in cards():
+        for c in pool:
             if (c.get('is_hitter') if pos == 'DH' else c['display_position'] == pos):
                 amounts[RARITY_ID.get(c['rarity'], 0)] += 1
         rows.append('<position id="%d">%s</position>' % (i, ''.join('<rarity id="%d" amount="%d"/>' % (k, n) for k, n in enumerate(amounts))))
@@ -3312,8 +4114,9 @@ def captain_description(c):
 def captain_assignments(state=None):
     """{'position': card or None, 'pitcher': card or None} for the main squad; stale picks drop out."""
     state = load_state() if state is None else state
-    saved = state.get('captains') if isinstance(state.get('captains'), dict) else {}
-    owned = {c['item_id']: c for c in cards(state) if c['quantity'] > 0}
+    saved = state.get(squad_storage_key('captains'), state.get('captains'))
+    saved = saved if isinstance(saved, dict) else {}
+    owned = {c['item_id']: c for c in playable_cards(state) if c['quantity'] > 0}
     picks = {}
     for kind in ('position', 'pitcher'):
         c = owned.get(saved.get(kind))
@@ -3341,7 +4144,7 @@ def captain_status(c, squad):
 def captain_report(squad=None, state=None):
     """Active captains of the main squad: {kind: (card, status)}; a captain outside the squad gives no boost."""
     state = load_state() if state is None else state
-    squad = current_squad(state.get('squad') or None) if squad is None else squad
+    squad = current_squad(active_saved_squad(state) or None) if squad is None else squad
     report = {}
     for kind, c in captain_assignments(state).items():
         if c is not None:
@@ -3429,10 +4232,10 @@ def captains_info(params):
         return None
     kind = 'pitcher' if str(q.get('is_pitcher', 0)) == '1' else 'position'
     state = load_state()
-    squad = current_squad(state.get('squad') or None)
+    squad = current_squad(active_saved_squad(state) or None)
     picked = captain_ids(captain_report(squad, state))[kind]
     seen, rows = set(), []
-    owned = cards(state)
+    owned = playable_cards(state)
     parallels = owned_parallel_levels(state, owned)
     for c in owned:
         if c['quantity'] > 0 and is_captain_card(c) and captain_kind(c) == kind and c['item_id'] not in seen:
@@ -3452,7 +4255,7 @@ def captains_info2(params):
     if not is_captain_card(c):
         return None
     state = load_state()
-    squad = current_squad(state.get('squad') or None)
+    squad = current_squad(active_saved_squad(state) or None)
     picked = captain_ids(captain_report(squad, state))[captain_kind(c)]
     return '<response>%s</response>' % captain_row('captain', c, captain_status(c, squad), c['item_id'] == picked,
                                                      parallels=owned_parallel_levels(state))
@@ -3474,12 +4277,12 @@ def assign_captain(params):
     if item_id <= 0:
         saved = {'position': 0, 'pitcher': 0}
     else:
-        c = next((x for x in cards(state) if x['item_id'] == item_id and x['quantity'] > 0), None)
+        c = next((x for x in playable_cards(state) if x['item_id'] == item_id and x['quantity'] > 0), None)
         if not is_captain_card(c):
             return envelope(status=1, message='That card is not one of your Captains.'), 'refused'
         kind = captain_kind(c)
         saved[kind] = 0 if saved[kind] == item_id else item_id
-    state['captains'] = saved
+    state[squad_storage_key('captains')] = saved
     save_state(state)
     return envelope(view_lineup(params) or '<response/>'), 'made'
 
@@ -4674,8 +5477,9 @@ def showdown_record_result(state, run, query):
         profile['stubs'] = profile.get('stubs', 0) + moment.stubs
         profile['xp'] = min(0xffffffff, profile.get('xp', 0) + moment.xp)
     if won:  # The hub can also send false to close an unfinished attempt (0xc870e2).
-        affinity_record_game(state, f'showdown:{run["id"]}:{index}',
-                             affinity_squad_clubs(current_squad(run['squad'])), True)
+        if not active_title_content().team_affinity:
+            affinity_record_game(state, f'showdown:{run["id"]}:{index}',
+                                 affinity_squad_clubs(current_squad(run['squad'])), True)
         if run.get('definition') and moment.kind == 4:
             settle_linked_program_goal(state, run['definition']['program_credit'])
     # Store the result and wallet change together. The consumed index and the
@@ -5074,6 +5878,13 @@ def inventory_data():
     except Exception as e:
         print('inventory: disc indexes incomplete (%r)' % (e,))
     if CARD_SOURCE == 'disc' or (LAYOUT.install and not os.path.isdir(CATALOGUE_DIR)):
+        inv['catalogue']['Perk'] = [
+            dict(name=perk['name'], item_id=int(perk['id']), uuid=f"disc-perk-{perk['id']}",
+                 quantity=1, rarity=rarity)
+            for perk in inv['perks'].values()
+            for rarity, number in RARITY_ID.items()
+            if perk.get('rarity_id') == str(number) and perk['id'].isdigit()
+        ]
         _inventory = inv
         return inv
     try:
@@ -6054,7 +6865,7 @@ def player_collection(query, *, search=False):
     match = lambda c: supported and ((search and wanted == 'All Series') or c.get('series') == wanted)
     catalogue_count = sum(match(c) for c in all_cards())
     state = load_state()
-    owned = [c for c in cards(state) if c['quantity'] > 0 and match(c)]
+    owned = [c for c in playable_cards(state) if c['quantity'] > 0 and match(c)]
     collected = len(owned)
     page, pages = 0, 1
     if search:
@@ -6254,15 +7065,64 @@ def pitch_table():
     return _pitch_table
 
 
-def player_ratings(c):
+PITCHER_CORE_RATINGS = ('stamina', 'pitching_clutch', 'hits_per_bf', 'hr_per_bf', 'k_per_bf', 'bb_per_bf')
+PITCH_SKILL_CAP = 99
+PARALLEL_125_RATINGS = frozenset((*PITCHER_CORE_RATINGS, 'contact_left', 'contact_right', 'power_left',
+                                 'power_right', 'batting_clutch', 'plate_vision', 'plate_discipline'))
+
+
+def parallel_rating(value, level, cap=CAPTAIN_RATING_CAP):
+    base = max(0, int(value or 0))
+    return max(base, min(cap, base + level))
+
+
+def parallel_named_rating(key, value, level):
+    return parallel_rating(value, level, CAPTAIN_RATING_CAP if key in PARALLEL_125_RATINGS else 99)
+
+
+def parallel_playing_ratings_mode():
+    """The local playing roster uses one Parallel input, never both."""
+    try:
+        with open(os.path.join(WORK, 'parallel-rating-mode.json'), encoding='utf-8') as file:
+            raw = file.read(4097)
+        value = json.loads(raw) if len(raw) <= 4096 else None
+    except (OSError, ValueError, RecursionError):
+        value = None
+    return 'native' if isinstance(value, dict) and value.get('playing_ratings') == 'native' else 'server'
+
+
+def parallel_playing_card(card, level):
+    # Keep the rating scalars consistent with the vector. Do not alter the
+    # source edition, card overall, potential or pitch speed in mph.
+    fields = [key for key in PLR_ATTRIBUTES if key not in ('ovr', 'durability')]
+    fields.extend(('hitting_durability', 'fielding_durability'))
+    boosted = dict(card, **{key: parallel_named_rating(key, card.get(key), level) for key in fields})
+    if not card.get('is_hitter') or card['display_position'] in ('SP', 'RP', 'CP'):
+        for key in PITCHER_CORE_RATINGS:
+            boosted[key] = parallel_rating(card.get(key), level)
+        for key in ('pitch_control', 'pitch_velocity', 'pitch_movement'):
+            if card.get(key) is not None:
+                boosted[key] = parallel_rating(card[key], level, PITCH_SKILL_CAP)
+    return boosted
+
+
+def player_ratings(c, *, parallel=0):
     """The value text for RATING_NAMES."""
     byte = lambda v: max(0, min(255, int(v or 0)))
     get = lambda k: (c.get('hitting_durability') or c.get('fielding_durability')) if k == 'durability' else c.get(k)
-    ratings = [byte(get(k)) for k in PLR_ATTRIBUTES]
+    ratings = [parallel_named_rating(k, get(k), parallel) if parallel and k != 'ovr' else byte(get(k))
+               for k in PLR_ATTRIBUTES]
     native = c.get('disc_pitch')
     if native is not None:
         ratings[10] = byte(c.get('potential', c['ovr']))
-        return '|'.join(','.join(map(str, group)) for group in (ratings, native[:6], native[6:30]))
+        codes, pitcher = native[:6], native[6:30]
+        if parallel and (not c.get('is_hitter') or c.get('display_position') in ('SP', 'RP', 'CP')):
+            pitcher = [
+                parallel_rating(value, parallel) if i < 6 else
+                parallel_rating(value, parallel, PITCH_SKILL_CAP) if codes[(i - 6) % 6] != 255 else value
+                for i, value in enumerate(pitcher)
+            ]
+        return '|'.join(','.join(map(str, group)) for group in (ratings, codes, pitcher))
     main = ','.join(map(str, ratings))
     table = pitch_table()
     pitches = [x for x in (c.get('pitches') or []) if x.get('name') in table['types']][:6] if not c.get('is_hitter') else []
@@ -6273,12 +7133,13 @@ def player_ratings(c):
         code = table['types'][x['name']]
         slope, intercept = (table['velocity'].get(str(code)) or [0, 70])[:2]
         codes.append(code)
-        control.append(byte(x.get('control')))
-        velocity.append(max(1, min(99, int(round(slope * (x.get('speed') or 0) + intercept)))))
-        movement.append(byte(x.get('movement')))
+        velo = max(1, min(PITCH_SKILL_CAP, int(round(slope * (x.get('speed') or 0) + intercept))))
+        control.append(parallel_rating(x.get('control'), parallel, PITCH_SKILL_CAP) if parallel else byte(x.get('control')))
+        velocity.append(parallel_rating(velo, parallel, PITCH_SKILL_CAP) if parallel else velo)
+        movement.append(parallel_rating(x.get('movement'), parallel, PITCH_SKILL_CAP) if parallel else byte(x.get('movement')))
     pad = 6 - len(pitches)
     text = lambda vals, fill: ','.join(str(v) for v in vals + [fill] * pad)
-    head = ','.join(str(byte(c.get(k))) for k in ('stamina', 'pitching_clutch', 'hits_per_bf', 'hr_per_bf', 'k_per_bf', 'bb_per_bf'))
+    head = ','.join(str(parallel_rating(c.get(k), parallel) if parallel else byte(c.get(k))) for k in PITCHER_CORE_RATINGS)
     return '%s|%s|%s,%s,%s,%s' % (main, text(codes, 255), head, text(control, 0), text(velocity, 0), text(movement, 0))
 
 
@@ -6751,9 +7612,13 @@ def card_art():
     content = active_title_content()
     covers = tuple(row['cover'] for row in content.showdowns.values())
     showdown = authored_preview_art(UPDATE_DIR, covers, 'showdown', 521100)
+    program_faces = []
+    for row in content.programs.values():
+        program_faces.extend((row['texture_name'], row['texture_name_bkg']))
+        program_faces.extend(tier['reward'].get('texture') for tier in row['tiers'])
     program_textures = tuple(dict.fromkeys(
-        row[field] for row in content.programs.values() for field in ('texture_name', 'texture_name_bkg')
-        if row[field] and not Path(LAYOUT.base, 'CROSS', 'LIVE', row[field] + '.WEBP').is_file()))
+        name for name in program_faces if name and name not in packs.get('names', ())
+        and not Path(LAYOUT.base, 'CROSS', 'LIVE', name + '.WEBP').is_file()))
     program = authored_preview_art(UPDATE_DIR, program_textures, 'program', 521200)
     gear = equipment_faces()
     return {'entries': (players['entries'] + packs['entries'] + affinity['entries'] + conquest['entries']
@@ -6840,6 +7705,7 @@ def team_reply(squad, team, captains=None, *, parallels=None):
     team_id = team.get('id', DD_TEAM_ID)
     walkup = (player_art().get('walkup_prefixes', {})
               if team_id >= len(MLB_TEAMS) and not team.get('mini_cpu') else {})
+    use_server_boost = bool(parallels) and parallel_playing_ratings_mode() == 'server'
 
     def add(c, **slots):
         slots.update(player_fields(c))
@@ -6848,14 +7714,20 @@ def team_reply(squad, team, captains=None, *, parallels=None):
         slots.setdefault('pitching_role', 0)
         slots.setdefault('pitching_position', 0)
         slots.setdefault('role', {'SP': 0, 'RP': 1, 'CP': 2}.get(c['display_position'], 7))   # 0 starter, 1 reliever, 2 closer, 7 position player (seen in the game's own team records)
-        ratings = player_ratings(boosted_card(c, boosts.get(c['item_id'])))
+        level = parallels.get(c['uuid'], 0) if use_server_boost else 0
+        effective = boosted_card(c, boosts.get(c['item_id']))
+        ratings = player_ratings(effective, parallel=level) if level else player_ratings(effective)
+        if level:
+            c = parallel_playing_card(effective, level)
+            slots['seq_level'] = 0
         # is_active is compared with the word "true" (0x9d3fa0); "1" made the builder skip every player
         # player_stats follows stat_names (reader 0x9aebf0). The one name that matters to play is
         # ENERGY: it goes into the player's record (+0xc0); without it every pitcher starts at 0
         # ("pitcher out of energy" before the first pitch, run 81). 255 asks for the game's own
         # default by pitcher kind (tables at 0x2018c5c / 0x2018c68).
         c = {k: v for k, v in c.items() if not k.startswith('lineup_')}
-        players.append('<arena_player %s/>' % card_attrs(c, parallels=parallels, is_active='true', player_attributes=ratings,
+        players.append('<arena_player %s/>' % card_attrs(c, parallels=None if use_server_boost else parallels,
+                                                         is_active='true', player_attributes=ratings,
                                                          player_appearances=player_looks(c), player_stats='255', **slots))
     for c in order:
         code = c.get('lineup_pos', 9 if c in dh else FIELD_NUMBER.get(c['display_position'], 0))
@@ -6976,6 +7848,9 @@ CARD_BATTING_WORDS = {
 CARD_PITCHING_WORDS = {
     'pitching_outs': 19, 'hits_allowed': 4, 'runs_allowed': 8, 'earned_runs_allowed': 9,
     'walks_allowed': 41, 'pitching_strikeouts': 12,
+    # Compact P offsets 0x2c, 0x30, 0x31, 0x33 and 0x39. Matched against the
+    # individual box and decision rows in the Baltimore and Conquest captures.
+    'pitching_appearances': 22, 'complete_games': 26, 'shutouts': 27, 'pitching_wins': 29, 'saves': 35,
 }
 
 
@@ -7107,6 +7982,12 @@ def decode_game_stats(r, aggregates, ids, record):
                         del card[lane][field]
                 else:
                     team[field] = compact
+            # Saves have no team aggregate. A finished game can have one
+            # credited reliever, and settlement additionally requires a win.
+            pitches = [card['pitching'] for card in cards.values()]
+            if (all(line['saves'] in (0, 1) and (not line['saves'] or line['pitching_appearances'] == 1)
+                    for line in pitches) and (saves := sum(line['saves'] for line in pitches)) <= 1):
+                team['saves'] = saves
             sides[side] = {'team': team, 'cards': cards}
         if r.left():
             raise ValueError('unexpected bytes after game stat records')
@@ -7425,9 +8306,13 @@ def mini_run(state, query, *, allow_create=False):
     ids = [int(query[key]) for key in ('run_id', 'mini_run_id') if key in query]
     if run is None and allow_create and not any(ids):
         from copy import deepcopy
+        unlocked = unlock_all_cards_enabled()
+        real_squad = state.get('squad') or (default_squad(cards(state)) if unlocked else default_squad())
         run = {'version': 1, 'id': 1, 'clubs': list(MINI_CLUBS), 'days': mini_days(),
-               'squad': deepcopy(state.get('squad') or default_squad()),
+               'squad': deepcopy(real_squad),
                'results': [], 'uploads': {}, 'pending': None, 'seconds': 0}
+        if unlocked and state.get('unlocked_squad'):
+            run['unlocked_squad'] = deepcopy(state['unlocked_squad'])
         state['mini_season'] = run
         return run, True
     if run is None:
@@ -7440,7 +8325,7 @@ def mini_run(state, query, *, allow_create=False):
 
 
 def mini_roster(run, slot):
-    squad = current_squad(run['squad']) if slot == 0 else cpu_squad(run['clubs'][slot - 1])
+    squad = current_squad(active_saved_squad(run)) if slot == 0 else cpu_squad(run['clubs'][slot - 1])
     lineup, dh, bench, starters, relief = squad
     batters, pitchers = lineup + dh + bench, starters + relief
     if (tuple(map(len, squad)) != (8, 1, 4, 5, 8)
@@ -7601,6 +8486,8 @@ def mini_restart(state, old):
     state.setdefault('mini_season_archive', {})[str(old['id'])] = old
     run = {'version': 1, 'id': old['id'] + 1, 'clubs': list(old['clubs']), 'days': mini_days(),
            'squad': deepcopy(old['squad']), 'results': [], 'uploads': {}, 'pending': None, 'seconds': 0}
+    if 'unlocked_squad' in old:
+        run['unlocked_squad'] = deepcopy(old['unlocked_squad'])
     state['mini_season'] = run
     return run
 
@@ -7798,7 +8685,8 @@ def mini_awards(run):
 
 def mini_start_game(state, run):
     day, slots = mini_fixture(run)
-    if run['pending'] is None:
+    unlocked = unlock_all_cards_enabled()
+    if run['pending'] is None or run['pending'].get('unlock_all_cards', False) != unlocked:
         teams, card_ids = {}, {}
         for side, slot in slots.items():
             card_ids[side] = [card['item_id'] for group in mini_roster(run, slot) for card in group]
@@ -7807,6 +8695,8 @@ def mini_start_game(state, run):
             else:
                 teams[side] = summary_local_team(state)
         run['pending'] = {'day': day, 'teams': teams, 'card_ids': card_ids, 'started_at': int(time.time())}
+        if unlocked:
+            run['pending']['unlock_all_cards'] = True
         save_state(state)
     return mini_ack(run, cur_game=day)
 
@@ -7894,12 +8784,17 @@ def mini_finish(state, run, data):
         profile['games'] = profile.get('games', 0) + 1
         profile['stubs'] = profile.get('stubs', 0) + STUBS_PER_GAME
         cards = pending.get('card_ids', {}).get(local, ())
-        match_ids = cards or squad_ids(run['squad'])
-        settle_batting_pxp(state, record, won, digest, card_ids=match_ids)
-        clubs = (affinity_card_clubs(card_by_id(item_id) for item_id in cards[:9] + cards[13:18])
-                 if len(cards) == 26 else affinity_squad_clubs(current_squad(run['squad'])))
-        affinity_record_game(state, digest, clubs, won)
-        settle_game_missions(state, mission_game_credits(state, record, won, card_ids=match_ids))
+        match_ids = cards or squad_ids(active_saved_squad(run))
+        awards, pxp_credits = settle_parallel_pxp(state, record, won, digest, card_ids=match_ids)
+        if active_title_content().team_affinity:
+            seasonal_affinity_record_game(state, digest, record, awards, card_ids=match_ids)
+        else:
+            clubs = (affinity_card_clubs(card_by_id(item_id) for item_id in cards[:9] + cards[13:18])
+                     if len(cards) == 26 else affinity_squad_clubs(current_squad(active_saved_squad(run))))
+            affinity_record_game(state, digest, clubs, won)
+        credits = mission_game_credits(state, record, won, card_ids=match_ids)
+        credits.update(pxp_credits)
+        settle_game_missions(state, credits)
         mini_advance_league(state, run)
     else:
         clear_parallel_xp_result(state)
@@ -8033,7 +8928,7 @@ def mini_shared(name, state, run, query, params):
         raise MiniSeasonRefusal('Only the player squad is editable in Mini Seasons.')
     if name in ('arena_squad.view_inventory', 'arena_squad.generate_lineup'):
         return mini_ack(run)
-    squad = run['squad']
+    squad = active_saved_squad(run)
     if name in ('arena_squad.filter_inventory', MINI_PREFIX + 'filtered_players'):
         reply = filter_inventory(params, squad, state=state)
         if ET.fromstring(reply).find('arena_cards/arena_card') is None:
@@ -8047,10 +8942,18 @@ def mini_shared(name, state, run, query, params):
     if name in ('arena_squad.assign_player', 'arena_squad.swap_player', 'arena_squad.swap_position'):
         if run['pending'] is not None:
             raise MiniSeasonRefusal('Finish the current Mini Seasons game before editing its squad.')
-        edit = assign_squad_slot if name.endswith('assign_player') else swap_squad_slots
-        if not edit(squad, query):
+        from copy import deepcopy
+        squad = deepcopy(squad)
+        if name.endswith('assign_player'):
+            owned_ids = {card['item_id'] for card in playable_cards(state) if card['quantity'] > 0}
+            changed = assign_squad_slot(squad, query, owned_ids=owned_ids)
+        else:
+            changed = swap_squad_slots(squad, query)
+        if not changed:
             raise MiniSeasonRefusal('Invalid Mini Seasons lineup change.')
-        reply = lineup_reply(mini_roster(run, 0), team, mini=True)
+        key = squad_storage_key()
+        reply = lineup_reply(mini_roster(dict(run, **{key: squad}), 0), team, mini=True)
+        run[key] = squad
         save_state(state)
         return reply
     raise MiniSeasonRefusal('This Mini Seasons request is unavailable on the local server.')
@@ -8176,6 +9079,7 @@ def live_module():
             module.active_title_content()
             module.COLLECTION, module.ROSTER_SOURCE = COLLECTION, ROSTER_SOURCE
             module.CARD_SOURCE = CARD_SOURCE
+            module.read_unlock_setting = read_unlock_setting
             if LAYOUT.install or CARD_SOURCE == 'disc':
                 module.STATE_FILE = STATE_FILE
             if LAYOUT.install:
@@ -8217,6 +9121,8 @@ class PackDraw(NamedTuple):
     item_id: int = 0
     minimum_rarity: str = ''
     minimum_ovr: int = 0
+    maximum_rarity: str = ''
+    rarity_odds: tuple = ()
 
 
 class ShopPack(NamedTuple):
@@ -8231,29 +9137,56 @@ class ShopPack(NamedTuple):
     description: str = ''
     legacy_chase: bool = False
     allow_partial_features: bool = False
+    featured_minimum_ovr: int = 0
 
 
-# Names, prices and contents are local inventions except where the disc supplies a label.
-# The shared pack face uses the listed art independently of these type-4 reward rules.
+class ShopBundle(NamedTuple):
+    name: str
+    texture: str
+    count: int
+    bonus: int
+
+
+# Each pair gives a cumulative 1-in-N chance for that tier or better.
+SHOW_ODDS = (('Diamond', 50), ('Gold', 10), ('Silver', 3))
+SILVER_TOPPER_ODDS = (('Diamond', 50), ('Gold', 10), ('Silver', 1))
+GOLD_TOPPER_ODDS = (('Diamond', 25), ('Gold', 1))
+CHASE_TWO_ODDS = (('Diamond', 2), ('Gold', 1))
+SHOW_PACK = 510001
+SHOW_PACK_PROGRAM_NAME = 'Standard Player Pack'  # Preserve the program preview wire labels.
+
 SHOP_PACKS = {
     # Zero cost marks reward-only packs. They are granted directly and use the regular opener.
     510060: ShopPack('Bronze Exchange Player Pack', 'PACK_EXCHANGE_BRONZE', 'base', 0, (PackDraw(1, rarity='Bronze'),)),
     510061: ShopPack('Silver Exchange Player Pack', 'PACK_EXCHANGE_SILVER', 'base', 0, (PackDraw(1, rarity='Silver'),)),
     510062: ShopPack('Gold Exchange Player Pack', 'PACK_EXCHANGE_GOLD', 'base', 0, (PackDraw(1, rarity='Gold'),)),
-    510001: ShopPack('Standard Player Pack', 'PACK_THESHOW', 'base', 200, (PackDraw(4),)),
-    510002: ShopPack('Player Pack Bundle', 'PACK_SCOUTINGREPORT', 'base', 350, (PackDraw(8),)),
+    SHOW_PACK: ShopPack('The Show Pack', 'PACK_THESHOW', 'base', 120,
+                        (PackDraw(3, maximum_rarity='Bronze'), PackDraw(1, rarity_odds=SHOW_ODDS),
+                         PackDraw(1, kind='Assorted')),
+                        description='Contains 4 player items and 1 assorted item.'),
+    # Keep the original pack ID openable for existing inventory and WBC rewards.
+    510002: ShopPack('Player Pack Bundle', 'PACK_SCOUTINGREPORT', 'base', 0, (PackDraw(8),)),
+    510063: ShopPack('Silver or Better Player Pack', 'PACK_TOPPERS_SILVER', 'base', 0,
+                     (PackDraw(1, minimum_rarity='Silver', rarity_odds=SILVER_TOPPER_ODDS),),
+                     description='Contains 1 Silver or better player item.'),
+    510064: ShopPack('Gold or Better Player Pack', 'PACK_TOPPERS_GOLD', 'base', 0,
+                     (PackDraw(1, minimum_rarity='Gold', rarity_odds=GOLD_TOPPER_ODDS),),
+                     description='Contains 1 Gold or better player item.'),
+    510065: ShopPack('Diamond Chase Pack', 'PACK_CHASE01', 'base', 0,
+                     (PackDraw(1, rarity='Diamond'),),
+                     description='Contains 1 Diamond player item. Odds: 1:1 85+ Diamond.'),
     510003: ShopPack('Diamond Headliner Pack', 'PACK_HEADLINERS_01', 'base', 900,
                      (PackDraw(3), PackDraw(1, rarity='Diamond'))),
-    510004: ShopPack('Bronze Player Pack', 'PACK_THESHOW', 'base', 250, (PackDraw(2), PackDraw(1, rarity='Bronze'))),
-    510005: ShopPack('Silver Player Pack', 'PACK_BALLINHABIT', 'base', 350, (PackDraw(2), PackDraw(1, rarity='Silver'))),
-    510006: ShopPack('Gold Player Pack', 'PACK_BALLINCONTROL', 'base', 500, (PackDraw(2), PackDraw(1, rarity='Gold'))),
-    510010: ShopPack('AL East Live Pack', 'PACK_ALEAST_LIVE', 'base', 250, (PackDraw(4, teams=('BAL', 'BOS', 'NYY', 'TB', 'TOR')),)),
-    510011: ShopPack('AL Central Live Pack', 'PACK_ALCENTRAL_LIVE', 'base', 250, (PackDraw(4, teams=('CHW', 'CLE', 'DET', 'KC', 'MIN')),)),
-    510012: ShopPack('AL West Live Pack', 'PACK_ALWEST_LIVE', 'base', 250, (PackDraw(4, teams=('HOU', 'LAA', 'OAK', 'SEA', 'TEX')),)),
-    510013: ShopPack('NL East Live Pack', 'PACK_NLEAST_LIVE', 'base', 250, (PackDraw(4, teams=('ATL', 'MIA', 'NYM', 'PHI', 'WAS')),)),
-    510014: ShopPack('NL Central Live Pack', 'PACK_NLCENTRAL_LIVE', 'base', 250, (PackDraw(4, teams=('CHC', 'CIN', 'MIL', 'PIT', 'STL')),)),
-    510015: ShopPack('NL West Live Pack', 'PACK_NLWEST_LIVE', 'base', 250, (PackDraw(4, teams=('ARI', 'COL', 'LAD', 'SD', 'SF')),)),
-    510020: ShopPack('All-Star Pack', 'PACK_RANKEDSEASON_AS', 'base', 450, (PackDraw(2, ('All-Star', 'All-Star Game', '2023 All-Star')),)),
+    510004: ShopPack('Bronze Player Pack', 'PACK_THESHOW', 'base', 85, (PackDraw(2), PackDraw(1, rarity='Bronze'))),
+    510005: ShopPack('Silver Player Pack', 'PACK_BALLINHABIT', 'base', 130, (PackDraw(2), PackDraw(1, rarity='Silver'))),
+    510006: ShopPack('Gold Player Pack', 'PACK_BALLINCONTROL', 'base', 280, (PackDraw(2), PackDraw(1, rarity='Gold'))),
+    510010: ShopPack('AL East Live Pack', 'PACK_ALEAST_LIVE', 'base', 160, (PackDraw(4, teams=('BAL', 'BOS', 'NYY', 'TB', 'TOR')),)),
+    510011: ShopPack('AL Central Live Pack', 'PACK_ALCENTRAL_LIVE', 'base', 160, (PackDraw(4, teams=('CHW', 'CLE', 'DET', 'KC', 'MIN')),)),
+    510012: ShopPack('AL West Live Pack', 'PACK_ALWEST_LIVE', 'base', 160, (PackDraw(4, teams=('HOU', 'LAA', 'OAK', 'SEA', 'TEX')),)),
+    510013: ShopPack('NL East Live Pack', 'PACK_NLEAST_LIVE', 'base', 160, (PackDraw(4, teams=('ATL', 'MIA', 'NYM', 'PHI', 'WAS')),)),
+    510014: ShopPack('NL Central Live Pack', 'PACK_NLCENTRAL_LIVE', 'base', 160, (PackDraw(4, teams=('CHC', 'CIN', 'MIL', 'PIT', 'STL')),)),
+    510015: ShopPack('NL West Live Pack', 'PACK_NLWEST_LIVE', 'base', 160, (PackDraw(4, teams=('ARI', 'COL', 'LAD', 'SD', 'SF')),)),
+    510020: ShopPack('All-Star Pack', 'PACK_RANKEDSEASON_AS', 'base', 220, (PackDraw(2, ('All-Star', 'All-Star Game', '2023 All-Star')),)),
     510021: ShopPack('Awards Pack', 'PACK_CAREERTRIBUTE', 'update', 450, (PackDraw(2, ('Awards',)),)),
     510022: ShopPack('Milestone Pack', 'PACK_DIAMONDDREAM', 'base', 450, (PackDraw(2, ('Milestone',)),)),
     510023: ShopPack('Signature Pack', 'PACK_HEADLINERS_01', 'base', 450, (PackDraw(2, ('Signature',)),)),
@@ -8267,11 +9200,17 @@ SHOP_PACKS = {
     510030: ShopPack('Kaiju Pack', 'PACK_THESHOW_KAIJUTAKEOVER', 'update', 450, (PackDraw(2, ('Kaiju',)),)),
     510031: ShopPack('Home Run Derby Pack', 'PACK_BALLINCONTROL', 'base', 450, (PackDraw(2, ('Home Run Derby', '2023 Home Run Derby')),)),
     510040: ShopPack('Diamond Duos Pack', 'PACK_DIAMONDDUOS_01', 'update', 1200, (PackDraw(2, rarity='Diamond'),)),
-    510041: ShopPack('Chase Pack', 'PACK_CHASE01', 'base', 450, (PackDraw(4),),
+    510041: ShopPack('Chase Pack', 'PACK_CHASE01', 'base', 260, (PackDraw(4),),
                      featured_chance=.05, legacy_chase=True),
-    510042: ShopPack('Equipment Pack', 'PACK_EQUIPMENT', 'base', 200, (PackDraw(2, kind='Equipment'),)),
-    510043: ShopPack('Unlockables Pack', 'PACK_UNLOCKABLE', 'base', 200, (PackDraw(2, kind='Unlockable'),)),
-    510044: ShopPack('Jumbo Player Bundle', 'PACK_THESHOW_JUMBO', 'update', 500, (PackDraw(12),)),
+    510042: ShopPack('Equipment Pack', 'PACK_EQUIPMENT', 'base', 90, (PackDraw(2, kind='Equipment'),)),
+    510043: ShopPack('Unlockables Pack', 'PACK_UNLOCKABLE', 'base', 70, (PackDraw(2, kind='Unlockable'),)),
+    510044: ShopPack('Jumbo Player Bundle', 'PACK_THESHOW_JUMBO', 'update', 440, (PackDraw(12),)),
+}
+
+SHOP_BUNDLES = {
+    510051: ShopBundle('The Show 10 Packs', 'PACK_THESHOW', 10, 510063),
+    510052: ShopBundle('The Show 20 Packs', 'PACK_THESHOW', 20, 510064),
+    510053: ShopBundle('The Show 50 Packs', 'PACK_THESHOW', 50, 510065),
 }
 
 # Featured UUIDs and pack art are from the event-pack study. The odds and
@@ -8355,22 +9294,36 @@ _PENNANT_UUIDS = (
 
 for _number, _uuid in enumerate(_CHASE_UUIDS, 1):
     _minimum = 'Gold' if _number == 2 else 'Diamond'
+    _odds = CHASE_TWO_ODDS if _number == 2 else (('Diamond', 1),)
     SHOP_PACKS[511000 + _number] = ShopPack(
-        f'Chase Pack {_number}', f'PACK_CHASE{_number:02d}', 'base' if _number <= 6 else 'update', 1000,
-        (PackDraw(2), PackDraw(1, minimum_rarity=_minimum), PackDraw(1)),
+        f'Chase Pack {_number}', f'PACK_CHASE{_number:02d}', 'base' if _number <= 6 else 'update',
+        500 if _number == 2 else 900,
+        (PackDraw(1, minimum_rarity=_minimum, rarity_odds=_odds),),
         (_uuid,), .05,
-        description=f'Four players, including a guaranteed {_minimum} or better. '
-                    '5% chance the last player is {featured}.',
+        description=f'Contains 1 {_minimum} or better player item. 5% chance of {{featured}}.',
     )
+SHOP_PACKS[511105] = ShopPack(
+    'Chase Season 5 Pack', 'PACK_CHASE_SEASON5', 'update', 0,
+    (PackDraw(1, rarity='Diamond'),), _CHASE_UUIDS[-2:], .05,
+    description='Contains 1 Diamond player. Local 5% chance of {featured}.', allow_partial_features=True,
+)
 for _number, _pair in enumerate(_DUOS_UUIDS, 1):
     SHOP_PACKS[512000 + _number] = ShopPack(
-        f'Diamond Duos {_number:02d}', f'PACK_DIAMONDDUOS_{_number:02d}', 'update', 1500,
+        f'Diamond Duos {_number:02d}', f'PACK_DIAMONDDUOS_{_number:02d}', 'update', 1050,
         (PackDraw(3), PackDraw(1, rarity='Diamond')), _pair, .10,
         description='Three players plus a Diamond. 10% chance the Diamond is {featured}.',
         allow_partial_features=True,
     )
+for _product, _first, _last in ((512041, 2, 25), (512042, 26, 40)):
+    SHOP_PACKS[_product] = ShopPack(
+        f'Diamond Duos Guaranteed Set {_first}-{_last}', 'PACK_DUOS_GUARANTEE', 'update', 2500,
+        (PackDraw(1, rarity='Diamond'),),
+        tuple(uuid for pair in _DUOS_UUIDS[_first - 1:_last] for uuid in pair), 1,
+        description=f'Contains 1 Diamond Duos Featured Player ({_first}-{_last}). Odds: 1:1 99 OVR.',
+        allow_partial_features=True, featured_minimum_ovr=99,
+    )
 SHOP_PACKS.update({
-    513001: ShopPack('Kaiju Takeover Show Pack', 'PACK_THESHOW_KAIJUTAKEOVER', 'update', 450,
+    513001: ShopPack('Kaiju Takeover Show Pack', 'PACK_THESHOW_KAIJUTAKEOVER', 'update', 170,
                      (PackDraw(4), PackDraw(1, kind='Equipment')), _KAIJU_UUIDS, .01, -2,
                      'Four players and one equipment item. 1% chance the last player is a featured Kaiju card.',
                      allow_partial_features=True),
@@ -8392,7 +9345,7 @@ SHOP_PACKS.update({
                       '14258a58715128abae1cb7d513da1ef4', '68c65932168bf9c9824ce31801b6596c'), 1,
                      description='Local Career Tribute pack. Three Live Series players and one of six '
                                  'equally likely 99 OVR headliners: {featured}.'),
-    513006: ShopPack('Diamond Topper', 'PACK_DIAMOND_TOPPER', 'update', 900,
+    513006: ShopPack('Diamond Topper', 'PACK_DIAMOND_TOPPER', 'update', 750,
                      (PackDraw(1, rarity='Diamond'),),
                      description='Local Diamond Topper. One random Live Series Diamond.'),
     513007: ShopPack('90+ Live Series Pack', 'PACK_LIVE_DIAMOND_90+', 'update', 1000,
@@ -8422,7 +9375,8 @@ def imported_pack_cards():
 
 
 def pack_featured_cards(pack, imported):
-    available = tuple(imported[uuid] for uuid in pack.featured_uuids if uuid in imported)
+    available = tuple(imported[uuid] for uuid in pack.featured_uuids
+                      if uuid in imported and imported[uuid]['ovr'] >= pack.featured_minimum_ovr)
     if len(available) == len(pack.featured_uuids) or (available and pack.allow_partial_features):
         return available
     return None
@@ -8464,6 +9418,8 @@ def reward_choice_description(pack):
     if any(available.keys().isdisjoint(row['options']) for row in pack['rounds']):
         return f'{description} {CHOICE_IMPORT_REQUIRED}'
     if options - available.keys():
+        if pack.get('exact_pool'):
+            return f'{description} This install offers the available program cards.'
         return f'{description} This install offers fewer program cards. Live Series substitutes may be offered to fill the selection.'
     return description
 
@@ -8477,7 +9433,7 @@ def resolve_reward_choice_rounds(pack, catalogue):
         if not options:
             raise ShopRefusal(CHOICE_IMPORT_REQUIRED)
         desired = min(len(row['options']), row['picks'] + 1)
-        if len(options) < desired:
+        if len(options) < desired and not pack.get('exact_pool'):
             if live is None:
                 live_ids = {card['item_id'] for card in all_cards() if card.get('series') in ('Live', 'Live Series')}
                 live = choice_card_catalogue(live_ids, allow_live=True)
@@ -8489,6 +9445,18 @@ def resolve_reward_choice_rounds(pack, catalogue):
             catalogue.update((item, live[item]) for item in fillers)
         rounds.append({'picks': min(row['picks'], len(options)), 'options': options})
     return rounds
+
+
+def choice_pack_offer(pack, *, require_complete=True):
+    options = choice_pack_options(pack)
+    catalogue = choice_card_catalogue(options)
+    if pack.get('partial_pool'):
+        rounds = resolve_reward_choice_rounds(pack, catalogue)
+    elif require_complete and not options <= catalogue.keys():
+        raise ShopRefusal('Install the required card catalogue and art to open this choice pack.')
+    else:
+        rounds = pack['rounds']
+    return rounds, catalogue
 
 
 @lru_cache(maxsize=2)
@@ -8549,10 +9517,16 @@ def shop_number(query, key):
 def shop_description(pack, rewards):
     if pack.description:
         featured = rewards[1] if rewards else ()
-        label = ' or '.join(card['name'].strip() for card in featured) or 'a featured player'
-        description = pack.description.format(featured=label)
+        description = pack.description
+        if '{featured}' in description:
+            label = ' or '.join(card['name'].strip() for card in featured) or 'a featured player'
+            description = description.format(featured=label.rstrip('.'))
         if featured and pack.allow_partial_features and len(featured) < len(pack.featured_uuids):
             description += f' Local pool: {len(featured)} of {len(pack.featured_uuids)} featured editions available.'
+        odds = next((draw.rarity_odds for draw in pack.draws if draw.rarity_odds), ())
+        if odds:
+            labels = {'Diamond': '85+ Diamond', 'Gold': '80+ Gold or better', 'Silver': '75+ Silver or better'}
+            description += ' Odds: ' + ', '.join(f'1:{ratio} {labels[tier]}' for tier, ratio in odds) + '.'
         return description
     first = pack.draws[0]
     count = sum(draw.count for draw in pack.draws)
@@ -8586,6 +9560,11 @@ def shop_picture_available(pack):
     return os.path.isfile(os.path.join(LAYOUT.base, 'CROSS', 'LIVE', pack.texture + '.WEBP'))
 
 
+def shop_bundle_available(bundle, imported=None):
+    return all(shop_picture_available(SHOP_PACKS[pid]) and shop_reward_pools(SHOP_PACKS[pid], imported) is not None
+               for pid in (SHOW_PACK, bundle.bonus))
+
+
 def shop_product(parent, product_id, name, description, texture, cost):
     product = mini_node(parent, 'product', id=product_id, name=name, description=description,
                         texture_name=texture, cost=cost, display_cost=cost,
@@ -8610,6 +9589,12 @@ def shop_shelf(product_id=0):
         if rewards is None:
             continue
         shop_product(products, pid, pack.name, shop_description(pack, rewards), pack.texture, pack.cost)
+    for pid, bundle in SHOP_BUNDLES.items():
+        if (not product_id or product_id == pid) and shop_bundle_available(bundle, imported):
+            show, bonus = SHOP_PACKS[SHOW_PACK], SHOP_PACKS[bundle.bonus]
+            description = f'Contains {bundle.count} The Show packs and 1 {bonus.name}.'
+            description += f' Topper: {shop_description(bonus, None)}'
+            shop_product(products, pid, bundle.name, description, bundle.texture, bundle.count * show.cost)
     choices = [pack for pid, pack in choice_pack_products().items()
                if pack['cost'] > 0 and (not product_id or pid == product_id)]
     if choices:
@@ -8656,6 +9641,17 @@ def shop_owned_packs(shop):
     return ET.tostring(response, encoding='unicode')
 
 
+def shop_item_pool(kind, inv):
+    return [
+        item for item in inv['catalogue'].get(kind, [])
+        if (kind != 'Equipment' or _item_key(item.get('brand', '')) in inv['brands'])
+        and (kind != 'Unlockable' or str(item.get('sub_category_id')) in {
+            '10000', '10001', '10002', '10003', '10004', '10005', '10006', '10007', '10008'
+        })
+        and inventory_item(kind, item) is not None
+    ]
+
+
 def shop_reward_pools(pack, imported=None):
     pools = []
     featured = ()
@@ -8672,6 +9668,7 @@ def shop_reward_pools(pack, imported=None):
                 and card['roster_player_id'] > 0 and card['team_id'] >= 0 and card['display_position'] in FIELD_NUMBER
                 and (not draw.rarity or card['rarity'] == draw.rarity)
                 and (not draw.minimum_rarity or RARITY_ID[card['rarity']] >= RARITY_ID[draw.minimum_rarity])
+                and (not draw.maximum_rarity or RARITY_ID[card['rarity']] <= RARITY_ID[draw.maximum_rarity])
                 and (not draw.minimum_ovr or card['ovr'] >= draw.minimum_ovr)
                 and (not draw.item_id or card['item_id'] == draw.item_id)
                 and (not draw.teams or aliases.get(card.get('team_short_name'), card.get('team_short_name')) in draw.teams)
@@ -8681,18 +9678,16 @@ def shop_reward_pools(pack, imported=None):
                 if not featured:
                     return None
                 pool = [c for c in pool if c['uuid'] not in LIVE_OHTANI_UUIDS]
-        else:
+            if draw.rarity_odds:
+                tiers = {card['rarity'] for card in pool}
+                advertised = {tier for tier, _ in draw.rarity_odds}
+                if advertised - tiers or (draw.rarity_odds[-1][1] != 1 and not tiers - advertised):
+                    return None
+        elif draw.kind == 'Assorted':
             inv = inventory_data()
-            pool = []
-            for item in inv['catalogue'].get(draw.kind, []):
-                if draw.kind == 'Equipment' and _item_key(item.get('brand', '')) not in inv['brands']:
-                    continue
-                if draw.kind == 'Unlockable' and str(item.get('sub_category_id')) not in {
-                    '10000', '10001', '10002', '10003', '10004', '10005', '10006', '10007', '10008'
-                }:
-                    continue
-                if inventory_item(draw.kind, item) is not None:
-                    pool.append(item)
+            pool = [(kind, item) for kind in ('Equipment', 'Unlockable', 'Perk') for item in shop_item_pool(kind, inv)]
+        else:
+            pool = shop_item_pool(draw.kind, inventory_data())
         if len(pool) < (draw.count if draw.rarity else 1):
             return None
         pools.append(pool)
@@ -8701,19 +9696,33 @@ def shop_reward_pools(pack, imported=None):
 
 def shop_draw_rewards(pack, pools, featured):
     rewards = []
+    featured_chance = pack.featured_chance
     for draw, pool in zip(pack.draws, pools):
+        if draw.kind == 'Assorted':
+            rewards.extend(PACK_RANDOM.choices(pool, k=draw.count))
+            continue
         if draw.rarity:
             selection = PACK_RANDOM.sample(pool, draw.count)
         elif draw.kind == 'Player':
             by_rarity = {}
             for card in pool:
                 by_rarity.setdefault(card['rarity'], []).append(card)
-            tiers = PACK_RANDOM.choices(list(by_rarity), [PACK_WEIGHTS[r] for r in by_rarity], k=draw.count)
+            if draw.rarity_odds:
+                roll = PACK_RANDOM.random()
+                hit = next((tier for tier, ratio in draw.rarity_odds if roll < 1 / ratio), None)
+                fallback = by_rarity.keys() - {tier for tier, _ in draw.rarity_odds}
+                tiers = [hit] if hit else PACK_RANDOM.choices(
+                    [tier for tier in by_rarity if tier in fallback],
+                    [PACK_WEIGHTS[tier] for tier in by_rarity if tier in fallback], k=1)
+                if featured:  # The featured card occupies part of the Diamond hit in a one-player Chase.
+                    featured_chance = pack.featured_chance * draw.rarity_odds[0][1] if hit == 'Diamond' else 0
+            else:
+                tiers = PACK_RANDOM.choices(list(by_rarity), [PACK_WEIGHTS[r] for r in by_rarity], k=draw.count)
             selection = [PACK_RANDOM.choice(by_rarity[tier]) for tier in tiers]
         else:
             selection = PACK_RANDOM.choices(pool, k=draw.count)
         rewards.extend((draw.kind, item) for item in selection)
-    if featured and (pack.featured_chance == 1 or PACK_RANDOM.random() < pack.featured_chance):
+    if featured and (featured_chance == 1 or featured_chance and PACK_RANDOM.random() < featured_chance):
         card = featured[0] if len(featured) == 1 else PACK_RANDOM.choice(featured)
         rewards[pack.featured_slot] = ('Player', card)
     return rewards
@@ -8740,11 +9749,21 @@ def grant_owned_pack(shop, product_id):
     shop.setdefault('owned_packs', {})[str(item_id)] = product_id
 
 
+def grant_shop_bundle(shop, bundle):
+    for _ in range(bundle.count):
+        grant_owned_pack(shop, SHOW_PACK)
+    grant_owned_pack(shop, bundle.bonus)
+
+
 def shop_buy(state, shop, query):
     pid = shop_number(query, 'product_id')
     pack = SHOP_PACKS.get(pid)
-    choice = None if pack else choice_pack_products().get(pid)
-    cost = pack.cost if pack else choice['cost'] if choice else 0
+    bundle = SHOP_BUNDLES.get(pid)
+    choice = None if pack or bundle else choice_pack_products().get(pid)
+    if bundle:
+        cost = bundle.count * SHOP_PACKS[SHOW_PACK].cost
+    else:
+        cost = pack.cost if pack else choice['cost'] if choice else 0
     if cost <= 0 or (pid in LEGACY_EVENT_PRODUCTS and imported_pack_cards()):
         raise ShopRefusal('That pack is unavailable on the local server.')
     if shop_number(query, 'quantity') != 1:
@@ -8753,7 +9772,9 @@ def shop_buy(state, shop, query):
     balance = profile.get('stubs', 0)
     if balance < cost:
         raise ShopRefusal('Not enough Stubs for this pack. Play games to earn Stubs.')
-    if choice:
+    if bundle:
+        available = shop_bundle_available(bundle)
+    elif choice:
         options = choice_pack_options(choice)
         available = (choice['texture'] in shop_pack_art(UPDATE_DIR)['names']
                      and options <= choice_card_catalogue(options).keys())
@@ -8762,7 +9783,10 @@ def shop_buy(state, shop, query):
     if not available:
         raise ShopRefusal('That pack is unavailable with the local catalogue or pack art.')
     receipt_id = str(uuid4())
-    grant_owned_pack(shop, pid)
+    if bundle:
+        grant_shop_bundle(shop, bundle)
+    else:
+        grant_owned_pack(shop, pid)
     shop.setdefault('purchases', {})[receipt_id] = 6 if choice else None
     profile['stubs'] = balance - cost
     save_shop_state(state, shop)
@@ -8868,18 +9892,10 @@ def shop_choice_open(state, shop, query):
     product = choice_pack_products().get(shop.get('owned_packs', {}).get(item_id))
     if product is None:
         raise ShopRefusal('That choice pack is not in your inventory.')
-    options = choice_pack_options(product)
-    catalogue = choice_card_catalogue(options)
-    partial = product.get('partial_pool', False)
-    if partial:
-        rounds = resolve_reward_choice_rounds(product, catalogue)
-    elif not options <= catalogue.keys():
-        raise ShopRefusal('Install the required card catalogue and art to open this choice pack.')
-    else:
-        rounds = product['rounds']
+    rounds, catalogue = choice_pack_offer(product)
     reply = choice_draft_xml(state, rounds, [], catalogue, 0)
     draft = {'rounds': rounds, 'receipts': [], 'open_reply': reply}
-    if partial:
+    if product.get('partial_pool', False):
         draft['allow_live'] = True
     shop.setdefault('choice_drafts', {})[item_id] = draft
     save_shop_state(state, shop)
@@ -9089,13 +10105,14 @@ def exchange_protected_cards(state):
             for entry in node.get('draft', ()):
                 if isinstance(entry, dict) and entry.get('group') != 'perk':
                     protected.update(exchange_card_number(card) for card in entry.get('offers', ()))
-            for child in node.values():
-                visit(child)
+            for key, child in node.items():
+                if key != 'unlocked_squad':
+                    visit(child)
         elif isinstance(node, (tuple, list)):
             for child in node:
                 visit(child)
 
-    visit(state.get('squad') or default_squad())
+    visit(state.get('squad') or (default_squad(cards(state)) if unlock_all_cards_enabled() else default_squad()))
     for key in ('mini_season', 'mini_season_archive', 'conquest', 'showdown'):
         visit(state.get(key))
     return protected
@@ -9945,11 +10962,15 @@ def conquest_settle(state, run):
         profile = state.setdefault('profile', {})
         profile['games'] = profile.get('games', 0) + 1
         profile['stubs'] = profile.get('stubs', 0) + STUBS_PER_GAME
-        clubs = saved.get('affinity_clubs')
-        if clubs is None:  # Battle staged before the affinity patch.
-            clubs = affinity_upload_clubs(state, record)
-        affinity_record_game(state, saved['digest'], clubs, won)
-        settle_game_missions(state, saved.pop('mission_credits', {}))
+        if not active_title_content().team_affinity:
+            clubs = saved.get('affinity_clubs')
+            if clubs is None:  # Battle staged before the affinity patch.
+                clubs = affinity_upload_clubs(state, record)
+            affinity_record_game(state, saved['digest'], clubs, won)
+        credits = saved.pop('mission_credits', {})
+        deltas = apply_parallel_awards(state, saved.pop('parallel_awards', []), 8, saved['digest'])
+        credits.update(pxp_mission_credits(8, deltas))
+        settle_game_missions(state, credits)
     conquest_progress(state, run)
     run['receipts'][saved['digest']] = dict(uuid=battle['uuid'], source=battle['from'],
                                             target=battle['to'], turn=run['turn'], skill_level=battle.get('skill_level', 0),
@@ -9996,7 +11017,9 @@ def conquest_upload(state, run, data):
         innings, scores, errors = decode_line_score(record, teams)
     except ValueError:  # Same aggregate-score fallback as Mini Seasons.
         innings, scores, errors = (3 if record['outcome'] == 'FINISHED' else 0), {}, {}
-    credits = mission_game_credits(state, record, record['totals']['away']['runs'] > record['totals']['home']['runs'])
+    won = record['totals']['away']['runs'] > record['totals']['home']['runs']
+    credits = mission_game_credits(state, record, won)
+    awards = measure_parallel_awards(state, record, won)
     record.pop('log')
     record.pop('stats')
     battle['to'] = target
@@ -10006,6 +11029,8 @@ def conquest_upload(state, run, data):
         battle['upload']['affinity_clubs'] = affinity_upload_clubs(state, record)
         if credits:
             battle['upload']['mission_credits'] = credits
+        if awards:
+            battle['upload']['parallel_awards'] = awards
     conquest_settle(state, run)
     save_state(state)
     return conquest_ack(run)
@@ -11043,6 +12068,8 @@ def main():
         build_content(log)
         try:
             log(f'cards: collection "{COLLECTION}", {len(cards())} cards with a roster player')
+            if unlock_all_cards_enabled():
+                log(f'cards: unlock mode active, {len(playable_cards())} playable editions')
         except StateUnreadable as error:
             sys.exit(str(error))
         except Exception as e:  # the snapshot or the roster may be absent; the server still runs

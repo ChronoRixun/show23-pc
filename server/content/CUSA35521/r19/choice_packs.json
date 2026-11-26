@@ -296,9 +296,28 @@
     ]
   },
   {
+    "id": 514020,
+    "name": "Captains Choice Pack Set 1",
+    "description": "Choose 1 of 4 Diamond Captain Series player items. Odds: 1:1 95 OVR.",
+    "texture": "CPACK_CAPTAINS",
+    "source": "base",
+    "cost": 1500,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          58416,
+          58417,
+          58418,
+          58419
+        ]
+      }
+    ]
+  },
+  {
     "id": 514016,
     "name": "Captains Choice Pack Set 2",
-    "description": "Local choice pack. Choose one player from 8 fixed options.",
+    "description": "Choose 1 of 8 Diamond Captain Series player items. Odds: 1:1 95 OVR.",
     "texture": "CPACK_CAPTAINS_SET2",
     "source": "update",
     "cost": 1500,
@@ -1438,6 +1457,264 @@
           60691,
           60697,
           60701
+        ]
+      }
+    ]
+  },
+  {
+    "id": 517001,
+    "name": "June Monthly Awards 97 Choice Pack",
+    "description": "Choose one of 5 players in this local June Monthly Awards reward pool.",
+    "texture": "CPACK_MONTHLYAWARDS_JUNE_97",
+    "source": "update",
+    "cost": 0,
+    "partial_pool": true,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          59166,
+          59162,
+          59178,
+          59168,
+          59170
+        ]
+      }
+    ]
+  },
+  {
+    "id": 517002,
+    "name": "July Monthly Awards 97 Choice Pack",
+    "description": "Choose one of 8 players in this local July Monthly Awards reward pool.",
+    "texture": "CPACK_MONTHLYAWARDS_JULY_97",
+    "source": "update",
+    "cost": 0,
+    "partial_pool": true,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          59696,
+          59701,
+          59715,
+          59697,
+          59714,
+          59705,
+          59706,
+          59707
+        ]
+      }
+    ]
+  },
+  {
+    "id": 517003,
+    "name": "August Monthly Awards 97 Choice Pack",
+    "description": "Choose one of 8 players in this local August Monthly Awards reward pool.",
+    "texture": "CPACK_MONTHLYAWARDS_AUGUST_97",
+    "source": "update",
+    "cost": 0,
+    "partial_pool": true,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          60121,
+          60118,
+          60131,
+          60124,
+          60128,
+          60123,
+          60126,
+          60148
+        ]
+      }
+    ]
+  },
+  {
+    "id": 517004,
+    "name": "September Monthly Awards 97 Choice Pack",
+    "description": "Choose one of 7 players in this local September Monthly Awards reward pool.",
+    "texture": "CPACK_MONTHLYAWARDS_SEPTEMBER_97",
+    "source": "update",
+    "cost": 0,
+    "partial_pool": true,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          60503,
+          60502,
+          60501,
+          60500,
+          60499,
+          60498,
+          60497
+        ]
+      }
+    ]
+  },
+  {
+    "id": 517005,
+    "name": "Mexico City Series Choice Pack",
+    "description": "Choose one of 4 players in this local Mexico City Series reward pool.",
+    "texture": "CPACK_MEXICOSERIES",
+    "source": "update",
+    "cost": 0,
+    "partial_pool": true,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          57492,
+          57493,
+          57494,
+          57491
+        ]
+      }
+    ]
+  },
+  {
+    "id": 517006,
+    "name": "All-Star Game Choice Pack",
+    "description": "Choose one of 6 players in this local All-Star Game reward pool.",
+    "texture": "CPACK_ASG2023",
+    "source": "update",
+    "cost": 0,
+    "partial_pool": true,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          59294,
+          59293,
+          58806,
+          59280,
+          59295,
+          59281
+        ]
+      }
+    ]
+  },
+  {
+    "id": 517007,
+    "name": "Milestone Retired Numbers Choice Pack",
+    "description": "Choose one of 8 players in this local Milestone reward pool.",
+    "texture": "CPACK_NUMBERRETIREMENT",
+    "source": "update",
+    "cost": 0,
+    "partial_pool": true,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          59361,
+          59360,
+          59359,
+          59366,
+          59365,
+          59364,
+          59363,
+          59362
+        ]
+      }
+    ]
+  },
+  {
+    "id": 517008,
+    "name": "Moonshot Home Run Derby Choice Pack",
+    "description": "Choose one of 8 players in this local Moonshot reward pool.",
+    "texture": "CPACK_HRD2023",
+    "source": "update",
+    "cost": 0,
+    "partial_pool": true,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          59259,
+          59261,
+          59257,
+          59254,
+          59255,
+          59260,
+          59256,
+          59258
+        ]
+      }
+    ]
+  },
+  {
+    "id": 519001,
+    "name": "Welcome to My Show Pack 1 Choice Pack",
+    "description": "Choose one player from the available editions in this pack.",
+    "cost": 0,
+    "texture": "CPACK_MYSHOW",
+    "source": "update",
+    "partial_pool": true,
+    "exact_pool": true,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          56590,
+          56579,
+          56591,
+          56595,
+          56597,
+          56602,
+          56592,
+          56593,
+          56594
+        ]
+      }
+    ]
+  },
+  {
+    "id": 519002,
+    "name": "Alter Ego Choice Pack 2",
+    "description": "Choose one player from the available editions in this pack.",
+    "cost": 0,
+    "texture": "CPACK_ALTEREGO_02",
+    "source": "update",
+    "partial_pool": true,
+    "exact_pool": true,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          57724,
+          57563,
+          57723,
+          57722,
+          57721,
+          57720,
+          57719,
+          57718
+        ]
+      }
+    ]
+  },
+  {
+    "id": 519003,
+    "name": "Draft, All-Star Game and Home Run Derby Rare Choice Pack",
+    "description": "Choose one player from the available editions in this pack.",
+    "cost": 0,
+    "texture": "CPACK_RARE_DRAFT_HRD_ASG",
+    "source": "update",
+    "partial_pool": true,
+    "exact_pool": true,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          59277,
+          59264,
+          59263,
+          59268,
+          59294,
+          59293,
+          59259,
+          59261
         ]
       }
     ]

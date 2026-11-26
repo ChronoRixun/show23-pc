@@ -1,0 +1,4620 @@
+[
+  {
+    "id": 730001,
+    "slot_id": 731001,
+    "name": "Finish 2 CPU games",
+    "description": "Finish two games against the CPU in Play vs. CPU or Mini Seasons.",
+    "evaluator": "cpu_game_finished",
+    "target": 2,
+    "reward": {
+      "kind": "stubs",
+      "amount": 50
+    },
+    "cadence": "permanent",
+    "shows_in": [
+      "daily"
+    ],
+    "modes": [
+      3,
+      6
+    ],
+    "xp": 500
+  },
+  {
+    "id": 730002,
+    "slot_id": 731002,
+    "name": "Win 1 CPU game",
+    "description": "Win a game against the CPU in Play vs. CPU or Mini Seasons.",
+    "evaluator": "cpu_game_won",
+    "target": 1,
+    "reward": {
+      "kind": "stubs",
+      "amount": 100
+    },
+    "cadence": "permanent",
+    "shows_in": [
+      "daily"
+    ],
+    "modes": [
+      3,
+      6
+    ],
+    "xp": 1000
+  },
+  {
+    "id": 730003,
+    "slot_id": 731003,
+    "name": "Hit 3 home runs",
+    "description": "Hit three home runs in Play vs. CPU, Mini Seasons, or Conquest.",
+    "evaluator": "home_runs",
+    "target": 3,
+    "reward": {
+      "kind": "stubs",
+      "amount": 75
+    },
+    "cadence": "permanent",
+    "shows_in": [
+      "daily"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 500
+  },
+  {
+    "id": 730004,
+    "slot_id": 731004,
+    "name": "Get 10 Live Series hits",
+    "description": "Get ten hits with Live Series cards in Diamond Dynasty Play vs. CPU.",
+    "evaluator": "hits",
+    "target": 10,
+    "reward": {
+      "kind": "stubs",
+      "amount": 100
+    },
+    "cadence": "permanent",
+    "shows_in": [
+      "daily"
+    ],
+    "modes": [
+      3
+    ],
+    "card_filter": {
+      "series": "Live Series"
+    },
+    "xp": 1000
+  },
+  {
+    "id": 730005,
+    "slot_id": 731005,
+    "name": "Get 5 extra-base hits",
+    "description": "Get five doubles, triples, or home runs in Play vs. CPU, Mini Seasons, or Conquest.",
+    "evaluator": "extra_base_hits",
+    "target": 5,
+    "reward": {
+      "kind": "stubs",
+      "amount": 75
+    },
+    "cadence": "permanent",
+    "shows_in": [
+      "daily"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 500
+  },
+  {
+    "id": 730006,
+    "slot_id": 731006,
+    "name": "Drive in 8 runs",
+    "description": "Record eight RBI in Play vs. CPU, Mini Seasons, or Conquest.",
+    "evaluator": "rbi",
+    "target": 8,
+    "reward": {
+      "kind": "stubs",
+      "amount": 75
+    },
+    "cadence": "permanent",
+    "shows_in": [
+      "daily"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 500
+  },
+  {
+    "id": 730007,
+    "slot_id": 731007,
+    "name": "Score 12 runs",
+    "description": "Score twelve runs in Play vs. CPU, Mini Seasons, or Conquest.",
+    "evaluator": "runs",
+    "target": 12,
+    "reward": {
+      "kind": "stubs",
+      "amount": 75
+    },
+    "cadence": "permanent",
+    "shows_in": [
+      "daily"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 500
+  },
+  {
+    "id": 730008,
+    "slot_id": 731008,
+    "name": "Strike out 15 batters",
+    "description": "Record fifteen strikeouts with your pitchers in Play vs. CPU, Mini Seasons, or Conquest.",
+    "evaluator": "pitching_strikeouts",
+    "target": 15,
+    "reward": {
+      "kind": "stubs",
+      "amount": 75
+    },
+    "cadence": "permanent",
+    "shows_in": [
+      "daily"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 500
+  },
+  {
+    "id": 730009,
+    "slot_id": 731009,
+    "name": "Win by 5 or more runs",
+    "description": "Win by at least five runs in Play vs. CPU or Mini Seasons.",
+    "evaluator": "win_margin",
+    "target": 1,
+    "reward": {
+      "kind": "stubs",
+      "amount": 100
+    },
+    "cadence": "permanent",
+    "shows_in": [
+      "daily"
+    ],
+    "modes": [
+      3,
+      6
+    ],
+    "min_margin": 5,
+    "xp": 1000
+  },
+  {
+    "id": 730010,
+    "slot_id": 731010,
+    "name": "Steal 2 bases",
+    "description": "Steal two bases in Play vs. CPU, Mini Seasons, or Conquest.",
+    "evaluator": "stolen_bases",
+    "target": 2,
+    "reward": {
+      "kind": "stubs",
+      "amount": 50
+    },
+    "cadence": "permanent",
+    "shows_in": [
+      "daily"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 500
+  },
+  {
+    "id": 730101,
+    "name": "Finish 1 CPU game",
+    "description": "Finish a game in Play vs. CPU or Mini Seasons to advance to the Championship Round.",
+    "evaluator": "cpu_game_finished",
+    "target": 1,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6
+    ],
+    "xp": 500
+  },
+  {
+    "id": 730102,
+    "name": "Finish 2 CPU games",
+    "description": "Finish two games in Play vs. CPU or Mini Seasons during the Championship Round.",
+    "evaluator": "cpu_game_finished",
+    "target": 2,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6
+    ],
+    "xp": 500
+  },
+  {
+    "id": 730103,
+    "name": "Win 1 CPU game",
+    "description": "Win a game in Play vs. CPU or Mini Seasons during the Championship Round.",
+    "evaluator": "cpu_game_won",
+    "target": 1,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6
+    ],
+    "xp": 1000
+  },
+  {
+    "id": 730201,
+    "name": "Get 3 hits",
+    "description": "Get three hits in Diamond Dynasty Play vs. CPU.",
+    "evaluator": "hits",
+    "target": 3,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3
+    ],
+    "xp": 500
+  },
+  {
+    "id": 730202,
+    "name": "Get 2 Monthly Awards extra-base hits",
+    "description": "Get two extra-base hits with Monthly Awards cards in Play vs. CPU.",
+    "evaluator": "extra_base_hits",
+    "target": 2,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3
+    ],
+    "card_filter": {
+      "series": "Monthly Awards"
+    },
+    "xp": 500
+  },
+  {
+    "id": 730203,
+    "name": "Strike out 9 batters",
+    "description": "Strike out nine batters with your pitchers in Play vs. CPU.",
+    "evaluator": "pitching_strikeouts",
+    "target": 9,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3
+    ],
+    "xp": 500
+  },
+  {
+    "id": 730301,
+    "name": "Get 5 hits",
+    "description": "Get five hits in Diamond Dynasty Play vs. CPU.",
+    "evaluator": "hits",
+    "target": 5,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3
+    ],
+    "xp": 500
+  },
+  {
+    "id": 730302,
+    "name": "Strike out 9 batters",
+    "description": "Strike out nine batters in Diamond Dynasty Play vs. CPU.",
+    "evaluator": "pitching_strikeouts",
+    "target": 9,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3
+    ],
+    "xp": 500
+  },
+  {
+    "id": 730303,
+    "name": "Win 1 CPU game",
+    "description": "Win a game in Play vs. CPU or Mini Seasons, or beat Pennant Clincher.",
+    "evaluator": "cpu_game_won",
+    "target": 1,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6
+    ],
+    "xp": 1000
+  },
+  {
+    "id": 730401,
+    "name": "Finish 1 CPU game",
+    "description": "Finish a game in Play vs. CPU or Mini Seasons.",
+    "evaluator": "cpu_game_finished",
+    "target": 1,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6
+    ],
+    "xp": 500
+  },
+  {
+    "id": 730402,
+    "name": "Get 3 extra-base hits",
+    "description": "Record three extra-base hits against the CPU.",
+    "evaluator": "extra_base_hits",
+    "target": 3,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6
+    ],
+    "xp": 500
+  },
+  {
+    "id": 730403,
+    "name": "Win 1 CPU game",
+    "description": "Win a game in Play vs. CPU or Mini Seasons, or play the Charisma Moment.",
+    "evaluator": "cpu_game_won",
+    "target": 1,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6
+    ],
+    "xp": 500
+  },
+  {
+    "id": 730501,
+    "name": "Finish two CPU games",
+    "description": "Finish two games against CPU opponents.",
+    "evaluator": "cpu_game_finished",
+    "target": 2,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6
+    ],
+    "xp": 250
+  },
+  {
+    "id": 730502,
+    "name": "Hit three doubles",
+    "description": "Hit three doubles against CPU opponents.",
+    "evaluator": "doubles",
+    "target": 3,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6
+    ],
+    "xp": 250
+  },
+  {
+    "id": 730503,
+    "name": "Score four runs",
+    "description": "Score four runs against CPU opponents.",
+    "evaluator": "runs",
+    "target": 4,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6
+    ],
+    "xp": 250
+  },
+  {
+    "id": 730511,
+    "name": "Hit two home runs",
+    "description": "Hit two home runs against CPU opponents.",
+    "evaluator": "home_runs",
+    "target": 2,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6
+    ],
+    "xp": 250
+  },
+  {
+    "id": 730512,
+    "name": "Strike out eight batters",
+    "description": "Record eight pitching strikeouts.",
+    "evaluator": "pitching_strikeouts",
+    "target": 8,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6
+    ],
+    "xp": 250
+  },
+  {
+    "id": 730513,
+    "name": "Score one run",
+    "description": "Score one run in Diamond Dynasty or complete A Giant Finish at Wrigley.",
+    "evaluator": "runs",
+    "target": 1,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6
+    ],
+    "xp": 250
+  },
+  {
+    "id": 730521,
+    "name": "Get six hits",
+    "description": "Record six hits against CPU opponents.",
+    "evaluator": "hits",
+    "target": 6,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6
+    ],
+    "xp": 250
+  },
+  {
+    "id": 730522,
+    "name": "Steal two bases",
+    "description": "Steal two bases against CPU opponents.",
+    "evaluator": "stolen_bases",
+    "target": 2,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6
+    ],
+    "xp": 250
+  },
+  {
+    "id": 730523,
+    "name": "Win two CPU games",
+    "description": "Win two games against CPU opponents.",
+    "evaluator": "cpu_game_won",
+    "target": 2,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6
+    ],
+    "xp": 250
+  },
+  {
+    "id": 730531,
+    "name": "Drive in four runs",
+    "description": "Record four RBI against CPU opponents.",
+    "evaluator": "rbi",
+    "target": 4,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6
+    ],
+    "xp": 250
+  },
+  {
+    "id": 730532,
+    "name": "Draw two walks",
+    "description": "Draw two walks against CPU opponents.",
+    "evaluator": "walks",
+    "target": 2,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6
+    ],
+    "xp": 250
+  },
+  {
+    "id": 730533,
+    "name": "Win a shutout",
+    "description": "Win a CPU game without allowing a run, or protect a late lead in the Moment.",
+    "evaluator": "shutout",
+    "target": 1,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6
+    ],
+    "xp": 250
+  },
+  {
+    "id": 730541,
+    "name": "Finish three CPU games",
+    "description": "Finish three games against CPU opponents.",
+    "evaluator": "cpu_game_finished",
+    "target": 3,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6
+    ],
+    "xp": 250
+  },
+  {
+    "id": 730542,
+    "name": "Get three extra-base hits",
+    "description": "Record three extra-base hits against CPU opponents.",
+    "evaluator": "extra_base_hits",
+    "target": 3,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6
+    ],
+    "xp": 250
+  },
+  {
+    "id": 730543,
+    "name": "Score one run",
+    "description": "Score one run in Diamond Dynasty or complete One More Rally in St. Louis.",
+    "evaluator": "runs",
+    "target": 1,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6
+    ],
+    "xp": 250
+  },
+  {
+    "id": 730551,
+    "name": "Hit three home runs",
+    "description": "Hit three home runs against CPU opponents.",
+    "evaluator": "home_runs",
+    "target": 3,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6
+    ],
+    "xp": 250
+  },
+  {
+    "id": 730552,
+    "name": "Score five runs",
+    "description": "Score five runs against CPU opponents.",
+    "evaluator": "runs",
+    "target": 5,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6
+    ],
+    "xp": 250
+  },
+  {
+    "id": 730553,
+    "name": "Win by two or more",
+    "description": "Win a CPU game by at least two runs, or win the Cubs rivalry Moment.",
+    "evaluator": "win_margin",
+    "target": 1,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6
+    ],
+    "xp": 250,
+    "min_margin": 2
+  },
+  {
+    "id": 730561,
+    "name": "Win twice by two or more",
+    "description": "Win two CPU games by at least two runs each.",
+    "evaluator": "win_margin",
+    "target": 2,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6
+    ],
+    "xp": 250,
+    "min_margin": 2
+  },
+  {
+    "id": 730562,
+    "name": "Draw five walks",
+    "description": "Draw five walks against CPU opponents.",
+    "evaluator": "walks",
+    "target": 5,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6
+    ],
+    "xp": 250
+  },
+  {
+    "id": 730563,
+    "name": "Strike out nine batters",
+    "description": "Record nine pitching strikeouts.",
+    "evaluator": "pitching_strikeouts",
+    "target": 9,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6
+    ],
+    "xp": 250
+  },
+  {
+    "id": 730611,
+    "name": "Get four hits",
+    "description": "Get four hits in Play vs. CPU or Mini Seasons.",
+    "evaluator": "hits",
+    "target": 4,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6
+    ],
+    "xp": 100
+  },
+  {
+    "id": 730612,
+    "name": "Draw two walks",
+    "description": "Draw two walks in Play vs. CPU or Mini Seasons.",
+    "evaluator": "walks",
+    "target": 2,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6
+    ],
+    "xp": 100
+  },
+  {
+    "id": 730613,
+    "name": "Win a game",
+    "description": "Win a game in Play vs. CPU or Mini Seasons.",
+    "evaluator": "cpu_game_won",
+    "target": 1,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6
+    ],
+    "xp": 150
+  },
+  {
+    "id": 730614,
+    "name": "Get three extra-base hits",
+    "description": "Get three extra-base hits in Play vs. CPU or Mini Seasons.",
+    "evaluator": "extra_base_hits",
+    "target": 3,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6
+    ],
+    "xp": 150
+  },
+  {
+    "id": 730621,
+    "name": "Steal two bases",
+    "description": "Steal two bases in Play vs. CPU or Mini Seasons.",
+    "evaluator": "stolen_bases",
+    "target": 2,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6
+    ],
+    "xp": 150
+  },
+  {
+    "id": 730622,
+    "name": "Score three runs",
+    "description": "Score three runs in Play vs. CPU or Mini Seasons.",
+    "evaluator": "runs",
+    "target": 3,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6
+    ],
+    "xp": 150
+  },
+  {
+    "id": 730623,
+    "name": "Drive in five runs",
+    "description": "Drive in five runs in Play vs. CPU or Mini Seasons.",
+    "evaluator": "rbi",
+    "target": 5,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6
+    ],
+    "xp": 150
+  },
+  {
+    "id": 730631,
+    "name": "Finish a game",
+    "description": "Finish a game in Play vs. CPU or Mini Seasons.",
+    "evaluator": "cpu_game_finished",
+    "target": 1,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6
+    ],
+    "xp": 100
+  },
+  {
+    "id": 730632,
+    "name": "Hit two doubles",
+    "description": "Hit two doubles in Play vs. CPU or Mini Seasons.",
+    "evaluator": "doubles",
+    "target": 2,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6
+    ],
+    "xp": 150
+  },
+  {
+    "id": 730633,
+    "name": "Strike out four batters",
+    "description": "Strike out four batters in Play vs. CPU or Mini Seasons.",
+    "evaluator": "pitching_strikeouts",
+    "target": 4,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6
+    ],
+    "xp": 100
+  },
+  {
+    "id": 730634,
+    "name": "Score three runs",
+    "description": "Score three runs in Play vs. CPU or Mini Seasons.",
+    "evaluator": "runs",
+    "target": 3,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6
+    ],
+    "xp": 100
+  },
+  {
+    "id": 730641,
+    "name": "Get two extra-base hits",
+    "description": "Get two extra-base hits in Play vs. CPU or Mini Seasons.",
+    "evaluator": "extra_base_hits",
+    "target": 2,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6
+    ],
+    "xp": 150
+  },
+  {
+    "id": 730642,
+    "name": "Strike out four batters",
+    "description": "Strike out four batters in Play vs. CPU or Mini Seasons.",
+    "evaluator": "pitching_strikeouts",
+    "target": 4,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6
+    ],
+    "xp": 150
+  },
+  {
+    "id": 730643,
+    "name": "Win a game by at least two runs",
+    "description": "Win a game by at least two runs in Play vs. CPU or Mini Seasons.",
+    "evaluator": "win_margin",
+    "target": 1,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6
+    ],
+    "xp": 200,
+    "min_margin": 2
+  },
+  {
+    "id": 730651,
+    "name": "Get five hits",
+    "description": "Get five hits in Play vs. CPU or Mini Seasons.",
+    "evaluator": "hits",
+    "target": 5,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6
+    ],
+    "xp": 150
+  },
+  {
+    "id": 730652,
+    "name": "Drive in four runs",
+    "description": "Drive in four runs in Play vs. CPU or Mini Seasons.",
+    "evaluator": "rbi",
+    "target": 4,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6
+    ],
+    "xp": 150
+  },
+  {
+    "id": 730653,
+    "name": "Win a game",
+    "description": "Win a game in Play vs. CPU or Mini Seasons.",
+    "evaluator": "cpu_game_won",
+    "target": 1,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6
+    ],
+    "xp": 150
+  },
+  {
+    "id": 730661,
+    "name": "Get five hits",
+    "description": "Get five hits in Play vs. CPU or Mini Seasons.",
+    "evaluator": "hits",
+    "target": 5,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6
+    ],
+    "xp": 150
+  },
+  {
+    "id": 730662,
+    "name": "Strike out five batters",
+    "description": "Strike out five batters in Play vs. CPU or Mini Seasons.",
+    "evaluator": "pitching_strikeouts",
+    "target": 5,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6
+    ],
+    "xp": 150
+  },
+  {
+    "id": 730663,
+    "name": "Win a game by at least two runs",
+    "description": "Win a game by at least two runs in Play vs. CPU or Mini Seasons.",
+    "evaluator": "win_margin",
+    "target": 1,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6
+    ],
+    "xp": 200,
+    "min_margin": 2
+  },
+  {
+    "id": 730671,
+    "name": "Get three extra-base hits",
+    "description": "Get three extra-base hits in Play vs. CPU or Mini Seasons.",
+    "evaluator": "extra_base_hits",
+    "target": 3,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6
+    ],
+    "xp": 150
+  },
+  {
+    "id": 730672,
+    "name": "Drive in five runs",
+    "description": "Drive in five runs in Play vs. CPU or Mini Seasons.",
+    "evaluator": "rbi",
+    "target": 5,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6
+    ],
+    "xp": 150
+  },
+  {
+    "id": 730673,
+    "name": "Win a shutout",
+    "description": "Win a shutout in Play vs. CPU or Mini Seasons.",
+    "evaluator": "shutout",
+    "target": 1,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6
+    ],
+    "xp": 200
+  },
+  {
+    "id": 730681,
+    "name": "Get two extra-base hits",
+    "description": "Get two extra-base hits in Play vs. CPU or Mini Seasons.",
+    "evaluator": "extra_base_hits",
+    "target": 2,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6
+    ],
+    "xp": 150
+  },
+  {
+    "id": 730682,
+    "name": "Drive in four runs",
+    "description": "Drive in four runs in Play vs. CPU or Mini Seasons.",
+    "evaluator": "rbi",
+    "target": 4,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6
+    ],
+    "xp": 150
+  },
+  {
+    "id": 730683,
+    "name": "Hit a home run",
+    "description": "Hit a home run in Play vs. CPU or Mini Seasons.",
+    "evaluator": "home_runs",
+    "target": 1,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6
+    ],
+    "xp": 150
+  },
+  {
+    "id": 738001,
+    "name": "Tally 10 Hits",
+    "description": "Tally 10 hits in Diamond Dynasty.",
+    "evaluator": "hits",
+    "target": 10,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738002,
+    "name": "Tally 25 Hits",
+    "description": "Tally 25 hits in Diamond Dynasty.",
+    "evaluator": "hits",
+    "target": 25,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738003,
+    "name": "Tally 50 Hits",
+    "description": "Tally 50 hits in Diamond Dynasty.",
+    "evaluator": "hits",
+    "target": 50,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738004,
+    "name": "Tally 75 Hits",
+    "description": "Tally 75 hits in Diamond Dynasty.",
+    "evaluator": "hits",
+    "target": 75,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738005,
+    "name": "Tally 100 Hits",
+    "description": "Tally 100 hits in Diamond Dynasty.",
+    "evaluator": "hits",
+    "target": 100,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738006,
+    "name": "Tally 200 Hits",
+    "description": "Tally 200 hits in Diamond Dynasty.",
+    "evaluator": "hits",
+    "target": 200,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738007,
+    "name": "Tally 300 Hits",
+    "description": "Tally 300 hits in Diamond Dynasty.",
+    "evaluator": "hits",
+    "target": 300,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738008,
+    "name": "Tally 5 XBH",
+    "description": "Tally 5 extra-base hits in Diamond Dynasty.",
+    "evaluator": "extra_base_hits",
+    "target": 5,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738009,
+    "name": "Tally 15 XBH",
+    "description": "Tally 15 extra-base hits in Diamond Dynasty.",
+    "evaluator": "extra_base_hits",
+    "target": 15,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738010,
+    "name": "Tally 30 XBH",
+    "description": "Tally 30 extra-base hits in Diamond Dynasty.",
+    "evaluator": "extra_base_hits",
+    "target": 30,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738011,
+    "name": "Tally 50 XBH",
+    "description": "Tally 50 extra-base hits in Diamond Dynasty.",
+    "evaluator": "extra_base_hits",
+    "target": 50,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738012,
+    "name": "Tally 75 XBH",
+    "description": "Tally 75 extra-base hits in Diamond Dynasty.",
+    "evaluator": "extra_base_hits",
+    "target": 75,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738013,
+    "name": "Tally 100 XBH",
+    "description": "Tally 100 extra-base hits in Diamond Dynasty.",
+    "evaluator": "extra_base_hits",
+    "target": 100,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738014,
+    "name": "Tally 150 XBH",
+    "description": "Tally 150 extra-base hits in Diamond Dynasty.",
+    "evaluator": "extra_base_hits",
+    "target": 150,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738015,
+    "name": "Tally 10 Ks",
+    "description": "Tally 10 strikeouts in Diamond Dynasty.",
+    "evaluator": "pitching_strikeouts",
+    "target": 10,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738016,
+    "name": "Tally 25 Ks",
+    "description": "Tally 25 strikeouts in Diamond Dynasty.",
+    "evaluator": "pitching_strikeouts",
+    "target": 25,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738017,
+    "name": "Tally 50 Ks",
+    "description": "Tally 50 strikeouts in Diamond Dynasty.",
+    "evaluator": "pitching_strikeouts",
+    "target": 50,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738018,
+    "name": "Tally 75 Ks",
+    "description": "Tally 75 strikeouts in Diamond Dynasty.",
+    "evaluator": "pitching_strikeouts",
+    "target": 75,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738019,
+    "name": "Tally 100 Ks",
+    "description": "Tally 100 strikeouts in Diamond Dynasty.",
+    "evaluator": "pitching_strikeouts",
+    "target": 100,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738020,
+    "name": "Tally 150 Ks",
+    "description": "Tally 150 strikeouts in Diamond Dynasty.",
+    "evaluator": "pitching_strikeouts",
+    "target": 150,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738021,
+    "name": "Tally 200 Ks",
+    "description": "Tally 200 strikeouts in Diamond Dynasty.",
+    "evaluator": "pitching_strikeouts",
+    "target": 200,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738022,
+    "name": "Tally 9 IP",
+    "description": "Tally 9 innings pitched in Diamond Dynasty.",
+    "evaluator": "pitching_outs",
+    "target": 27,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738023,
+    "name": "Tally 15 IP",
+    "description": "Tally 15 innings pitched in Diamond Dynasty.",
+    "evaluator": "pitching_outs",
+    "target": 45,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738024,
+    "name": "Tally 30 IP",
+    "description": "Tally 30 innings pitched in Diamond Dynasty.",
+    "evaluator": "pitching_outs",
+    "target": 90,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738025,
+    "name": "Tally 50 IP",
+    "description": "Tally 50 innings pitched in Diamond Dynasty.",
+    "evaluator": "pitching_outs",
+    "target": 150,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738026,
+    "name": "Tally 100 IP",
+    "description": "Tally 100 innings pitched in Diamond Dynasty.",
+    "evaluator": "pitching_outs",
+    "target": 300,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738027,
+    "name": "Tally 150 IP",
+    "description": "Tally 150 innings pitched in Diamond Dynasty.",
+    "evaluator": "pitching_outs",
+    "target": 450,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738028,
+    "name": "Tally 200 IP",
+    "description": "Tally 200 innings pitched in Diamond Dynasty.",
+    "evaluator": "pitching_outs",
+    "target": 600,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738029,
+    "name": "Tally 5 RBI",
+    "description": "Tally 5 runs batted in (RBI) in Diamond Dynasty.",
+    "evaluator": "rbi",
+    "target": 5,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738030,
+    "name": "Tally 15 RBI",
+    "description": "Tally 15 runs batted in (RBI) in Diamond Dynasty.",
+    "evaluator": "rbi",
+    "target": 15,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738031,
+    "name": "Tally 50 RBI",
+    "description": "Tally 50 runs batted in (RBI) in Diamond Dynasty.",
+    "evaluator": "rbi",
+    "target": 50,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738032,
+    "name": "Tally 75 RBI",
+    "description": "Tally 75 runs batted in (RBI) in Diamond Dynasty.",
+    "evaluator": "rbi",
+    "target": 75,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738033,
+    "name": "Tally 100 RBI",
+    "description": "Tally 100 runs batted in (RBI) in Diamond Dynasty.",
+    "evaluator": "rbi",
+    "target": 100,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738034,
+    "name": "Tally 150 RBI",
+    "description": "Tally 150 runs batted in (RBI) in Diamond Dynasty.",
+    "evaluator": "rbi",
+    "target": 150,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738035,
+    "name": "Tally 200 RBI",
+    "description": "Tally 200 runs batted in (RBI) in Diamond Dynasty.",
+    "evaluator": "rbi",
+    "target": 200,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738036,
+    "name": "Tally 25 TB",
+    "description": "Tally 25 total bases in Diamond Dynasty.",
+    "evaluator": "total_bases",
+    "target": 25,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738037,
+    "name": "Tally 50 TB",
+    "description": "Tally 50 total bases in Diamond Dynasty.",
+    "evaluator": "total_bases",
+    "target": 50,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738038,
+    "name": "Tally 100 TB",
+    "description": "Tally 100 total bases in Diamond Dynasty.",
+    "evaluator": "total_bases",
+    "target": 100,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738039,
+    "name": "Tally 200 TB",
+    "description": "Tally 200 total bases in Diamond Dynasty.",
+    "evaluator": "total_bases",
+    "target": 200,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738040,
+    "name": "Tally 300 TB",
+    "description": "Tally 300 total bases in Diamond Dynasty.",
+    "evaluator": "total_bases",
+    "target": 300,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738041,
+    "name": "Tally 400 TB",
+    "description": "Tally 400 total bases in Diamond Dynasty.",
+    "evaluator": "total_bases",
+    "target": 400,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738042,
+    "name": "Tally 500 TB",
+    "description": "Tally 500 total bases in Diamond Dynasty.",
+    "evaluator": "total_bases",
+    "target": 500,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738043,
+    "name": "Score 5 Runs",
+    "description": "Score 5 runs in Diamond Dynasty.",
+    "evaluator": "runs",
+    "target": 5,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738044,
+    "name": "Score 25 Runs",
+    "description": "Score 25 runs in Diamond Dynasty.",
+    "evaluator": "runs",
+    "target": 25,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738045,
+    "name": "Score 50 Runs",
+    "description": "Score 50 runs in Diamond Dynasty.",
+    "evaluator": "runs",
+    "target": 50,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738046,
+    "name": "Score 100 Runs",
+    "description": "Score 100 runs in Diamond Dynasty.",
+    "evaluator": "runs",
+    "target": 100,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738047,
+    "name": "Score 150 Runs",
+    "description": "Score 150 runs in Diamond Dynasty.",
+    "evaluator": "runs",
+    "target": 150,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738048,
+    "name": "Score 200 Runs",
+    "description": "Score 200 runs in Diamond Dynasty.",
+    "evaluator": "runs",
+    "target": 200,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738049,
+    "name": "Score 250 Runs",
+    "description": "Score 250 runs in Diamond Dynasty.",
+    "evaluator": "runs",
+    "target": 250,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738050,
+    "name": "Steal 1 Base",
+    "description": "Steal 1 base in Diamond Dynasty.",
+    "evaluator": "stolen_bases",
+    "target": 1,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738051,
+    "name": "Steal 5 Bases",
+    "description": "Steal 5 bases in Diamond Dynasty.",
+    "evaluator": "stolen_bases",
+    "target": 5,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738052,
+    "name": "Steal 10 Bases",
+    "description": "Steal 10 bases in Diamond Dynasty.",
+    "evaluator": "stolen_bases",
+    "target": 10,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738053,
+    "name": "Steal 15 Bases",
+    "description": "Steal 15 bases in Diamond Dynasty.",
+    "evaluator": "stolen_bases",
+    "target": 15,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738054,
+    "name": "Steal 25 Bases",
+    "description": "Steal 25 bases in Diamond Dynasty.",
+    "evaluator": "stolen_bases",
+    "target": 25,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738055,
+    "name": "Steal 40 Bases",
+    "description": "Steal 40 bases in Diamond Dynasty.",
+    "evaluator": "stolen_bases",
+    "target": 40,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738056,
+    "name": "Steal 50 Bases",
+    "description": "Steal 50 bases in Diamond Dynasty.",
+    "evaluator": "stolen_bases",
+    "target": 50,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738057,
+    "name": "Tally 3 HR",
+    "description": "Tally 3 home runs in Diamond Dynasty.",
+    "evaluator": "home_runs",
+    "target": 3,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738058,
+    "name": "Tally 10 HR",
+    "description": "Tally 10 home runs in Diamond Dynasty.",
+    "evaluator": "home_runs",
+    "target": 10,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738059,
+    "name": "Tally 25 HR",
+    "description": "Tally 25 home runs in Diamond Dynasty.",
+    "evaluator": "home_runs",
+    "target": 25,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738060,
+    "name": "Tally 50 HR",
+    "description": "Tally 50 home runs in Diamond Dynasty.",
+    "evaluator": "home_runs",
+    "target": 50,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738061,
+    "name": "Tally 70 HR",
+    "description": "Tally 70 home runs in Diamond Dynasty.",
+    "evaluator": "home_runs",
+    "target": 70,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738062,
+    "name": "Tally 80 HR",
+    "description": "Tally 80 home runs in Diamond Dynasty.",
+    "evaluator": "home_runs",
+    "target": 80,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738063,
+    "name": "Tally 100 HR",
+    "description": "Tally 100 home runs in Diamond Dynasty.",
+    "evaluator": "home_runs",
+    "target": 100,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738064,
+    "name": "Tally 1 Save",
+    "description": "Tally 1 save in Diamond Dynasty.",
+    "evaluator": "saves",
+    "target": 1,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738065,
+    "name": "Tally 5 Saves",
+    "description": "Tally 5 saves in Diamond Dynasty.",
+    "evaluator": "saves",
+    "target": 5,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738066,
+    "name": "Tally 10 Saves",
+    "description": "Tally 10 saves in Diamond Dynasty.",
+    "evaluator": "saves",
+    "target": 10,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738067,
+    "name": "Tally 25 Saves",
+    "description": "Tally 25 saves in Diamond Dynasty.",
+    "evaluator": "saves",
+    "target": 25,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738068,
+    "name": "Tally 50 Saves",
+    "description": "Tally 50 saves in Diamond Dynasty.",
+    "evaluator": "saves",
+    "target": 50,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738069,
+    "name": "Tally 75 Saves",
+    "description": "Tally 75 saves in Diamond Dynasty.",
+    "evaluator": "saves",
+    "target": 75,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738070,
+    "name": "Tally 100 Saves",
+    "description": "Tally 100 saves in Diamond Dynasty.",
+    "evaluator": "saves",
+    "target": 100,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738071,
+    "name": "Tally 500 PXP",
+    "description": "Tally 500 Parallel XP (PXP) in Diamond Dynasty.",
+    "evaluator": "parallel_xp",
+    "target": 500,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738072,
+    "name": "Tally 1,250 PXP",
+    "description": "Tally 1,250 Parallel XP (PXP) in Diamond Dynasty.",
+    "evaluator": "parallel_xp",
+    "target": 1250,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738073,
+    "name": "Tally 3,000 PXP",
+    "description": "Tally 3,000 Parallel XP (PXP) in Diamond Dynasty.",
+    "evaluator": "parallel_xp",
+    "target": 3000,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738074,
+    "name": "Tally 5,000 PXP",
+    "description": "Tally 5,000 Parallel XP (PXP) in Diamond Dynasty.",
+    "evaluator": "parallel_xp",
+    "target": 5000,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738075,
+    "name": "Tally 10,000 PXP",
+    "description": "Tally 10,000 Parallel XP (PXP) in Diamond Dynasty.",
+    "evaluator": "parallel_xp",
+    "target": 10000,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738076,
+    "name": "Tally 15,000 PXP",
+    "description": "Tally 15,000 Parallel XP (PXP) in Diamond Dynasty.",
+    "evaluator": "parallel_xp",
+    "target": 15000,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738077,
+    "name": "Tally 20,000 PXP",
+    "description": "Tally 20,000 Parallel XP (PXP) in Diamond Dynasty.",
+    "evaluator": "parallel_xp",
+    "target": 20000,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738078,
+    "name": "Tally 50 Innings with Charisma Series",
+    "description": "Pitch 50 innings with Charisma Series pitchers.",
+    "evaluator": "pitching_outs",
+    "target": 150,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "series": "Charisma"
+    }
+  },
+  {
+    "id": 738079,
+    "name": "Tally 50 Innings with Kaiju Series",
+    "description": "Pitch 50 innings with Kaiju Series pitchers.",
+    "evaluator": "pitching_outs",
+    "target": 150,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "series": "Kaiju"
+    }
+  },
+  {
+    "id": 738080,
+    "name": "Tally 50 Innings with Incognito Series",
+    "description": "Pitch 50 innings with Incognito Series pitchers.",
+    "evaluator": "pitching_outs",
+    "target": 150,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "series": "Incognito"
+    }
+  },
+  {
+    "id": 738081,
+    "name": "Tally 50 Innings with Snapshot Series",
+    "description": "Pitch 50 innings with Snapshot Series pitchers.",
+    "evaluator": "pitching_outs",
+    "target": 150,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "series": "Snapshot"
+    }
+  },
+  {
+    "id": 738082,
+    "name": "Tally 50 Innings with Great Race of '98 Series",
+    "description": "Pitch 50 innings with Great Race of '98 Series pitchers.",
+    "evaluator": "pitching_outs",
+    "target": 150,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "series": "Great Race of '98"
+    }
+  },
+  {
+    "id": 738083,
+    "name": "Tally 50 Innings with Captain Series",
+    "description": "Pitch 50 innings with Captain Series pitchers.",
+    "evaluator": "pitching_outs",
+    "target": 150,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "series": "Captain"
+    }
+  },
+  {
+    "id": 738084,
+    "name": "Tally 100 Innings with 2023 Series",
+    "description": "Pitch 100 innings with 2023 All-Star, 2023 Draft, 2023 Home Run Derby, 2023 Postseason, or 2023 Finest pitchers.",
+    "evaluator": "pitching_outs",
+    "target": 300,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "series": [
+        "2023 All-Star",
+        "2023 Draft",
+        "2023 Home Run Derby",
+        "2023 Postseason",
+        "2023 Finest"
+      ]
+    }
+  },
+  {
+    "id": 738085,
+    "name": "Tally 10 Home Runs",
+    "description": "Tally 10 home runs in Diamond Dynasty.",
+    "evaluator": "home_runs",
+    "target": 10,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738086,
+    "name": "Tally 20 Home Runs",
+    "description": "Tally 20 home runs in Diamond Dynasty.",
+    "evaluator": "home_runs",
+    "target": 20,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738087,
+    "name": "Tally 30 Home Runs",
+    "description": "Tally 30 home runs in Diamond Dynasty.",
+    "evaluator": "home_runs",
+    "target": 30,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738088,
+    "name": "Tally 40 Home Runs",
+    "description": "Tally 40 home runs in Diamond Dynasty.",
+    "evaluator": "home_runs",
+    "target": 40,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738089,
+    "name": "Tally 46 Home Runs",
+    "description": "Tally 46 home runs in Diamond Dynasty.",
+    "evaluator": "home_runs",
+    "target": 46,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738090,
+    "name": "Tally 62 Home Runs",
+    "description": "Tally 62 home runs in Diamond Dynasty.",
+    "evaluator": "home_runs",
+    "target": 62,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738091,
+    "name": "Tally 70 Home Runs",
+    "description": "Tally 70 home runs in Diamond Dynasty.",
+    "evaluator": "home_runs",
+    "target": 70,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738092,
+    "name": "Hit 3 home runs in one game",
+    "description": "Hit 3 home runs in a single Play vs. CPU, Mini Seasons, or Conquest game.",
+    "evaluator": "home_runs",
+    "target": 3,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 738093,
+    "name": "Tally 1,998 PXP with Great Race of '98 program players",
+    "description": "Tally 1,998 Parallel XP (PXP) with Great Race of '98 program players in Diamond Dynasty.",
+    "evaluator": "parallel_xp",
+    "target": 1998,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "item_ids": [
+        59910,
+        59906,
+        59904,
+        59907,
+        59909,
+        59905,
+        59908,
+        59903,
+        59901
+      ]
+    }
+  },
+  {
+    "id": 738094,
+    "name": "Tally 16 HR with Great Race of '98 Series players",
+    "description": "Tally 16 home runs with Great Race of '98 Series players in Diamond Dynasty.",
+    "evaluator": "home_runs",
+    "target": 16,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "series": "Great Race of '98"
+    }
+  },
+  {
+    "id": 738095,
+    "name": "Tally 40 Ks with Great Race of '98 Series pitchers",
+    "description": "Tally 40 strikeouts with Great Race of '98 Series pitchers in Diamond Dynasty.",
+    "evaluator": "pitching_strikeouts",
+    "target": 40,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "series": "Great Race of '98"
+    }
+  },
+  {
+    "id": 738096,
+    "name": "Tally 21 HR with Great Race of '98 Sammy Sosa",
+    "description": "Tally 21 home runs with Great Race of '98 Sammy Sosa in Diamond Dynasty.",
+    "evaluator": "home_runs",
+    "target": 21,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "item_ids": [
+        59901
+      ]
+    }
+  },
+  {
+    "id": 738097,
+    "name": "Tally 10 XBH",
+    "description": "Tally 10 extra-base hits in Diamond Dynasty.",
+    "evaluator": "extra_base_hits",
+    "target": 10,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738098,
+    "name": "Tally 25 XBH",
+    "description": "Tally 25 extra-base hits in Diamond Dynasty.",
+    "evaluator": "extra_base_hits",
+    "target": 25,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738099,
+    "name": "Tally 50 XBH",
+    "description": "Tally 50 extra-base hits in Diamond Dynasty.",
+    "evaluator": "extra_base_hits",
+    "target": 50,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738100,
+    "name": "Tally 10 RBI",
+    "description": "Tally 10 runs batted in (RBI) in Diamond Dynasty.",
+    "evaluator": "rbi",
+    "target": 10,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738101,
+    "name": "Tally 30 RBI",
+    "description": "Tally 30 runs batted in (RBI) in Diamond Dynasty.",
+    "evaluator": "rbi",
+    "target": 30,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738102,
+    "name": "Tally 60 RBI",
+    "description": "Tally 60 runs batted in (RBI) in Diamond Dynasty.",
+    "evaluator": "rbi",
+    "target": 60,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738103,
+    "name": "Score 10 Runs",
+    "description": "Score 10 runs in Diamond Dynasty.",
+    "evaluator": "runs",
+    "target": 10,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738104,
+    "name": "Score 30 Runs",
+    "description": "Score 30 runs in Diamond Dynasty.",
+    "evaluator": "runs",
+    "target": 30,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738105,
+    "name": "Score 60 Runs",
+    "description": "Score 60 runs in Diamond Dynasty.",
+    "evaluator": "runs",
+    "target": 60,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738106,
+    "name": "Tally 50 TB",
+    "description": "Tally 50 total bases in Diamond Dynasty.",
+    "evaluator": "total_bases",
+    "target": 50,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738107,
+    "name": "Tally 150 TB",
+    "description": "Tally 150 total bases in Diamond Dynasty.",
+    "evaluator": "total_bases",
+    "target": 150,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738108,
+    "name": "Tally 5,000 PXP with September Monthly Awards players",
+    "description": "Tally 5,000 Parallel XP (PXP) with September Monthly Awards players in Diamond Dynasty.",
+    "evaluator": "parallel_xp",
+    "target": 5000,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "item_ids": [
+        60478,
+        60477,
+        60492,
+        60493,
+        60494,
+        60495,
+        60496,
+        60497,
+        60498,
+        60499,
+        60500,
+        60501,
+        60502,
+        60503,
+        60504,
+        60505,
+        60506,
+        60509,
+        60507,
+        60508,
+        60510,
+        60450
+      ]
+    }
+  },
+  {
+    "id": 738109,
+    "name": "Tally 50 TB with September Monthly Awards players",
+    "description": "Tally 50 total bases with September Monthly Awards players in Diamond Dynasty.",
+    "evaluator": "total_bases",
+    "target": 50,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "item_ids": [
+        60478,
+        60477,
+        60492,
+        60493,
+        60494,
+        60495,
+        60496,
+        60497,
+        60498,
+        60499,
+        60500,
+        60501,
+        60502,
+        60503,
+        60504,
+        60505,
+        60506,
+        60509,
+        60507,
+        60508,
+        60510,
+        60450
+      ]
+    }
+  },
+  {
+    "id": 738110,
+    "name": "Tally 27 IP with September Monthly Awards players",
+    "description": "Tally 27 innings pitched with September Monthly Awards players in Diamond Dynasty.",
+    "evaluator": "pitching_outs",
+    "target": 81,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "item_ids": [
+        60478,
+        60477,
+        60492,
+        60493,
+        60494,
+        60495,
+        60496,
+        60497,
+        60498,
+        60499,
+        60500,
+        60501,
+        60502,
+        60503,
+        60504,
+        60505,
+        60506,
+        60509,
+        60507,
+        60508,
+        60510,
+        60450
+      ]
+    }
+  },
+  {
+    "id": 738111,
+    "name": "Tally 30 Ks with September Monthly Awards players",
+    "description": "Tally 30 strikeouts with September Monthly Awards players in Diamond Dynasty.",
+    "evaluator": "pitching_strikeouts",
+    "target": 30,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "item_ids": [
+        60478,
+        60477,
+        60492,
+        60493,
+        60494,
+        60495,
+        60496,
+        60497,
+        60498,
+        60499,
+        60500,
+        60501,
+        60502,
+        60503,
+        60504,
+        60505,
+        60506,
+        60509,
+        60507,
+        60508,
+        60510,
+        60450
+      ]
+    }
+  },
+  {
+    "id": 738112,
+    "name": "Tally 15 XBH with September Monthly Awards players",
+    "description": "Tally 15 extra-base hits with September Monthly Awards players in Diamond Dynasty.",
+    "evaluator": "extra_base_hits",
+    "target": 15,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "item_ids": [
+        60478,
+        60477,
+        60492,
+        60493,
+        60494,
+        60495,
+        60496,
+        60497,
+        60498,
+        60499,
+        60500,
+        60501,
+        60502,
+        60503,
+        60504,
+        60505,
+        60506,
+        60509,
+        60507,
+        60508,
+        60510,
+        60450
+      ]
+    }
+  },
+  {
+    "id": 738113,
+    "name": "Tally 25 Hits",
+    "description": "Tally 25 hits in Diamond Dynasty.",
+    "evaluator": "hits",
+    "target": 25,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738114,
+    "name": "Tally 50 TB",
+    "description": "Tally 50 total bases in Diamond Dynasty.",
+    "evaluator": "total_bases",
+    "target": 50,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738115,
+    "name": "Score 25 Runs",
+    "description": "Score 25 runs in Diamond Dynasty.",
+    "evaluator": "runs",
+    "target": 25,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738116,
+    "name": "Tally 25 RBI",
+    "description": "Tally 25 runs batted in (RBI) in Diamond Dynasty.",
+    "evaluator": "rbi",
+    "target": 25,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738117,
+    "name": "Tally 30 Ks",
+    "description": "Tally 30 strikeouts in Diamond Dynasty.",
+    "evaluator": "pitching_strikeouts",
+    "target": 30,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738118,
+    "name": "Tally 27 IP",
+    "description": "Tally 27 innings pitched in Diamond Dynasty.",
+    "evaluator": "pitching_outs",
+    "target": 81,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 738119,
+    "name": "Tally 2,500 PXP",
+    "description": "Tally 2,500 Parallel XP (PXP) in Diamond Dynasty.",
+    "evaluator": "parallel_xp",
+    "target": 2500,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 739001,
+    "name": "PXP with Kaiju Series Program players",
+    "description": "Tally 2,000 Parallel XP with the player rewards from the Kaiju Series Program.",
+    "evaluator": "parallel_xp",
+    "target": 2000,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "item_ids": [
+        57743,
+        57809,
+        57745,
+        57747,
+        57746,
+        57750,
+        57749,
+        57748,
+        57707,
+        57708,
+        57744,
+        57751
+      ]
+    }
+  },
+  {
+    "id": 739002,
+    "name": "Tally XBH with Kaiju Series batters",
+    "description": "Tally 10 extra-base hits with Kaiju Series batters in Diamond Dynasty.",
+    "evaluator": "extra_base_hits",
+    "target": 10,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "series": "Kaiju"
+    }
+  },
+  {
+    "id": 739003,
+    "name": "Tally HR with Kaiju Series batters",
+    "description": "Tally 5 home runs with Kaiju Series batters in Diamond Dynasty.",
+    "evaluator": "home_runs",
+    "target": 5,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "series": "Kaiju"
+    }
+  },
+  {
+    "id": 739004,
+    "name": "Tally IP with Kaiju Series pitchers",
+    "description": "Tally 20 innings pitched with Kaiju Series pitchers in Diamond Dynasty.",
+    "evaluator": "pitching_outs",
+    "target": 60,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "series": "Kaiju"
+    }
+  },
+  {
+    "id": 739005,
+    "name": "Tally Strikeouts with Kaiju Series pitchers",
+    "description": "Tally 25 strikeouts with Kaiju Series pitchers in Diamond Dynasty.",
+    "evaluator": "pitching_strikeouts",
+    "target": 25,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "series": "Kaiju"
+    }
+  },
+  {
+    "id": 739006,
+    "name": "PXP with Kaiju Mike Yastrzemski",
+    "description": "Tally 200 Parallel XP with Kaiju Mike Yastrzemski.",
+    "evaluator": "parallel_xp",
+    "target": 200,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "item_ids": [
+        57743
+      ]
+    }
+  },
+  {
+    "id": 739007,
+    "name": "PXP with Kaiju Jerry Hairston Jr.",
+    "description": "Tally 200 Parallel XP with Kaiju Jerry Hairston Jr..",
+    "evaluator": "parallel_xp",
+    "target": 200,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "item_ids": [
+        57809
+      ]
+    }
+  },
+  {
+    "id": 739008,
+    "name": "PXP with Kaiju Zack Britton",
+    "description": "Tally 500 Parallel XP with Kaiju Zack Britton.",
+    "evaluator": "parallel_xp",
+    "target": 500,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "item_ids": [
+        57745
+      ]
+    }
+  },
+  {
+    "id": 739009,
+    "name": "PXP with Kaiju Keith Hernandez",
+    "description": "Tally 200 Parallel XP with Kaiju Keith Hernandez.",
+    "evaluator": "parallel_xp",
+    "target": 200,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "item_ids": [
+        57747
+      ]
+    }
+  },
+  {
+    "id": 739010,
+    "name": "PXP with Kaiju David Robertson",
+    "description": "Tally 500 Parallel XP with Kaiju David Robertson.",
+    "evaluator": "parallel_xp",
+    "target": 500,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "item_ids": [
+        57746
+      ]
+    }
+  },
+  {
+    "id": 739011,
+    "name": "PXP with Kaiju Warren Spahn",
+    "description": "Tally 500 Parallel XP with Kaiju Warren Spahn.",
+    "evaluator": "parallel_xp",
+    "target": 500,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "item_ids": [
+        57750
+      ]
+    }
+  },
+  {
+    "id": 739012,
+    "name": "PXP with Kaiju Harold Baines",
+    "description": "Tally 200 Parallel XP with Kaiju Harold Baines.",
+    "evaluator": "parallel_xp",
+    "target": 200,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "item_ids": [
+        57749
+      ]
+    }
+  },
+  {
+    "id": 739013,
+    "name": "PXP with Kaiju Joe Torre",
+    "description": "Tally 200 Parallel XP with Kaiju Joe Torre.",
+    "evaluator": "parallel_xp",
+    "target": 200,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "item_ids": [
+        57748
+      ]
+    }
+  },
+  {
+    "id": 739014,
+    "name": "PXP with Kaiju Hunter Renfroe",
+    "description": "Tally 200 Parallel XP with Kaiju Hunter Renfroe.",
+    "evaluator": "parallel_xp",
+    "target": 200,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "item_ids": [
+        57707
+      ]
+    }
+  },
+  {
+    "id": 739015,
+    "name": "PXP with Kaiju Brandon Lowe",
+    "description": "Tally 200 Parallel XP with Kaiju Brandon Lowe.",
+    "evaluator": "parallel_xp",
+    "target": 200,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "item_ids": [
+        57708
+      ]
+    }
+  },
+  {
+    "id": 739016,
+    "name": "PXP with Kaiju Stephen Strasburg",
+    "description": "Tally 500 Parallel XP with Kaiju Stephen Strasburg.",
+    "evaluator": "parallel_xp",
+    "target": 500,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "item_ids": [
+        57744
+      ]
+    }
+  },
+  {
+    "id": 739020,
+    "name": "The Kaiju Arrive at The City",
+    "description": "Score a run in one Diamond Dynasty game.",
+    "evaluator": "runs",
+    "target": 1,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739021,
+    "name": "Distraction Tactics",
+    "description": "Tally 4 total bases in one Diamond Dynasty game.",
+    "evaluator": "total_bases",
+    "target": 4,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739022,
+    "name": "The Kaiju are Interested in Baseball",
+    "description": "Tally 3 hits in one Diamond Dynasty game.",
+    "evaluator": "hits",
+    "target": 3,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739023,
+    "name": "Sold-Out Crowd in The City",
+    "description": "Tally 1 run batted in (RBI) in one Diamond Dynasty game.",
+    "evaluator": "rbi",
+    "target": 1,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739024,
+    "name": "At Sea is the Place to Be",
+    "description": "Strike out 3 batters in one Diamond Dynasty game.",
+    "evaluator": "pitching_strikeouts",
+    "target": 3,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739025,
+    "name": "What do the Kaiju Desire?",
+    "description": "Strike out 2 batters in one Diamond Dynasty game.",
+    "evaluator": "pitching_strikeouts",
+    "target": 2,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739026,
+    "name": "The Kaiju are Not Happy",
+    "description": "Record a save in one Diamond Dynasty game.",
+    "evaluator": "saves",
+    "target": 1,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739027,
+    "name": "Baseball Souvenirs for the Monsters",
+    "description": "Tally 2 extra-base hits in one Diamond Dynasty game.",
+    "evaluator": "extra_base_hits",
+    "target": 2,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739028,
+    "name": "Target Acquired",
+    "description": "Record 3 pitching outs in one Diamond Dynasty game.",
+    "evaluator": "pitching_outs",
+    "target": 3,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739029,
+    "name": "A Warm Welcome",
+    "description": "Tally 2 hits in one Diamond Dynasty game.",
+    "evaluator": "hits",
+    "target": 2,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739030,
+    "name": "More Where that Came from",
+    "description": "Tally 1 extra-base hit in one Diamond Dynasty game.",
+    "evaluator": "extra_base_hits",
+    "target": 1,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739031,
+    "name": "Hit it Out of Their World",
+    "description": "Hit a home run in one Diamond Dynasty game.",
+    "evaluator": "home_runs",
+    "target": 1,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739032,
+    "name": "Take on the Kaiju",
+    "description": "Score 3 runs in one Diamond Dynasty game to earn the Kaiju Showdown points.",
+    "evaluator": "runs",
+    "target": 3,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739033,
+    "name": "Tally 40 hits",
+    "description": "Tally 40 hits in Diamond Dynasty.",
+    "evaluator": "hits",
+    "target": 40,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 739034,
+    "name": "Tally 15 home runs",
+    "description": "Tally 15 home runs in Diamond Dynasty.",
+    "evaluator": "home_runs",
+    "target": 15,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 739035,
+    "name": "Tally 25 RBI",
+    "description": "Tally 25 RBI in Diamond Dynasty.",
+    "evaluator": "rbi",
+    "target": 25,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 739036,
+    "name": "Tally 35 strikeouts",
+    "description": "Tally 35 strikeouts in Diamond Dynasty.",
+    "evaluator": "pitching_strikeouts",
+    "target": 35,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 739037,
+    "name": "Tally 2,000 PXP",
+    "description": "Tally 2,000 PXP in Diamond Dynasty.",
+    "evaluator": "parallel_xp",
+    "target": 2000,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 739040,
+    "name": "Miggy Mashes to MVP",
+    "description": "Hit a home run in one Diamond Dynasty game.",
+    "evaluator": "home_runs",
+    "target": 1,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739041,
+    "name": "Wishing Waino Well",
+    "description": "Strike out 6 batters in one Diamond Dynasty game.",
+    "evaluator": "pitching_strikeouts",
+    "target": 6,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739042,
+    "name": "Dallas Dominates Way to Cy Young",
+    "description": "Strike out 4 batters in one Diamond Dynasty game.",
+    "evaluator": "pitching_strikeouts",
+    "target": 4,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739043,
+    "name": "Melancon Paces MLB in Saves",
+    "description": "Strike out 2 batters in one Diamond Dynasty game.",
+    "evaluator": "pitching_strikeouts",
+    "target": 2,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739044,
+    "name": "Can't Hit Against Hendricks",
+    "description": "Strike out 5 batters in one Diamond Dynasty game.",
+    "evaluator": "pitching_strikeouts",
+    "target": 5,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739045,
+    "name": "Segura Sets Career-Highs Galore",
+    "description": "Tally 2 hits in one Diamond Dynasty game.",
+    "evaluator": "hits",
+    "target": 2,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739046,
+    "name": "Matt Masters the Home Run Craft",
+    "description": "Hit a home run in one Diamond Dynasty game.",
+    "evaluator": "home_runs",
+    "target": 1,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739047,
+    "name": "Automatic Ottavino",
+    "description": "Strike out 2 batters in one Diamond Dynasty game.",
+    "evaluator": "pitching_strikeouts",
+    "target": 2,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739048,
+    "name": "Play it again, D.J.!",
+    "description": "Tally 6 total bases in one Diamond Dynasty game.",
+    "evaluator": "total_bases",
+    "target": 6,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739049,
+    "name": "Santana's All-Star Season",
+    "description": "Tally 4 total bases in one Diamond Dynasty game.",
+    "evaluator": "total_bases",
+    "target": 4,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739050,
+    "name": "Yeli Takes Extra Bases",
+    "description": "Tally 1 extra-base hit in one Diamond Dynasty game.",
+    "evaluator": "extra_base_hits",
+    "target": 1,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739051,
+    "name": "PXP with Career Tribute Program Players",
+    "description": "Tally 2,500 Parallel XP with Career Tribute Program players.",
+    "evaluator": "parallel_xp",
+    "target": 2500,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "item_ids": [
+        60181,
+        60178,
+        60182,
+        60179,
+        60180,
+        60183,
+        39300,
+        39324
+      ]
+    }
+  },
+  {
+    "id": 739052,
+    "name": "PXP with Career Tribute Pack Players",
+    "description": "Tally 1,250 Parallel XP with Career Tribute Pack players.",
+    "evaluator": "parallel_xp",
+    "target": 1250,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "item_ids": [
+        39326,
+        39293,
+        60187,
+        28893,
+        60185,
+        60186
+      ]
+    }
+  },
+  {
+    "id": 739053,
+    "name": "PXP with Career Tribute Choice Pack Players",
+    "description": "Tally 1,250 Parallel XP with Career Tribute Choice Pack players.",
+    "evaluator": "parallel_xp",
+    "target": 1250,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "item_ids": [
+        60184,
+        39323,
+        51432
+      ]
+    }
+  },
+  {
+    "id": 739054,
+    "name": "Tally IP with Prime Dallas Keuchel",
+    "description": "Tally 9 innings pitched with Prime Dallas Keuchel in single-player Diamond Dynasty games.",
+    "evaluator": "pitching_outs",
+    "target": 27,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "item_ids": [
+        60181
+      ]
+    }
+  },
+  {
+    "id": 739055,
+    "name": "Tally Ks with Prime Adam Ottavino",
+    "description": "Tally 12 strikeouts with Prime Adam Ottavino in single-player Diamond Dynasty games.",
+    "evaluator": "pitching_strikeouts",
+    "target": 12,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "item_ids": [
+        60178
+      ]
+    }
+  },
+  {
+    "id": 739056,
+    "name": "Tally Hits with Prime Jean Segura",
+    "description": "Tally 10 hits with Prime Jean Segura in single-player Diamond Dynasty games.",
+    "evaluator": "hits",
+    "target": 10,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "item_ids": [
+        60182
+      ]
+    }
+  },
+  {
+    "id": 739057,
+    "name": "Tally Ks with Prime Kyle Hendricks",
+    "description": "Tally 12 strikeouts with Prime Kyle Hendricks in single-player Diamond Dynasty games.",
+    "evaluator": "pitching_strikeouts",
+    "target": 12,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "item_ids": [
+        60179
+      ]
+    }
+  },
+  {
+    "id": 739058,
+    "name": "Tally Saves with Prime Mark Melancon",
+    "description": "Tally 6 saves with Prime Mark Melancon in single-player Diamond Dynasty games.",
+    "evaluator": "saves",
+    "target": 6,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "item_ids": [
+        60180
+      ]
+    }
+  },
+  {
+    "id": 739059,
+    "name": "Tally Hits with Prime D.J. LeMahieu",
+    "description": "Tally 10 hits with Prime D.J. LeMahieu in single-player Diamond Dynasty games.",
+    "evaluator": "hits",
+    "target": 10,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "item_ids": [
+        60183
+      ]
+    }
+  },
+  {
+    "id": 739060,
+    "name": "Tally HR with Signature Miguel Cabrera",
+    "description": "Tally 10 home runs with Signature Miguel Cabrera in single-player Diamond Dynasty games.",
+    "evaluator": "home_runs",
+    "target": 10,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "item_ids": [
+        39324
+      ]
+    }
+  },
+  {
+    "id": 739061,
+    "name": "Tally IP with Signature Adam Wainwright",
+    "description": "Tally 9 innings pitched with Signature Adam Wainwright in single-player Diamond Dynasty games.",
+    "evaluator": "pitching_outs",
+    "target": 27,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "item_ids": [
+        39300
+      ]
+    }
+  },
+  {
+    "id": 739062,
+    "name": "Rally for the Career Tribute Showdown",
+    "description": "Score 3 runs in one Diamond Dynasty game to earn the Career Tribute Showdown points.",
+    "evaluator": "runs",
+    "target": 3,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739063,
+    "name": "Tally 30 hits",
+    "description": "Tally 30 hits in Diamond Dynasty.",
+    "evaluator": "hits",
+    "target": 30,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 739064,
+    "name": "Tally 20 extra-base hits",
+    "description": "Tally 20 extra-base hits in Diamond Dynasty.",
+    "evaluator": "extra_base_hits",
+    "target": 20,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 739065,
+    "name": "Tally 12 home runs",
+    "description": "Tally 12 home runs in Diamond Dynasty.",
+    "evaluator": "home_runs",
+    "target": 12,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 739066,
+    "name": "Tally 30 RBI",
+    "description": "Tally 30 RBI in Diamond Dynasty.",
+    "evaluator": "rbi",
+    "target": 30,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 739067,
+    "name": "Tally 40 strikeouts",
+    "description": "Tally 40 strikeouts in Diamond Dynasty.",
+    "evaluator": "pitching_strikeouts",
+    "target": 40,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 739068,
+    "name": "Tally 2,000 PXP",
+    "description": "Tally 2,000 PXP in Diamond Dynasty.",
+    "evaluator": "parallel_xp",
+    "target": 2000,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  }
+]
