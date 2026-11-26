@@ -3,7 +3,7 @@
     "id": 730001,
     "slot_id": 731001,
     "name": "Finish 2 CPU games",
-    "description": "Finish two games against the CPU in Diamond Dynasty.",
+    "description": "Finish two games against the CPU in Play vs. CPU or Mini Seasons.",
     "evaluator": "cpu_game_finished",
     "target": 2,
     "reward": {
@@ -15,14 +15,16 @@
       "daily"
     ],
     "modes": [
-      3
-    ]
+      3,
+      6
+    ],
+    "xp": 500
   },
   {
     "id": 730002,
     "slot_id": 731002,
     "name": "Win 1 CPU game",
-    "description": "Win a game against the CPU in Diamond Dynasty.",
+    "description": "Win a game against the CPU in Play vs. CPU or Mini Seasons.",
     "evaluator": "cpu_game_won",
     "target": 1,
     "reward": {
@@ -34,8 +36,10 @@
       "daily"
     ],
     "modes": [
-      3
-    ]
+      3,
+      6
+    ],
+    "xp": 1000
   },
   {
     "id": 730003,
@@ -56,7 +60,8 @@
       3,
       6,
       8
-    ]
+    ],
+    "xp": 500
   },
   {
     "id": 730004,
@@ -78,7 +83,8 @@
     ],
     "card_filter": {
       "series": "Live Series"
-    }
+    },
+    "xp": 1000
   },
   {
     "id": 730005,
@@ -99,7 +105,8 @@
       3,
       6,
       8
-    ]
+    ],
+    "xp": 500
   },
   {
     "id": 730006,
@@ -120,7 +127,8 @@
       3,
       6,
       8
-    ]
+    ],
+    "xp": 500
   },
   {
     "id": 730007,
@@ -141,7 +149,8 @@
       3,
       6,
       8
-    ]
+    ],
+    "xp": 500
   },
   {
     "id": 730008,
@@ -162,13 +171,14 @@
       3,
       6,
       8
-    ]
+    ],
+    "xp": 500
   },
   {
     "id": 730009,
     "slot_id": 731009,
     "name": "Win by 5 or more runs",
-    "description": "Win a Diamond Dynasty Play vs. CPU game by at least five runs.",
+    "description": "Win by at least five runs in Play vs. CPU or Mini Seasons.",
     "evaluator": "win_margin",
     "target": 1,
     "reward": {
@@ -180,9 +190,11 @@
       "daily"
     ],
     "modes": [
-      3
+      3,
+      6
     ],
-    "min_margin": 5
+    "min_margin": 5,
+    "xp": 1000
   },
   {
     "id": 730010,
@@ -203,12 +215,13 @@
       3,
       6,
       8
-    ]
+    ],
+    "xp": 500
   },
   {
     "id": 730101,
     "name": "Finish 1 CPU game",
-    "description": "Finish a Diamond Dynasty Play vs. CPU game to advance to the Championship Round.",
+    "description": "Finish a game in Play vs. CPU or Mini Seasons to advance to the Championship Round.",
     "evaluator": "cpu_game_finished",
     "target": 1,
     "cadence": "permanent",
@@ -216,13 +229,15 @@
       "program"
     ],
     "modes": [
-      3
-    ]
+      3,
+      6
+    ],
+    "xp": 500
   },
   {
     "id": 730102,
     "name": "Finish 2 CPU games",
-    "description": "Finish two Diamond Dynasty Play vs. CPU games during the Championship Round.",
+    "description": "Finish two games in Play vs. CPU or Mini Seasons during the Championship Round.",
     "evaluator": "cpu_game_finished",
     "target": 2,
     "cadence": "permanent",
@@ -230,13 +245,15 @@
       "program"
     ],
     "modes": [
-      3
-    ]
+      3,
+      6
+    ],
+    "xp": 500
   },
   {
     "id": 730103,
     "name": "Win 1 CPU game",
-    "description": "Win a Diamond Dynasty Play vs. CPU game during the Championship Round.",
+    "description": "Win a game in Play vs. CPU or Mini Seasons during the Championship Round.",
     "evaluator": "cpu_game_won",
     "target": 1,
     "cadence": "permanent",
@@ -244,8 +261,10 @@
       "program"
     ],
     "modes": [
-      3
-    ]
+      3,
+      6
+    ],
+    "xp": 1000
   },
   {
     "id": 730201,
@@ -259,7 +278,8 @@
     ],
     "modes": [
       3
-    ]
+    ],
+    "xp": 500
   },
   {
     "id": 730202,
@@ -276,7 +296,8 @@
     ],
     "card_filter": {
       "series": "Monthly Awards"
-    }
+    },
+    "xp": 500
   },
   {
     "id": 730203,
@@ -290,7 +311,8 @@
     ],
     "modes": [
       3
-    ]
+    ],
+    "xp": 500
   },
   {
     "id": 730301,
@@ -304,7 +326,8 @@
     ],
     "modes": [
       3
-    ]
+    ],
+    "xp": 500
   },
   {
     "id": 730302,
@@ -318,12 +341,13 @@
     ],
     "modes": [
       3
-    ]
+    ],
+    "xp": 500
   },
   {
     "id": 730303,
     "name": "Win 1 CPU game",
-    "description": "Win a game in Diamond Dynasty Play vs. CPU or beat Pennant Clincher.",
+    "description": "Win a game in Play vs. CPU or Mini Seasons, or beat Pennant Clincher.",
     "evaluator": "cpu_game_won",
     "target": 1,
     "cadence": "permanent",
@@ -331,7 +355,9 @@
       "program"
     ],
     "modes": [
-      3
-    ]
+      3,
+      6
+    ],
+    "xp": 1000
   }
 ]

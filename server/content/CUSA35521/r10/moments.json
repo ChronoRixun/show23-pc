@@ -12,7 +12,8 @@
       "opponent_club": 0,
       "situation_id": 733001,
       "stubs": 150,
-      "difficulty": "Rookie"
+      "difficulty": "Rookie",
+      "objective": "walk_off_runs"
     },
     {
       "id": 733002,
@@ -57,7 +58,7 @@
       "situation_id": 733004,
       "stubs": 150,
       "difficulty": "Rookie",
-      "objective": "walk_off"
+      "objective": "walk_off_runs"
     }
   ],
   "situations": [

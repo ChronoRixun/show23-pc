@@ -748,7 +748,7 @@ def add_bonus_xp(params):
     return '<response><bonus_xp amount="0"/></response>'
 
 
-MISSION_CONTENT_DIR = Path(HERE) / 'content' / 'CUSA35521' / 'r8'
+MISSION_CONTENT_DIR = Path(HERE) / 'content' / 'CUSA35521' / 'r10'
 DAILY_GOAL_GROUP_ID = 730000
 MISSION_REROLL_FLAG = 'reward_flag_ab_dkxi'  # 0x35fa44, hash 0xbc667a79 gates Get New Mission
 # Type-0 detail indexes the global slot vector. Keep one small ordered board.
@@ -786,10 +786,11 @@ class TitleContent(NamedTuple):
     moment_groups: dict
 
 
-# Fields in the ordinary Moment conditions parser: WINS (0xae0fa1),
-# pitching K (0xae10fd), HR (0xae12ab), OUTS (0xae14fd), pitching RUNS (0xae1723).
+# Ordinary Moment stats: batting R (0xae1005), HR (0xae12ab), OUTS (0xae14fd),
+# pitching K (0xae10fd) and RUNS (0xae1723).
 MOMENT_OBJECTIVES = {
-    'walk_off': ('batting', 'WINS', 1),
+    'walk_off': ('batting', 'WINS', 1),  # Historical r4-r8 wire definition.
+    'walk_off_runs': ('batting', 'R', 2),
     'pitching_strikeouts': ('pitching', 'K', 2),
     'home_run': ('batting', 'HR', 1),
 }
@@ -833,8 +834,8 @@ def load_title_content(directory):
     if not isinstance(manifest, dict) or manifest.keys() != {'schema_version', 'title', 'revision', 'files'}:
         raise invalid('manifest.json must contain schema_version, title, revision and files')
     version = manifest['schema_version']
-    if type(version) is not int or not 1 <= version <= 8:
-        raise invalid('manifest.json schema_version must be an integer from 1 through 8')
+    if type(version) is not int or not 1 <= version <= 10:
+        raise invalid('manifest.json schema_version must be an integer from 1 through 10')
     if manifest['title'] != 'CUSA35521' or manifest['revision'] != directory.name:
         raise invalid(f'manifest.json must identify title CUSA35521 and revision {directory.name}')
     expected_files = {'missions.json'} if version == 1 else {'missions.json', 'programs.json'}
@@ -860,6 +861,8 @@ def load_title_content(directory):
     if not isinstance(missions, list) or not missions:
         raise invalid('missions.json must contain a nonempty list of missions')
     common = {'id', 'name', 'description', 'evaluator', 'target', 'cadence'}
+    if version >= 10:
+        common.add('xp')
     mission_index = {}
     slots = set()
     for index, mission in enumerate(missions, 1):
@@ -883,6 +886,8 @@ def load_title_content(directory):
         for field in ('id', 'target', 'slot_id') if 'slot_id' in fields else ('id', 'target'):
             if not content_positive(mission[field]):
                 raise invalid(f'{label} {field} must be a positive integer within signed 32-bit range')
+        if 'xp' in fields and not content_positive(mission['xp']):
+            raise invalid(f'{label} xp must be a positive integer within signed 32-bit range')
         mission_id = mission['id']
         if mission_id in mission_index:
             raise invalid(f'{label} has duplicate id {mission_id}')
@@ -914,7 +919,8 @@ def load_title_content(directory):
         mission_index[mission_id] = mission
     if len(slots) > DAILY_SLOT_LIMIT:
         raise invalid(f'missions.json daily board exceeds {DAILY_SLOT_LIMIT} slots')
-    moments, situations, groups = (validate_moment_content(read_json('moments.json'), invalid, browser=version >= 7)
+    moments, situations, groups = (validate_moment_content(read_json('moments.json'), invalid, browser=version >= 7,
+                                                           require_run_criteria=version >= 9)
                                    if version >= 4 else ({}, {}, {}))
     browser_moments = {mid for mid, moment in moments.items()
                        if moment['set_id'] in groups.get(moment['group_id'], {}).get('sets', {})}
@@ -954,7 +960,7 @@ def validate_mission_options(mission, label, invalid):
             raise invalid(f'{label} card_filter has an unknown club')
 
 
-def validate_moment_content(content, invalid, *, browser=False):
+def validate_moment_content(content, invalid, *, browser=False, require_run_criteria=False):
     keys = {'moments', 'situations', 'groups'} if browser else {'moments', 'situations'}
     if (not content_record(content, keys)
             or any(not isinstance(rows, list) or not rows for rows in content.values())):
@@ -1003,9 +1009,12 @@ def validate_moment_content(content, invalid, *, browser=False):
         objective = row.get('objective', 'walk_off')
         if not isinstance(objective, str) or objective not in MOMENT_OBJECTIVES:
             raise invalid('moments.json moment objective is unsupported')
+        if require_run_criteria and objective == 'walk_off':
+            raise invalid('moments.json needs walk_off_runs for a walk-off objective')
         top = situation.get('inning_is_top', False)
         lead = situation['user_runs'] - situation['cpu_runs']
-        if ((top, lead) != {'walk_off': (False, -1), 'pitching_strikeouts': (True, 1),
+        if ((top, lead) != {'walk_off': (False, -1), 'walk_off_runs': (False, -1),
+                           'pitching_strikeouts': (True, 1),
                            'home_run': (False, 0)}[objective]
                 or objective == 'pitching_strikeouts' and situation['outs'] > 1):
             raise invalid(f'moments.json situation does not match the {objective} objective')
@@ -1199,7 +1208,11 @@ def mission_rows(profile):
         target = mission['target']
         remaining = mission_count(progress, key) - mission_count(paid_cycles, key) * target
         current = min(target, max(0, remaining))
-        description = f'{mission["description"]} Reward: {mission["reward"]["amount"]} Stubs.'
+        xp = mission.get('xp', 0)
+        reward = f'{mission["reward"]["amount"]} Stubs'
+        if xp:
+            reward += f' and {xp} XP'
+        description = f'{mission["description"]} Reward: {reward}.'
         yield mission, dict(id=mission['id'], name=mission['name'], description=description,
                             type_tab=0, is_complete=int(current == target),
                             progress_current=current, progress_max=target, stat=mission_unit(mission))
@@ -1227,9 +1240,9 @@ def mission_slots(params):
                         current_progress=fields['progress_current'], max_progress=fields['progress_max'],
                         timed_tab=0, timed_remaining=0, submode=0, **{MISSION_REROLL_FLAG: 0}, **fields)
         # The type-0 detail reads the amount (0x35fa94) with a fixed XP display
-        # argument (0x3539a0). The description above advertises the real Stubs.
+        # argument (0x3539a0). The description also advertises the Stubs.
         extras = ET.SubElement(ET.SubElement(row, 'reward'), 'extras')
-        mini_node(extras, 'extra', amount=0)
+        mini_node(extras, 'extra', amount=mission.get('xp', 0))
     return mini_xml(response)
 
 
@@ -1289,14 +1302,24 @@ def authored_program_fields(program, saved, missions):
     return fields
 
 
+def authored_goal_xp(mission):
+    # A mission on both boards earns its XP through daily cycle settlement.
+    return 0 if 'daily' in mission.get('shows_in', ()) else mission.get('xp', 0)
+
+
 def authored_program_goals(parent, program, saved, missions, current_stage, *, include_moments=False):
     stages = ET.SubElement(parent, 'stages')
     units = saved.get('units')
-    mode = 'Play vs. CPU'
+    cpu_mode = 'Play vs. CPU'
+    mini_mode = 'Play vs. CPU or Mini Seasons'
     for index, definition in enumerate(program['stages']):
+        mini_goals = {goal['mission_id'] for goal in definition['goals']
+                      if 6 in missions[goal['mission_id']].get('modes', ())}
+        mode = mini_mode if mini_goals else cpu_mode
+        where = 'the modes listed on each goal' if 0 < len(mini_goals) < len(definition['goals']) else mode
         stage = mini_node(stages, 'stage', stage=index, is_unlocked=int(index <= current_stage))
         goals = mini_node(stage, 'goals', id=definition['id'], name=definition['name'],
-                          description=f'Complete {definition["name"]} goals in {mode}.',
+                          description=f'Complete {definition["name"]} goals in {where}.',
                           type=2, is_group=1, is_complete=1, type_tab=0, tickets=0, mode_name=mode)
         # Type 2 uses these goal rows directly, as Team Affinity does. Type 0
         # would index the global daily DATA_M slots and show the wrong goals.
@@ -1305,8 +1328,13 @@ def authored_program_goals(parent, program, saved, missions, current_stage, *, i
             target = mission['target']
             current = min(target, mission_count(units, str(mission['id'])))
             complete = int(current == target)
-            row = mini_node(goals, 'goal', id=mission['id'], type=2, type_tab=0, mode_name=mode,
-                            name=mission['name'], description=mission['description'],
+            description = mission['description']
+            xp = authored_goal_xp(mission)
+            if xp:
+                description += f' Reward: {xp} XP.'
+            row = mini_node(goals, 'goal', id=mission['id'], type=2, type_tab=0,
+                            mode_name=mini_mode if mission['id'] in mini_goals else cpu_mode,
+                            name=mission['name'], description=description,
                             is_complete=complete, tickets=goal['points'], progress_current=current,
                             progress_max=target, mission_criteria_id=0, preview_count=0,
                             stat=mission_unit(mission))
@@ -1824,6 +1852,9 @@ def settle_daily_missions(profile, credits):
         newly_earned = cycles - mission_count(paid_cycles, key)
         if newly_earned > 0:
             profile['stubs'] = profile.get('stubs', 0) + newly_earned * mission['reward']['amount']
+            xp = mission.get('xp', 0)
+            if xp:
+                queue_profile_xp(profile, newly_earned * xp)
             paid_cycles[key] = cycles
 
 
@@ -1851,7 +1882,13 @@ def settle_authored_programs(state, credits, *, program_id=None):
             mission = content.missions[goal['mission_id']]
             mid = str(mission['id'])
             if mid in credits:
-                units[mid] = min(mission['target'], mission_count(units, mid) + credits[mid])
+                target = mission['target']
+                before = mission_count(units, mid)
+                after = min(target, before + credits[mid])
+                units[mid] = after
+                xp = authored_goal_xp(mission)
+                if xp and before < target == after:
+                    queue_profile_xp(profile, xp)
         points, _ = authored_program_status(program, saved, content.missions)
         claimed = set(saved['claimed_tiers'])
         for tier in authored_program_tiers(program):
@@ -1871,10 +1908,130 @@ def settle_game_missions(state, credits):
         settle_authored_programs(state, credits)
 
 
+PXP_THRESHOLDS = (0, 500, 1250, 3000, 5000, 10000)
+# Retail 23 hitting panel. A single is the remainder after removing XBH.
+PXP_BATTING_RATES = (
+    ('plate_appearances', 10, 'PA', 'PA'),
+    ('singles', 5, 'single', 'singles'),
+    ('doubles', 10, 'double', 'doubles'),
+    ('triples', 20, 'triple', 'triples'),
+    ('home_runs', 20, 'home run', 'home runs'),
+    ('runs', 5, 'run', 'runs'),
+    ('rbi', 5, 'RBI', 'RBI'),
+    ('stolen_bases', 5, 'stolen base', 'stolen bases'),
+    ('walks', 5, 'walk', 'walks'),
+)
+PXP_CARD_FIELDS = tuple('hits' if field == 'singles' else field for field, *_ in PXP_BATTING_RATES)
+PXP_MODIFIER_FIELDS = tuple('itemseq_skill_mod_' + skill for skill in ('rookie', 'veteran', 'allstar', 'hof', 'legend')) + (
+    'itemseq_online_mod', 'itemseq_offline_mod')
+
+
+def batting_pxp(line):
+    events = {field: line.get(field) for field in PXP_CARD_FIELDS}
+    if any(type(count) is not int or count < 0 for count in events.values()):
+        return 0, ''
+    events['singles'] = events['hits'] - events['doubles'] - events['triples'] - events['home_runs']
+    if events['singles'] < 0 or events['hits'] + events['walks'] > events['plate_appearances']:
+        return 0, ''
+    earned = sum(events[field] * rate for field, rate, _, _ in PXP_BATTING_RATES)
+    description = ', '.join(f'{count} {single if count == 1 else plural}'
+                            for field, _, single, plural in PXP_BATTING_RATES
+                            if (count := events[field]))
+    return earned, description
+
+
+def clear_parallel_xp_result(state):
+    state.get('parallel_xp', {}).pop('latest', None)
+
+
+def settle_batting_pxp(state, record, won, receipt, *, card_ids=None):
+    clear_parallel_xp_result(state)
+    if (record['game_type'] != 'ARENA' or record['sub_mode'] not in (3, 6)
+            or record['outcome'] != 'FINISHED' or not record.get('stats')):
+        return
+    sides = [side for side in SUMMARY_SIDES if record['players'][side] == ACCOUNT_ID]
+    if len(sides) != 1:
+        return
+    lines = record['stats'][sides[0]]['cards']
+    appearances = [card['batting'].get('plate_appearances') for card in lines.values()]
+    if not won and (any(type(pa) is not int or pa < 0 for pa in appearances) or sum(appearances) < 8):
+        return
+    match_cards = match_stat_cards(state, record, card_ids)
+    if not match_cards:
+        return
+    try:
+        owned = {card['uuid'] for card in cards(state) if card['quantity'] > 0}
+    except (OSError, ValueError, KeyError, TypeError, struct.error):
+        return   # A catalogue problem must not prevent the game from settling.
+    updates = []
+    for item, line in lines.items():
+        card = match_cards.get(item)
+        if not card or card.get('uuid') not in owned:
+            continue
+        earned, description = batting_pxp(line['batting'])
+        if not earned:
+            continue
+        progress = state.setdefault('parallel_xp', {'rules_version': 1, 'cards': {}})
+        edition = progress['cards'].setdefault(card['uuid'], {'xp': 0, 'crossings': {}})
+        before = mission_count(edition, 'xp')
+        after = min(0x7fffffff, before + earned)
+        if after <= before:
+            continue
+        edition['xp'] = after
+        for tier, threshold in enumerate(PXP_THRESHOLDS[1:], 1):
+            if before < threshold <= after:
+                edition['crossings'].setdefault(str(tier), receipt)
+        # The bar animates from the pre-game tier. At max, keep the last
+        # positive span so the client's two bound operands never coincide.
+        level = sum(before >= threshold for threshold in PXP_THRESHOLDS[1:-1])
+        updates.append(dict(name=card['name'], describe=description, delta_xp=after - before, after_xp=after,
+                            prev_level=PXP_THRESHOLDS[level], next_level=PXP_THRESHOLDS[level + 1],
+                            prev_level_index=level, next_level_index=level + 1))
+    if updates:
+        progress['latest'] = {'receipt': receipt, 'sub_mode': record['sub_mode'], 'updates': updates}
+
+
+def remember_parallel_cpu_quit(state, record, data):
+    if not record['uuid'] or len(record['uuid']) > 128:
+        return False
+    try:
+        summary_teams(record, summary_local_team(state))
+    except ValueError:
+        return False
+    # CPU quits have no game-credit receipt. Track their display-only reset
+    # so a delayed retry cannot remove the result of a newer completed game.
+    receipt = hashlib.sha256(data).hexdigest()
+    progress = state.setdefault('parallel_xp', {'rules_version': 1, 'cards': {}})
+    seen = progress.setdefault('cpu_quit_receipts', [])
+    if receipt in seen:
+        return False
+    seen.append(receipt)
+    clear_parallel_xp_result(state)
+    return True
+
+
+def parallel_levelups(_params):
+    # 0xbfd870 builds skill/mode lists from info and independently stashes
+    # the xp_updates vector. Step 1 only emits batting XP progress rows.
+    progress = load_state(migrate_team=False).get('parallel_xp', {})
+    response = ET.Element('response')
+    mini_node(response, 'info', levelup_trophy=0, **dict.fromkeys(PXP_MODIFIER_FIELDS, '1.0'))
+    ET.SubElement(response, 'items')
+    updates = ET.SubElement(response, 'xp_updates')
+    for row in progress.get('latest', {}).get('updates', ()):
+        mini_node(updates, 'xp_update', **row)
+    return mini_xml(response)
+
+
 def up_levels(xp):
     # GUESS: level_prog is a percent and cur_level_xp is XP into this level (0xaa1e30).
     level, into = divmod(xp, UP_XP_PER_LEVEL)
     return level, into * 100 // UP_XP_PER_LEVEL, into, UP_XP_PER_LEVEL
+
+
+def queue_profile_xp(profile, amount):
+    profile['xp'] = max(0, min(0xffffffff, profile.get('xp', 0) + amount))
+    profile['pending_xp'] = profile.get('pending_xp', 0) + amount
 
 
 def xp_grant_answer(body):
@@ -1916,8 +2073,7 @@ def xp_grant_answer(body):
 
     if n:
         p['grant_mark'] = {'time': newest_t, 'counts': dict(newest_counts)}
-    p['xp'] = max(0, min(0xffffffff, p.get('xp', 0) + added))
-    p['pending_xp'] = p.get('pending_xp', 0) + added
+    queue_profile_xp(p, added)
     level, prog, into, need = up_levels(p['xp'])
     # Reader 0x16c72c0, consumer 0xb14ad0: accepted clears the queue, cap_seconds 0 means no cap.
     w = (Writer().u32(p['xp']).u32(level).u32(prog).u32(p.get('prestige', 0)).u32(into).u32(need)
@@ -1946,8 +2102,11 @@ def game_create(params, game_data=None):
         won = cpu_upload_win(state, record)
         if won is None:
             # Keep the existing quit summary while withholding all game credit.
-            if record['outcome'] in ('QUIT', 'QUIT_ON') and remember_summary_upload(state, record):
-                save_state(state)
+            if record['outcome'] in ('QUIT', 'QUIT_ON'):
+                summary_changed = remember_summary_upload(state, record)
+                pxp_changed = remember_parallel_cpu_quit(state, record, game_data)
+                if summary_changed or pxp_changed:
+                    save_state(state)
             return '<response/>'
         # A UUID can be reused by a subsequent game. Reuse the exact-payload receipt
         # from Team Affinity so old uploads and retries cannot earn any game credit.
@@ -1955,8 +2114,11 @@ def game_create(params, game_data=None):
         if receipt in state.get('team_affinity', {}).get('game_receipts', {}):
             return '<response/>'
         credits = mission_game_credits(state, record, won)
+        settle_batting_pxp(state, record, won, receipt)  # Before affinity consumes the setup roster.
         affinity_record_game(state, receipt, affinity_upload_clubs(state, record), won)
         settle_game_missions(state, credits)
+    else:
+        clear_parallel_xp_result(state)
 
     # Dispatch and persistence are synchronous on the service event loop. All
     # credit, the receipt and any legacy team migration commit in one replace.
@@ -3091,7 +3253,8 @@ SHOWDOWN_BLUE_RECAP = SHOWDOWN_NINTH_INNING_MOMENTS[0]._replace(
     identifier=7190, name='Recap marker', stubs=0, banked_runs=0,
     batter_upgrade=False, perk_rarity=None, ends_run_on_loss=False)
 SHOWDOWN_BLUE_CASES = (
-    (0, 'WINS', 'team'),
+    # Batting WINS has no valid enum. Keep T0 on the same in-play run stat as T1.
+    (0, 'R', 'team'),
     (1, 'R', 'team'),
     (2, 'R', 'leadoff'),
     (3, None, None),  # Known raid-outs control, with the shipped start situation.
@@ -3668,8 +3831,8 @@ def showdown_banked_runs(run):
 
 
 def showdown_blue_criteria(field, threshold, actor=-1, *, mode='batting'):
-    # -1 is the native fallback sentinel. The team/actor binding remains an
-    # experiment. The tokens, integer types, and complete row shape are known.
+    # The native sender copies this id into the result row (0x9eaa30).
+    # The ordinary evaluator selects team or player stats separately (0xa7d8f6).
     row = dict(mode=mode, field=field, condition='>=', value=threshold, id=actor,
                pre='Reach ', post=f' {field}', post_singular=f' {field}')
     return json.dumps(dict(stat_binder=0, stat_conditions=[row]))
@@ -3913,6 +4076,7 @@ def program_moment_score(moment, query):
     if receipt is None:
         receipt = {'won': won, 'data': data}
         progress['receipts'][key] = receipt
+        clear_parallel_xp_result(state)
         if won:
             profile = state.setdefault('profile', {})
             profile['stubs'] = profile.get('stubs', 0) + moment['stubs']
@@ -4143,6 +4307,7 @@ def showdown_record_result(state, run, query):
         return
     won = raw in (True, 'true', '1')
     moment = showdown_moments(run)[index]
+    clear_parallel_xp_result(state)
     if showdown_is_blue(run):
         del run['pending_moment']
         run.pop('pending_loss_on_resume', None)
@@ -5915,6 +6080,7 @@ def home_panels(params):
 
 CARD_ART_HOST = 's3.amazonaws.com'
 CARD_ART_PATH = '/mlb23-production-2023/scout-card-art/'
+PLAYER_ART_DOWNLOAD_LIMIT = 3500  # Leave room in the 4,000-entry client cache.
 _card_art = None
 
 # THE GAME'S OWN UPDATE PACKAGE (v1.21, unpacked beside the base game) carries the real art of the special cards:
@@ -5991,6 +6157,69 @@ def register_picture(registry, name, art_id, url_id, data, extension='.webp'):
     return True
 
 
+def walkup_player_handle(card):
+    first, _, last = card['name'].strip().partition(' ')
+    # 0x9bf200 copies at most 15 bytes per name. 0x9c5360 joins last_first,
+    # removes the listed delimiters and folds ASCII case.
+    raw = b'_'.join(part.encode('utf-8')[:15] for part in (last, first))
+    try:
+        name = raw.translate(None, b" \\.,`-'").lower().decode('utf-8')
+    except UnicodeDecodeError:
+        return None
+    return name if all(char.isalnum() or char == '_' for char in name) else None
+
+
+def texture_cache_hash(name):
+    value = 0
+    for byte in name.encode('utf-8').lower():
+        value = (((value << 8) | (value >> 24)) ^ (byte if byte < 128 else byte - 256)) & 0xffffffff
+    return value | 0x80000000  # Native 0x1ae47d0.
+
+
+def prepare_walkup_art(registry, pool):
+    """Point each in-game edition at its existing picture or a cache alias."""
+    import io
+
+    published = {name: url for name, _, _, url in registry['entries']}
+    if not published:
+        return
+    prefixes = registry['walkup_prefixes']
+    occupied = {texture_cache_hash(name) for name in published}
+    for card in pool:
+        item_id = card['item_id']
+        art = registry['override'].get(item_id)
+        if not art or card.get('series') in (None, '', 'Live', 'Live Series'):
+            continue
+        handle, art_id = art
+        if item_id not in registry['full_art_ids'] and not (card.get('imported_special') and item_id == art_id):
+            continue  # The override can be a plain photo borrowed from a different edition.
+        source = f'as_{handle}_{art_id}'
+        url = published.get(source)
+        player_handle = walkup_player_handle(card)
+        if not url or not player_handle:
+            continue
+        # The in-game getter uses the roster item_id as the suffix. If the
+        # existing key matches, it only needs the part before last_first.
+        if art_id == item_id and handle.lower().endswith(player_handle):
+            prefix = handle[:-len(player_handle)]
+            if re.fullmatch(r'[A-Za-z0-9_]{0,14}', prefix):
+                prefixes[item_id] = prefix
+                continue
+        alias = f'as_ig_{player_handle}_{item_id}'
+        key = texture_cache_hash(alias)
+        if len(registry['entries']) >= PLAYER_ART_DOWNLOAD_LIMIT or key in occupied:
+            continue
+        try:
+            archive = registry['files']['/__host/' + url.removeprefix('https://')]
+            with zipfile.ZipFile(io.BytesIO(archive)) as file:
+                picture = file.read(source + '.webp')
+        except (KeyError, zipfile.BadZipFile):
+            continue
+        if register_picture(registry, alias, item_id, f'walkup-{item_id}', picture):
+            occupied.add(key)
+            prefixes[item_id] = 'ig_'
+
+
 def designed_card_series(card):
     return card.get('series') not in (None, '', 'Live', 'Live Series', 'Captain')
 
@@ -6060,9 +6289,7 @@ def publish_disc_art(registry):
         plain_by_player = {card['roster_player_id']: registry['override'][card['item_id']]
                            for card in plain if card['item_id'] in registry['override']}
         for card in special:
-            # The on-disk cache holds 4,000 entries; leave room for stock
-            # content and other downloads. Decoded pictures are evicted separately.
-            kind = publish_special_art(registry, card) if len(registry['entries']) < 3500 else None
+            kind = publish_special_art(registry, card) if len(registry['entries']) < PLAYER_ART_DOWNLOAD_LIMIT else None
             if kind is None:
                 fallback = plain_by_player.get(card['roster_player_id'])
                 if fallback:
@@ -6071,6 +6298,7 @@ def publish_disc_art(registry):
             counts[kind] += 1
         print('imported card art: %d disc, %d site, %d plain photo, %d generic'
               % tuple(counts[kind] for kind in ('disc', 'site', 'photo', 'generic')))
+        prepare_walkup_art(registry, special)
 
 
 def player_art():
@@ -6086,7 +6314,7 @@ def player_art():
     global _card_art
     if _card_art is not None:
         return _card_art
-    _card_art = {'entries': [], 'files': {}, 'override': {}, 'full_art_ids': set()}
+    _card_art = {'entries': [], 'files': {}, 'override': {}, 'full_art_ids': set(), 'walkup_prefixes': {}}
     if CARD_SOURCE == 'disc':
         publish_disc_art(_card_art)
         return _card_art
@@ -6115,7 +6343,8 @@ def player_art():
                 _card_art['full_art_ids'].add(c['item_id'])
             counts[kind] += 1
     seen = set()
-    for c in cards():
+    pool = cards()
+    for c in pool:
         try:
             # 1. A candidate from the update package (a WebP or a plain .tex action shot).
             own = update_art(c)
@@ -6141,6 +6370,7 @@ def player_art():
             print('card art: %s skipped (%r)' % (c['name'], e))
     print('card art: %d from the update package (+%d action shots), %d from the website download'
           % (counts['update'], counts['update_tex'], counts['site']))
+    prepare_walkup_art(_card_art, pool)
     return _card_art
 
 
@@ -6257,9 +6487,14 @@ def team_reply(squad, team, captains=None):
         order = sorted(lineup + dh, key=lambda c: -(c.get('contact_right', 0) + c.get('power_right', 0)))
     order_nodh = [c for c in order if c not in dh]
     players = []
+    team_id = team.get('id', DD_TEAM_ID)
+    walkup = (player_art().get('walkup_prefixes', {})
+              if team_id >= len(MLB_TEAMS) and not team.get('mini_cpu') else {})
 
     def add(c, **slots):
         slots.update(player_fields(c))
+        if c['item_id'] in walkup:
+            slots['actionshot_small'] = walkup[c['item_id']]
         slots.setdefault('pitching_role', 0)
         slots.setdefault('pitching_position', 0)
         slots.setdefault('role', {'SP': 0, 'RP': 1, 'CP': 2}.get(c['display_position'], 7))   # 0 starter, 1 reliever, 2 closer, 7 position player (seen in the game's own team records)
@@ -6294,7 +6529,6 @@ def team_reply(squad, team, captains=None):
     colours = ' '.join('%s="%s"' % (k, esc(v)) for k, v in team.items() if k.endswith(('_hue', '_saturation', '_brightness'))
                        or k in ('audio_comm_location', 'audio_comm_name') or (k.startswith('uniform_') and k != 'uniform_id'))
     names = RATING_NAMES
-    team_id = team.get('id', DD_TEAM_ID)
     return ('<response><arena_team id="%d" name="%s" location="%s" abbreviation="%s" mini_cpu="%d" tier="" trophy_data="" is_logo_approved="true" '
             'draft_state="0" has_dh="1" wins="%d" losses="%d" rating="0" rating_coop="0" logo_version="0" br_wins="0" br_losses="0" '
             'capt_pit="%d" capt_pos="%d" onramp_step="0" home_uniform_team_id="%d" away_uniform_team_id="%d" %s/>'
@@ -6384,6 +6618,7 @@ TEAM_STAT_WORDS = {
 CARD_BATTING_WORDS = {
     'hits': 5, 'at_bats': 0, 'total_bases': 11, 'home_runs': 24, 'doubles': 22, 'triples': 23,
     'rbi': 9, 'runs': 8, 'walks': 36, 'batting_strikeouts': 10, 'stolen_bases': 44, 'errors': 42,
+    'plate_appearances': 13,  # B+0x1a, includes walks and sacrifices.
 }
 CARD_PITCHING_WORDS = {
     'pitching_outs': 19, 'hits_allowed': 4, 'runs_allowed': 8, 'earned_runs_allowed': 9,
@@ -7304,12 +7539,15 @@ def mini_finish(state, run, data):
         profile['games'] = profile.get('games', 0) + 1
         profile['stubs'] = profile.get('stubs', 0) + STUBS_PER_GAME
         cards = pending.get('card_ids', {}).get(local, ())
+        match_ids = cards or squad_ids(run['squad'])
+        settle_batting_pxp(state, record, won, digest, card_ids=match_ids)
         clubs = (affinity_card_clubs(card_by_id(item_id) for item_id in cards[:9] + cards[13:18])
                  if len(cards) == 26 else affinity_squad_clubs(current_squad(run['squad'])))
         affinity_record_game(state, digest, clubs, won)
-        settle_game_missions(state, mission_game_credits(state, record, won,
-                                                        card_ids=cards or squad_ids(run['squad'])))
+        settle_game_missions(state, mission_game_credits(state, record, won, card_ids=match_ids))
         mini_advance_league(state, run)
+    else:
+        clear_parallel_xp_result(state)
     record.pop('stats')
     run['uploads'][key] = {'teams': teams, 'record': record, 'innings': innings, 'scores': scores, 'errors': errors,
                            'created_at': now, 'cur_game': len(run['results']), 'digest': digest, 'day': day,
@@ -7549,7 +7787,7 @@ DYNAMIC = {'content_update.latest': content_update_reply, 'arena_team.create': a
            'arena_squad.assign_player': squad_assign, 'arena_squad.swap_player': squad_swap,
            'arena_squad.swap_position': squad_swap,
            'mlb_game.create': game_create, 'mlb_game.view_post_game': view_post_game,
-           'arena_game.summary': arena_game_summary,
+           'arena_game.summary': arena_game_summary, 'arena_team.get_levelups': parallel_levelups,
            'program.all_progress': all_progress, 'program.list': program_list, 'program.view': program_view,
            'mission.view_slots': mission_slots, 'reward_game.add_bonus_xp': add_bonus_xp,
            'universal_profile.update_currency': update_currency}
@@ -9077,6 +9315,7 @@ def conquest_settle(state, run):
     dst = conquest_cell(run, battle['to'])
     if battle['revision'] != run['revision']:
         raise ConquestRefusal('The Conquest board changed before the game finished.')
+    clear_parallel_xp_result(state)
     stolen = 0
     if record['outcome'] == 'FINISHED':
         won = record['totals']['away']['runs'] > record['totals']['home']['runs']
