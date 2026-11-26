@@ -714,13 +714,19 @@ def program_goal(program, tickets, *, available=True, maximum=PATH_TOTAL, goal_n
 
 
 def program_pack_fields(pack_id):
-    pack = SHOP_PACKS[pack_id]
-    return dict(id=pack_id, item_id=pack_id, type_id=4, name=pack.name, description=shop_description(pack, None),
-                texture_name=pack.texture, quantity=1, rank=0,
-                rarity_id=max(RARITY_ID.get(draw.rarity, 0) for draw in pack.draws),
+    pack = SHOP_PACKS.get(pack_id)
+    if pack is None:
+        choice = choice_pack_products()[pack_id]
+        name, description, texture = (choice[key] for key in ('name', 'description', 'texture'))
+        item_type, rarity = 6, RARITY_ID['Diamond']
+    else:
+        name, description, texture = pack.name, shop_description(pack, None), pack.texture
+        item_type, rarity = 4, max(RARITY_ID.get(draw.rarity, 0) for draw in pack.draws)
+    return dict(id=pack_id, item_id=pack_id, type_id=item_type, name=name, description=description,
+                texture_name=texture, quantity=1, rank=0, rarity_id=rarity,
                 no_sell=1, odds_valid=0, item_draft_pack_id=0, anim_index=0,
                 is_live_set=0, captain=0, captained=0, set_name='',
-                item_label_aaadeb49z9__=pack.name)  # script 0xf1697e59
+                item_label_aaadeb49z9__=name)  # script 0xf1697e59
 
 
 def program_card_item(card, quantity, *, tag='item'):
@@ -747,8 +753,13 @@ def program_extra(parent, tag, amount):
 
 
 def program_tier_row(parent, tier, tickets, claimed):
-    item_id, name, type_id = (tier.card['item_id'], tier.card['name'], 0) if tier.card is not None else (
-        (tier.pack_id, SHOP_PACKS[tier.pack_id].name, 4) if tier.pack_id else (0, 'Stubs', -1))
+    if tier.card is not None:
+        item_id, name, type_id = tier.card['item_id'], tier.card['name'], 0
+    elif tier.pack_id:
+        fields = program_pack_fields(tier.pack_id)
+        item_id, name, type_id = fields['id'], fields['name'], fields['type_id']
+    else:
+        item_id, name, type_id = 0, 'Stubs', -1
     has_item = type_id >= 0
     row = mini_node(parent, 'reward', id=item_id, level=tier.level, name=name,
                     type_id=type_id, tickets_required=tier.threshold, cur_val=tickets,
@@ -858,7 +869,7 @@ def add_bonus_xp(params):
     return '<response><bonus_xp amount="0"/></response>'
 
 
-MISSION_CONTENT_DIR = Path(HERE) / 'content' / 'CUSA35521' / 'r12'
+MISSION_CONTENT_DIR = Path(HERE) / 'content' / 'CUSA35521' / 'r14'
 DAILY_GOAL_GROUP_ID = 730000
 MISSION_REROLL_FLAG = 'reward_flag_ab_dkxi'  # 0x35fa44, hash 0xbc667a79 gates Get New Mission
 # Type-0 detail indexes the global slot vector. Keep one small ordered board.
@@ -946,8 +957,8 @@ def load_title_content(directory):
     if not isinstance(manifest, dict) or manifest.keys() != {'schema_version', 'title', 'revision', 'files'}:
         raise invalid('manifest.json must contain schema_version, title, revision and files')
     version = manifest['schema_version']
-    if type(version) is not int or not 1 <= version <= 12:
-        raise invalid('manifest.json schema_version must be an integer from 1 through 12')
+    if type(version) is not int or not 1 <= version <= 13:
+        raise invalid('manifest.json schema_version must be an integer from 1 through 13')
     if manifest['title'] != 'CUSA35521' or manifest['revision'] != directory.name:
         raise invalid(f'manifest.json must identify title CUSA35521 and revision {directory.name}')
     expected_files = {'missions.json'} if version == 1 else {'missions.json', 'programs.json'}
@@ -1040,8 +1051,11 @@ def load_title_content(directory):
                                    if version >= 4 else ({}, {}, {}))
     browser_moments = {mid for mid, moment in moments.items()
                        if moment['set_id'] in groups.get(moment['group_id'], {}).get('sets', {})}
+    choices = (validate_choice_packs(read_json('choice_packs.json'), invalid, program_rewards=version >= 13)
+               if version >= 12 else None)
     programs = (validate_authored_programs(read_json('programs.json'), mission_index, invalid,
-                                           moments if version >= 4 else None, browser_moments=browser_moments)
+                                           moments if version >= 4 else None, browser_moments=browser_moments,
+                                           reward_packs=choices if version >= 13 else None)
                 if version >= 2 else {})
     if moments.keys() & (mission_index.keys() | programs.keys()):
         raise invalid('moments.json moment ids cannot reuse a mission or program id')
@@ -1051,18 +1065,20 @@ def load_title_content(directory):
                                            multiple=version >= 8)
                  if version >= 6 else {})
     season = validate_season_path(read_json('season_path.json'), invalid) if version >= 11 else None
-    choices = validate_choice_packs(read_json('choice_packs.json'), invalid) if version >= 12 else None
     return TitleContent(mission_index, programs, moments, situations, conquest, showdowns, groups, season, choices)
 
 
-def validate_choice_packs(products, invalid):
+def validate_choice_packs(products, invalid, *, program_rewards=False):
     if not isinstance(products, list) or not products:
         raise invalid('choice_packs.json must contain a nonempty list of products')
     index = {}
-    textures = set()
+    textures, sold_textures, divisions = {}, set(), set()
     for number, product in enumerate(products, 1):
         label = f'choice_packs.json product {number}'
-        if not content_record(product, {'id', 'name', 'description', 'cost', 'texture', 'source', 'rounds'}):
+        fields = {'id', 'name', 'description', 'cost', 'texture', 'source', 'rounds'}
+        if program_rewards and isinstance(product, dict):
+            fields |= product.keys() & {'partial_pool', 'affinity_division'}
+        if not content_record(product, fields):
             raise invalid(f'{label} has invalid fields')
         product_id = product['id']
         if not content_positive(product_id) or product_id in SHOP_PACKS or product_id in index:
@@ -1070,11 +1086,20 @@ def validate_choice_packs(products, invalid):
         if not all(content_text(product[key]) for key in ('name', 'description', 'texture')):
             raise invalid(f'{label} needs valid text')
         texture = product['texture']
-        if (not re.fullmatch(r'CPACK_[A-Z0-9_]+', texture) or texture in textures
-                or product['source'] not in ('base', 'update')):
-            raise invalid(f'{label} needs a unique choice-pack texture and an art source')
         if type(product['cost']) is not int or not 0 <= product['cost'] <= 0x7fffffff:
             raise invalid(f'{label} needs a nonnegative Stubs price')
+        if (not re.fullmatch(r'CPACK_[A-Z0-9_]+', texture) or product['source'] not in ('base', 'update')
+                or texture in textures and (not program_rewards or textures[texture] != product['source']
+                                            or product['cost'] > 0 and texture in sold_textures)):
+            raise invalid(f'{label} needs a valid choice-pack texture and art source')
+        if 'partial_pool' in product and (product['partial_pool'] is not True or product['cost']):
+            raise invalid(f'{label} partial_pool requires a reward-only pack')
+        if 'affinity_division' in product:
+            division = product['affinity_division']
+            if (type(division) is not int or not 0 <= division < len(AFFINITY_DIVISIONS)
+                    or division in divisions or not product.get('partial_pool')):
+                raise invalid(f'{label} needs a unique Team Affinity division on a reward-only pack')
+            divisions.add(division)
         rounds = product['rounds']
         if not isinstance(rounds, list) or not 1 <= len(rounds) <= 12:
             raise invalid(f'{label} needs 1 to 12 rounds')
@@ -1091,7 +1116,9 @@ def validate_choice_packs(products, invalid):
         if sum(row['picks'] for row in rounds) > 50:
             raise invalid(f'{label} exceeds 50 total picks')
         index[product_id] = product
-        textures.add(texture)
+        textures[texture] = product['source']
+        if product['cost']:
+            sold_textures.add(texture)
     return index
 
 
@@ -1278,7 +1305,7 @@ def validate_moment_groups(groups, moments, invalid):
     return index
 
 
-def validate_authored_programs(programs, missions, invalid, moments=None, *, browser_moments=()):
+def validate_authored_programs(programs, missions, invalid, moments=None, *, browser_moments=(), reward_packs=None):
     if not isinstance(programs, list) or not programs:
         raise invalid('programs.json must contain a nonempty list of programs')
     index = {}
@@ -1372,9 +1399,18 @@ def validate_authored_programs(programs, missions, invalid, moments=None, *, bro
             kind = reward.get('kind') if isinstance(reward, dict) else None
             if kind == 'stubs' and content_record(reward, {'kind', 'amount'}) and content_positive(reward['amount']):
                 continue
-            if kind == 'pack' and content_record(reward, {'kind', 'product_id'}):
-                if not content_positive(reward['product_id']) or reward['product_id'] not in SHOP_PACKS:
+            pack_fields = {'kind', 'product_id'}
+            if kind == 'pack' and reward_packs is not None and 'replaces' in reward:
+                pack_fields.add('replaces')
+            if kind == 'pack' and content_record(reward, pack_fields):
+                product = reward['product_id']
+                known_packs = SHOP_PACKS.keys() | (reward_packs or {}).keys()
+                if not content_positive(product) or product not in known_packs:
                     raise invalid(f'{label} tier references an unknown pack product')
+                if 'replaces' in reward and (not content_positive(reward['replaces'])
+                                             or reward['replaces'] not in known_packs
+                                             or reward['replaces'] == product):
+                    raise invalid(f'{label} replaces must reference a different known pack')
                 continue
             raise invalid(f'{label} tier must award positive Stubs or an owned pack product')
         if previous != total:
@@ -1567,12 +1603,15 @@ def authored_program_goals(parent, program, saved, missions, current_stage, *, i
 
 
 def authored_program_view(program):
-    profile = load_state(migrate_team=False).get('profile', {})
+    state = load_state(migrate_team=False)
+    profile = state.get('profile', {})
     saved = authored_program_state(profile, program)
     missions = active_title_content().missions
     moment_ids = tuple(stage['moment_goal']['moment_id'] for stage in program['stages'] if 'moment_goal' in stage)
     PROGRAM_MOMENT_CONTEXT.set(moment_ids or None)
     fields = authored_program_fields(program, saved, missions)
+    if grant_authored_tiers(state, program, saved, fields['tickets_earned'], upgrades_only=True):
+        save_state(state)
     response = ET.Element('response')
     row = mini_node(response, 'program', **fields)
     authored_program_goals(row, program, saved, missions, fields['current_stage'], include_moments=True)
@@ -1697,7 +1736,8 @@ def affinity_division_points(state, division):
 
 
 def affinity_pack_id(division):
-    return 510010 + division
+    return next((pid for pid, pack in choice_pack_products().items() if pack.get('affinity_division') == division),
+                510010 + division)
 
 
 def affinity_basic_card(club):
@@ -1787,6 +1827,8 @@ def affinity_tiers(division):
             key = affinity_reward_key(kind, target)
         elif kind == 'pack' and target is None:
             target = affinity_pack_id(division)
+            if target != 510010 + division:
+                key = f'pack:{target}'
         yield level, level * AFFINITY_STOP_TA, key, kind, amount, target
 
 
@@ -1899,7 +1941,8 @@ def affinity_grant_tiers(state, division, points):
     key = str(division)
     claimed = affinity_claims(affinity, division)
     for _, threshold, reward, kind, amount, target in affinity_tiers(division):
-        if points < threshold or reward in claimed:
+        upgraded = reward.startswith('pack:') and 'pack' in claimed
+        if reward in claimed or (points < threshold and not upgraded):
             continue
         profile = state.setdefault('profile', {})
         if kind == 'pack':
@@ -2064,6 +2107,36 @@ def settle_daily_missions(profile, credits):
             paid_cycles[key] = cycles
 
 
+def grant_authored_tiers(state, program, saved, points, *, upgrades_only=False):
+    claimed = set(saved.get('claimed_tiers', ()))
+    pack_claims = saved.get('claimed_pack_rewards', {})
+    changed = False
+    for level, tier in enumerate(program['tiers'], 1):
+        reward = tier['reward']
+        product_id = reward.get('product_id')
+        replacement = 'replaces' in reward
+        earned = level in claimed
+        if earned:
+            if not replacement or pack_claims.get(str(level)) == product_id:
+                continue
+        elif upgrades_only or points < tier['threshold']:
+            continue
+        if product_id:
+            grant_owned_pack(state.setdefault('pack_shop', {}), product_id)
+            if replacement:
+                pack_claims[str(level)] = product_id
+        else:
+            profile = state['profile']
+            profile['stubs'] = profile.get('stubs', 0) + reward['amount']
+        claimed.add(level)
+        changed = True
+    if changed:
+        saved['claimed_tiers'] = sorted(claimed)
+        if pack_claims:
+            saved['claimed_pack_rewards'] = pack_claims
+    return changed
+
+
 def settle_authored_programs(state, credits, *, program_id=None):
     content = active_title_content()
     if not content.programs:
@@ -2073,7 +2146,9 @@ def settle_authored_programs(state, credits, *, program_id=None):
     for program in programs:
         key = str(program['id'])
         saved = authored_program_state(profile, program)
-        _, current = authored_program_status(program, saved, content.missions)
+        points, current = authored_program_status(program, saved, content.missions)
+        # Apply replacements in the saved cycle before advancing into the next one.
+        grant_authored_tiers(state, program, saved, points, upgrades_only=True)
         completed = current == len(program['stages'])
         stage = program['stages'][0 if completed else current]
         if not any(credits.get(str(goal['mission_id'])) for goal in stage['goals']):
@@ -2096,16 +2171,7 @@ def settle_authored_programs(state, credits, *, program_id=None):
                 if xp and before < target == after:
                     queue_profile_xp(profile, xp)
         points, _ = authored_program_status(program, saved, content.missions)
-        claimed = set(saved['claimed_tiers'])
-        for tier in authored_program_tiers(program):
-            if points < tier.threshold or tier.level in claimed:
-                continue
-            if tier.pack_id:
-                grant_owned_pack(state.setdefault('pack_shop', {}), tier.pack_id)
-            else:
-                profile['stubs'] = profile.get('stubs', 0) + tier.stubs
-            claimed.add(tier.level)
-        saved['claimed_tiers'] = sorted(claimed)
+        grant_authored_tiers(state, program, saved, points)
 
 
 def settle_game_missions(state, credits):
@@ -2117,19 +2183,60 @@ def settle_game_missions(state, credits):
 PXP_THRESHOLDS = (0, 500, 1250, 3000, 5000, 10000)
 # Retail 23 hitting panel. A single is the remainder after removing XBH.
 PXP_BATTING_RATES = (
-    ('plate_appearances', 10, 'PA', 'PA'),
-    ('singles', 5, 'single', 'singles'),
-    ('doubles', 10, 'double', 'doubles'),
-    ('triples', 20, 'triple', 'triples'),
-    ('home_runs', 20, 'home run', 'home runs'),
-    ('runs', 5, 'run', 'runs'),
-    ('rbi', 5, 'RBI', 'RBI'),
-    ('stolen_bases', 5, 'stolen base', 'stolen bases'),
-    ('walks', 5, 'walk', 'walks'),
+    ('plate_appearances', 10, 'PA', 'PA', 'pa'),
+    ('singles', 5, 'single', 'singles', '1b'),
+    ('doubles', 10, 'double', 'doubles', '2b'),
+    ('triples', 20, 'triple', 'triples', '3b'),
+    ('home_runs', 20, 'home run', 'home runs', 'hr'),
+    ('runs', 5, 'run', 'runs', 'run'),
+    ('rbi', 5, 'RBI', 'RBI', 'rbi'),
+    ('stolen_bases', 5, 'stolen base', 'stolen bases', 'sb'),
+    ('walks', 5, 'walk', 'walks', 'bb'),
 )
 PXP_CARD_FIELDS = tuple('hits' if field == 'singles' else field for field, *_ in PXP_BATTING_RATES)
 PXP_MODIFIER_FIELDS = tuple('itemseq_skill_mod_' + skill for skill in ('rookie', 'veteran', 'allstar', 'hof', 'legend')) + (
     'itemseq_online_mod', 'itemseq_offline_mod')
+PXP_PITCHING_RATE_FIELDS = ('ip', 'w', 'so', 'qs', 's', 'h', 'cg', 'sho')
+
+
+def parallel_editions(state):
+    progress = state.get('parallel_xp')
+    editions = progress.get('cards') if isinstance(progress, dict) else None
+    return editions if isinstance(editions, dict) else {}
+
+
+def parallel_level(xp):
+    return sum(xp >= threshold for threshold in PXP_THRESHOLDS[1:])
+
+
+def owned_parallel_levels(state, owned=None):
+    editions = parallel_editions(state)
+    if not editions:
+        return {}
+    if owned is None:
+        owned = cards(state)
+    levels = {}
+    for card in owned:
+        uuid = card['uuid']
+        if card['quantity'] > 0 and (level := parallel_level(mission_count(editions.get(uuid), 'xp'))):
+            levels[uuid] = level
+    return levels
+
+
+def parallel_item_seq(xp, level):
+    # 0xb22a50 binds this sibling as SEQ_STATS. The tab selectors are zero-based
+    # and the six discovery pairs are one-based (Base is the first pair).
+    fields = {'xp': xp, 'mylevel': level}
+    for index in range(1, len(PXP_THRESHOLDS) + 1):
+        fields[f'myseq{index}'] = fields[f'allseq{index}'] = int(index <= level + 1)
+    for index, threshold in enumerate(PXP_THRESHOLDS[1:], 1):
+        # The compiled paths hash these aliases to 0x972e3231 through 0x972e3235.
+        fields[f'pxp_threshold_a_a_addrmz88{index}'] = threshold
+    for _, amount, _, _, suffix in PXP_BATTING_RATES:
+        fields[f'itemseq_xpmod_{suffix}'] = amount
+    for suffix in PXP_PITCHING_RATE_FIELDS:
+        fields[f'itemseq_xpmod_{suffix}'] = 0  # Numeric controls, pitching awards are pending verified rates.
+    return mini_xml(ET.Element('item_seq', {key: str(value) for key, value in fields.items()}))
 
 
 def batting_pxp(line):
@@ -2139,9 +2246,9 @@ def batting_pxp(line):
     events['singles'] = events['hits'] - events['doubles'] - events['triples'] - events['home_runs']
     if events['singles'] < 0 or events['hits'] + events['walks'] > events['plate_appearances']:
         return 0, ''
-    earned = sum(events[field] * rate for field, rate, _, _ in PXP_BATTING_RATES)
+    earned = sum(events[field] * rate for field, rate, *_ in PXP_BATTING_RATES)
     description = ', '.join(f'{count} {single if count == 1 else plural}'
-                            for field, _, single, plural in PXP_BATTING_RATES
+                            for field, _, single, plural, _ in PXP_BATTING_RATES
                             if (count := events[field]))
     return earned, description
 
@@ -2775,7 +2882,7 @@ def actionshot_handle(c):
     return alt if alt in _actionshots else 'ACTIONGENERIC'
 
 
-def card_attrs(c, **extra):
+def card_attrs(c, *, parallels=None, **extra):
     first, _, last = c['name'].strip().partition(' ')
     a = {'id': c['item_id'], 'item_id': c['item_id'], 'uuid': c['uuid'], 'team_id': c['team_id'],
          'roster_player_id': c['roster_player_id'], 'rarity_id': RARITY_ID.get(c['rarity'], 0),
@@ -2794,6 +2901,9 @@ def card_attrs(c, **extra):
         a['series_name'] = c['series']
         a['set_name'] = c.get('set_name') or ''
     a.update(extra)
+    level = parallels.get(c['uuid'], 0) if parallels else 0
+    if level:
+        a.update(seq_level=level, has_seq=1, sequence='1/1', my_seq_order=1, total_seq=1)
     a['border_style'] = 4 if c['item_id'] in art.get('full_art_ids', ()) else 0
     esc = lambda v: str(v).replace('&', '&amp;').replace('"', '&quot;').replace('<', '&lt;')
     return ' '.join('%s="%s"' % (k, esc(v)) for k, v in a.items())
@@ -2948,7 +3058,7 @@ def squad_swap(params):
     return view_lineup(params)
 
 
-def filter_inventory(params, squad=None):
+def filter_inventory(params, squad=None, *, state=None):
     # The substitution list of Manage Squad: arena_squad.filter_inventory {"filt_pos":N,"filt_role":R,
     # "filt_type":T,"page":P,"per_page":7} (handler 0xe93fd0: <arena_cards><arena_card .../>..., each card
     # kept as ARENACARD<n>). filt_type 0 = cards whose own position is N, 1 = N among their secondary
@@ -2980,7 +3090,9 @@ def filter_inventory(params, squad=None):
         own, second = code_of(c) == pos, pos in others_of(c)
         return own if kind == 0 else (second and not own if kind == 1 else not own and not second)
     seen, pool = set(), []
-    for c in cards():
+    state = load_state() if state is None else state
+    owned = cards(state)
+    for c in owned:
         if wanted(c) and c['name'] not in seen:        # one card per person, the best first
             seen.add(c['name'])
             pool.append(c)
@@ -2995,7 +3107,8 @@ def filter_inventory(params, squad=None):
     # The run 85 crash blamed on extra attributes here was the script's IF_Q_ELSE_INT (see compare_attrs and the
     # emulator fix d61abd60), so a card may carry more than a collection card.
     eligible = 'false' if squad is None else '0'
-    items = ''.join('<arena_card %s/>' % card_attrs(c, position=code_of(c), new_position=max(pos, 0), type_id=0, out_of_season=eligible,
+    parallels = owned_parallel_levels(state, chosen)
+    items = ''.join('<arena_card %s/>' % card_attrs(c, parallels=parallels, position=code_of(c), new_position=max(pos, 0), type_id=0, out_of_season=eligible,
                                                     order=page * per_page + i + 1, display_order=page * per_page + i + 1,
                                                     **compare_attrs(c, pos), **squad_card_text(c, pos), **captain_flags(c))
                     for i, c in enumerate(chosen))
@@ -3021,7 +3134,14 @@ def view_item(params):
                   appearance_names='|'.join(f['name'] for f in looks_fields()), attribute_names=RATING_NAMES,
                   stat_names='ENERGY', player_appearances=player_looks(c), player_attributes=player_ratings(c),
                   player_stats='255', is_active='true', type_id=0, has_actionshot='false')
-    return '<response><player %s/></response>' % card_attrs(c, **fields)
+    state = load_state(migrate_team=False)
+    uuid = c['uuid']
+    if not any(owned['uuid'] == uuid and owned['quantity'] > 0 for owned in cards(state)):
+        return '<response><player %s/></response>' % card_attrs(c, **fields)
+    xp = mission_count(parallel_editions(state).get(uuid), 'xp')
+    level = parallel_level(xp)
+    attrs = card_attrs(c, parallels={uuid: level}, seq_level=level, **fields)
+    return f'<response><player {attrs}/>{parallel_item_seq(xp, level)}</response>'
 
 
 def compare_attrs(c, pos):
@@ -3106,16 +3226,19 @@ def squad_stats(hitters, pitchers):
 
 def view_lineup(params):
     squad = current_squad()
-    return lineup_reply(squad, load_state().get('arena_team', {}), captains=captain_report(squad))
+    state = load_state()
+    return lineup_reply(squad, state.get('arena_team', {}), captains=captain_report(squad, state),
+                        parallels=owned_parallel_levels(state))
 
 
-def lineup_reply(squad, team, *, mini=False, captains=None):
+def lineup_reply(squad, team, *, mini=False, captains=None, parallels=None):
     lineup, dh, bench, starters, relief = squad
     if not lineup:
         return None
     order = sorted(lineup + dh, key=lambda c: c.get('lineup_ord', 0))
     rows = lambda cs, group: ''.join(
         '<position %s/>' % card_attrs({k: v for k, v in c.items() if not k.startswith('lineup_')},
+                                      parallels=parallels,
                                       position=FIELD_NUMBER.get(c['display_position'], 0),
                                       new_position=c.get('lineup_pos', 0),
                                       order=i + 1, display_order=i + 1, group=group,
@@ -3285,11 +3408,11 @@ def captain_tiers_xml(kind, status):
     return '<boost_tiers>%s</boost_tiers><boosts>%s</boosts>' % (tiers, current)
 
 
-def captain_row(tag, c, status, active):
+def captain_row(tag, c, status, active, *, parallels=None):
     esc = lambda v: str(v).replace('&', '&amp;').replace('"', '&quot;').replace('<', '&lt;')
     kind = status['kind']
     pos = FIELD_NUMBER.get(c['display_position'], 0)
-    attrs = card_attrs(c, type_id=0, position=pos, new_position=pos, is_live_set=0, captain=1, captained=0,
+    attrs = card_attrs(c, parallels=parallels, type_id=0, position=pos, new_position=pos, is_live_set=0, captain=1, captained=0,
                        cpt_name=status['theme'] or 'Captain', cpt_texture='', is_active=int(active),
                        cur_boost=status['tier'], in_squad=int(status['in_squad']), is_pitcher=int(kind == 'pitcher'),
                        qualifying=status['count'], required=CAPTAIN_TIERS[kind][min(status['tier'], 2)],
@@ -3309,10 +3432,13 @@ def captains_info(params):
     squad = current_squad(state.get('squad') or None)
     picked = captain_ids(captain_report(squad, state))[kind]
     seen, rows = set(), []
-    for c in cards(state):
+    owned = cards(state)
+    parallels = owned_parallel_levels(state, owned)
+    for c in owned:
         if c['quantity'] > 0 and is_captain_card(c) and captain_kind(c) == kind and c['item_id'] not in seen:
             seen.add(c['item_id'])
-            rows.append(captain_row('captain', c, captain_status(c, squad), c['item_id'] == picked))
+            rows.append(captain_row('captain', c, captain_status(c, squad), c['item_id'] == picked,
+                                    parallels=parallels))
     return '<response><captains>%s</captains></response>' % ''.join(rows) if rows else None
 
 
@@ -3328,7 +3454,8 @@ def captains_info2(params):
     state = load_state()
     squad = current_squad(state.get('squad') or None)
     picked = captain_ids(captain_report(squad, state))[captain_kind(c)]
-    return '<response>%s</response>' % captain_row('captain', c, captain_status(c, squad), c['item_id'] == picked)
+    return '<response>%s</response>' % captain_row('captain', c, captain_status(c, squad), c['item_id'] == picked,
+                                                     parallels=owned_parallel_levels(state))
 
 
 def assign_captain(params):
@@ -5926,7 +6053,8 @@ def player_collection(query, *, search=False):
         supported = False                         # role-scoped picker ABI is unverified
     match = lambda c: supported and ((search and wanted == 'All Series') or c.get('series') == wanted)
     catalogue_count = sum(match(c) for c in all_cards())
-    owned = [c for c in cards() if c['quantity'] > 0 and match(c)]
+    state = load_state()
+    owned = [c for c in cards(state) if c['quantity'] > 0 and match(c)]
     collected = len(owned)
     page, pages = 0, 1
     if search:
@@ -5937,7 +6065,8 @@ def player_collection(query, *, search=False):
             page = 0
         start = page * COLLECTION_PAGE_SIZE
         owned = owned[start:start + COLLECTION_PAGE_SIZE]
-    items = ''.join('<item %s/>' % card_attrs(c, type_id=0, order=i + 1, seq_level=0,
+    parallels = owned_parallel_levels(state, owned)
+    items = ''.join('<item %s/>' % card_attrs(c, parallels=parallels, type_id=0, order=i + 1, seq_level=0,
                                              is_live_set=0, **{'captain': 0, 'captained': 0, **captain_flags(c)})
                     for i, c in enumerate(owned))
     body = '<items count="%d" total="%d" page="%d" pages="%d" items_collected="%d" items_total="%d">%s</items>' % (
@@ -6200,7 +6329,9 @@ def _cpu_team(index, short, city, name):
 def view_team(params):
     # our own team: arena_team.view {"player_id":<account>,"squad_type":0}
     squad = current_squad()
-    return team_reply(squad, load_state().get('arena_team'), captains=captain_report(squad))
+    state = load_state()
+    return team_reply(squad, state.get('arena_team'), captains=captain_report(squad, state),
+                      parallels=owned_parallel_levels(state))
 
 
 def view_by_team(params):
@@ -6252,15 +6383,20 @@ def collections_reply(name, params):
         team = [c for c in all_cards() if c.get('series') == 'Live' and c['team_id'] == i]
         if not team:
             return None
-        owned = {c['item_id']: c['quantity'] for c in cards()}
-        item = lambda c: '<item %s/>' % card_attrs(c, quantity=owned.get(c['item_id'], 0), collection_index=0, type_id=0,
-                                                   slot_type_id=0, sub_category_id=0, seq_level=0, short_description='Player card')
+        state = load_state()
+        inventory = cards(state)
+        owned = {c['item_id']: c['quantity'] for c in inventory}
+        parallels = owned_parallel_levels(state, inventory)
+        def item(c, levels=None):
+            return '<item %s/>' % card_attrs(c, parallels=levels, quantity=owned.get(c['item_id'], 0),
+                                              collection_index=0, type_id=0, slot_type_id=0, sub_category_id=0,
+                                              seq_level=0, short_description='Player card')
         top = max(team, key=lambda c: c['ovr'])
         n = len(team)
         return ('<response><collection id="%d" name="%s %s" description="Live Series %s. Collecting is view-only on the local server.">'
                 '<items>%s</items><rewards progress_current="0" progress_max="%d">'
                 '<reward item_id="%d" qty_required="%d" has_collected="false" xp="0" stubs="0">%s</reward></rewards></collection></response>'
-                % (101 + i, MLB_TEAMS[i][1], MLB_TEAMS[i][2], MLB_TEAMS[i][2], ''.join(item(c) for c in team), n,
+                % (101 + i, MLB_TEAMS[i][1], MLB_TEAMS[i][2], MLB_TEAMS[i][2], ''.join(item(c, parallels) for c in team), n,
                    top['item_id'], n, item(top)))
     return None
 
@@ -6279,11 +6415,13 @@ def home_panels(params):
         slots[0] = starters[0]
     season = ('<curr_season><season name="Season 1" short_name="1" time_remaining="0" all_sets_eligible="1"><sets/></season>'
               '</curr_season>')
-    affinity = affinity_home_panel(load_state())
+    state = load_state()
+    affinity = affinity_home_panel(state)
     if any(i not in slots for i in range(10)):
         return '<response>%s%s</response>' % (season, affinity)
-    report = captain_report()
-    rows = ''.join('<position %s/>' % card_attrs(slots[i], position=i, new_position=i,
+    report = captain_report(state=state)
+    parallels = owned_parallel_levels(state)
+    rows = ''.join('<position %s/>' % card_attrs(slots[i], parallels=parallels, position=i, new_position=i,
                                                  **{'captain': 0, 'captained': 0, **captain_flags(slots[i], report)},
                                                  is_oop=0, is_2nd=0, has_rank_change=0, has_matchup=0, has_augment=0)
                    for i in range(10))
@@ -6687,7 +6825,7 @@ def worn_uniform(value, side):
     return cpu_team(FALLBACK_UNIFORM_CLUB)['%s_uniform_id' % side]
 
 
-def team_reply(squad, team, captains=None):
+def team_reply(squad, team, captains=None, *, parallels=None):
     lineup, dh, bench, starters, relief = squad
     boosts = captain_boosts(captains)
     picked = captain_ids(captains)
@@ -6717,7 +6855,7 @@ def team_reply(squad, team, captains=None):
         # ("pitcher out of energy" before the first pitch, run 81). 255 asks for the game's own
         # default by pitcher kind (tables at 0x2018c5c / 0x2018c68).
         c = {k: v for k, v in c.items() if not k.startswith('lineup_')}
-        players.append('<arena_player %s/>' % card_attrs(c, is_active='true', player_attributes=ratings,
+        players.append('<arena_player %s/>' % card_attrs(c, parallels=parallels, is_active='true', player_attributes=ratings,
                                                          player_appearances=player_looks(c), player_stats='255', **slots))
     for c in order:
         code = c.get('lineup_pos', 9 if c in dh else FIELD_NUMBER.get(c['display_position'], 0))
@@ -6775,9 +6913,12 @@ def loading_screen(params):
         return None
 
     squads = {DD_TEAM_ID: current_squad(), club: showdown_cpu_squad(club)}
-    report = captain_report(squads[DD_TEAM_ID])
+    state = load_state()
+    report = captain_report(squads[DD_TEAM_ID], state)
+    levels = owned_parallel_levels(state)
     body = loading_cards(*(squads[team_id] for team_id in team_ids),
-                         captains=tuple(report if team_id == DD_TEAM_ID else None for team_id in team_ids))
+                         captains=tuple(report if team_id == DD_TEAM_ID else None for team_id in team_ids),
+                         parallels=tuple(levels if team_id == DD_TEAM_ID else None for team_id in team_ids))
     if body is not None:
         local = squads[DD_TEAM_ID]
         _affinity_lineup = (team_ids, affinity_squad_clubs(local),
@@ -6785,16 +6926,16 @@ def loading_screen(params):
     return body
 
 
-def loading_cards(home, away, captains=(None, None)):
+def loading_cards(home, away, captains=(None, None), *, parallels=(None, None)):
     rows = []
-    for roster, report in zip((home, away), captains):
+    for roster, report, levels in zip((home, away), captains, parallels):
         squad = [card for group in roster for card in group]
         # VERIFIED 0x9c7ef0: the lookup uses rows 0–25 for home and the rest for away.
         if len(squad) != 26:
             return None
         for card in squad:
             rows.append('<player %s/>' % card_attrs(
-                card, bat_hand=HAND.get(card.get('bat_hand'), 0),
+                card, parallels=levels, bat_hand=HAND.get(card.get('bat_hand'), 0),
                 throw_hand=HAND.get(card.get('throw_hand'), 0),
                 is_live_set=int(card.get('series') == 'Live'),
                 **{'captain': 0, 'captained': 0, **captain_flags(card, report)}, set_name=card.get('set_name') or ''))
@@ -7600,7 +7741,7 @@ def mini_team_reply(state, run, slot):
     records, _, _, _, _ = mini_standings(run)
     team = mini_team(state, run, slot)
     team['mini_wins'], team['mini_losses'] = records[slot]
-    return team_reply(mini_roster(run, slot), team)
+    return team_reply(mini_roster(run, slot), team, parallels=owned_parallel_levels(state) if slot == 0 else None)
 
 
 def mini_side_slots(query, type_suffix, id_suffix=None):
@@ -7678,7 +7819,9 @@ def mini_loading(state, run, query):
     teams = tuple(mini_team(state, run, slots[side])['id'] for side in SUMMARY_SIDES)
     if wire not in ((ACCOUNT_ID, ACCOUNT_ID), owners, teams):
         raise MiniSeasonRefusal('The loading request does not match the scheduled Mini Seasons sides.')
-    return loading_cards(*(mini_roster(run, slots[side]) for side in SUMMARY_SIDES))
+    levels = owned_parallel_levels(state)
+    return loading_cards(*(mini_roster(run, slots[side]) for side in SUMMARY_SIDES),
+                         parallels=tuple(levels if slots[side] == 0 else None for side in SUMMARY_SIDES))
 
 
 def mini_game_mode(data):
@@ -7892,7 +8035,7 @@ def mini_shared(name, state, run, query, params):
         return mini_ack(run)
     squad = run['squad']
     if name in ('arena_squad.filter_inventory', MINI_PREFIX + 'filtered_players'):
-        reply = filter_inventory(params, squad)
+        reply = filter_inventory(params, squad, state=state)
         if ET.fromstring(reply).find('arena_cards/arena_card') is None:
             raise MiniSeasonRefusal('There are no eligible replacement players for this filter.')
         return reply
@@ -7900,7 +8043,7 @@ def mini_shared(name, state, run, query, params):
     if name == 'arena_squad.rarity_counts':
         return rarity_counts(params, squad, team)
     if name == 'arena_squad.view_lineup':
-        return lineup_reply(mini_roster(run, 0), team, mini=True)
+        return lineup_reply(mini_roster(run, 0), team, mini=True, parallels=owned_parallel_levels(state))
     if name in ('arena_squad.assign_player', 'arena_squad.swap_player', 'arena_squad.swap_position'):
         if run['pending'] is not None:
             raise MiniSeasonRefusal('Finish the current Mini Seasons game before editing its squad.')
@@ -8289,7 +8432,7 @@ def choice_pack_products():
     return active_title_content().choice_packs or {}
 
 
-def choice_card_catalogue(item_ids):
+def choice_card_catalogue(item_ids, *, allow_live=False):
     """A choice is available only with its playable edition and its own card picture."""
     candidates = {card['item_id']: card for card in all_cards() if card['item_id'] in item_ids}
     art = player_art()['override'] if candidates else {}
@@ -8297,8 +8440,9 @@ def choice_card_catalogue(item_ids):
     for item_id, card in candidates.items():
         handle, art_id = art.get(item_id, ('', 0))
         uuid = hashlib.md5(str(item_id).encode('ascii'), usedforsecurity=False).hexdigest()
-        if (card.get('uuid') == uuid and card.get('roster_player_id', 0) > 0
-                and card.get('display_position') in FIELD_NUMBER and art_id == item_id
+        live = allow_live and card.get('series') in ('Live', 'Live Series')
+        if ((card.get('uuid') == uuid and art_id == item_id or live) and card.get('roster_player_id', 0) > 0
+                and card.get('display_position') in FIELD_NUMBER
                 and handle and handle != 'ACTIONGENERIC'):
             resolved[item_id] = card
     return resolved
@@ -8306,6 +8450,45 @@ def choice_card_catalogue(item_ids):
 
 def choice_pack_options(pack):
     return {item_id for row in pack['rounds'] for item_id in row['options']}
+
+
+CHOICE_IMPORT_REQUIRED = 'No cards from this program pool are installed. Import the card catalogue and art to open it. This pack remains owned.'
+
+
+def reward_choice_description(pack):
+    description = pack['description']
+    if not pack.get('partial_pool'):
+        return description
+    options = choice_pack_options(pack)
+    available = choice_card_catalogue(options)
+    if any(available.keys().isdisjoint(row['options']) for row in pack['rounds']):
+        return f'{description} {CHOICE_IMPORT_REQUIRED}'
+    if options - available.keys():
+        return f'{description} This install offers fewer program cards. Live Series substitutes may be offered to fill the selection.'
+    return description
+
+
+def resolve_reward_choice_rounds(pack, catalogue):
+    """Keep the authored program choices that work here, with playable Live fillers if needed."""
+    rounds = []
+    live = None
+    for row in pack['rounds']:
+        options = [item for item in row['options'] if item in catalogue]
+        if not options:
+            raise ShopRefusal(CHOICE_IMPORT_REQUIRED)
+        desired = min(len(row['options']), row['picks'] + 1)
+        if len(options) < desired:
+            if live is None:
+                live_ids = {card['item_id'] for card in all_cards() if card.get('series') in ('Live', 'Live Series')}
+                live = choice_card_catalogue(live_ids, allow_live=True)
+            clubs = {catalogue[item]['team_id'] for item in options}
+            fillers = sorted(live.keys() - set(options),
+                             key=lambda item: (live[item]['team_id'] not in clubs, -live[item]['ovr'], item))
+            fillers = fillers[:desired - len(options)]
+            options.extend(fillers)
+            catalogue.update((item, live[item]) for item in fillers)
+        rounds.append({'picks': min(row['picks'], len(options)), 'options': options})
+    return rounds
 
 
 @lru_cache(maxsize=2)
@@ -8334,12 +8517,13 @@ def shop_pack_art(update_dir):
         options = {item for pack in choices.values() for item in choice_pack_options(pack)}
         catalogue = choice_card_catalogue(options)
         for pid, pack in choices.items():
-            if not choice_pack_options(pack) <= catalogue.keys():
+            texture = pack['texture']
+            if texture in registry['names'] or (not pack.get('partial_pool')
+                                                 and not choice_pack_options(pack) <= catalogue.keys()):
                 continue
             root = update_dir if pack['source'] == 'update' else LAYOUT.base
             if root is None:
                 continue
-            texture = pack['texture']
             try:
                 with open(Path(root, 'CROSS', 'LIVE', texture + '.WEBP'), 'rb') as source:
                     data = source.read(512 * 1024 + 1)
@@ -8448,9 +8632,11 @@ def shop_owned_packs(shop):
         choice = choices.get(product_id)
         if choice is not None:
             texture = choice['texture'] if choice['texture'] in shop_pack_art(UPDATE_DIR)['names'] else 'PACK_THESHOW'
+            if product_id not in descriptions:
+                descriptions[product_id] = reward_choice_description(choice)
             item = mini_node(items, 'item', id=item_id, item_id=item_id, type_id=6, quantity=1,
                              rarity_id=RARITY_ID['Diamond'], anim_index=0, item_draft_pack_id=item_id,
-                             name=choice['name'], texture_name=texture, description=choice['description'],
+                             name=choice['name'], texture_name=texture, description=descriptions[product_id],
                              odds_valid=0, no_sell=1, quantity_tab_index=0, is_live_set=0, captain=0,
                              captained=0, has_rank_change=0, in_squad=0, set_name='')
             ET.SubElement(item, 'item_exclusives')
@@ -8684,11 +8870,18 @@ def shop_choice_open(state, shop, query):
         raise ShopRefusal('That choice pack is not in your inventory.')
     options = choice_pack_options(product)
     catalogue = choice_card_catalogue(options)
-    if not options <= catalogue.keys():
+    partial = product.get('partial_pool', False)
+    if partial:
+        rounds = resolve_reward_choice_rounds(product, catalogue)
+    elif not options <= catalogue.keys():
         raise ShopRefusal('Install the required card catalogue and art to open this choice pack.')
-    rounds = product['rounds']
+    else:
+        rounds = product['rounds']
     reply = choice_draft_xml(state, rounds, [], catalogue, 0)
-    shop.setdefault('choice_drafts', {})[item_id] = {'rounds': rounds, 'receipts': [], 'open_reply': reply}
+    draft = {'rounds': rounds, 'receipts': [], 'open_reply': reply}
+    if partial:
+        draft['allow_live'] = True
+    shop.setdefault('choice_drafts', {})[item_id] = draft
     save_shop_state(state, shop)
     return reply
 
@@ -8725,7 +8918,7 @@ def shop_choice_submit(state, shop, query):
     complete = next_round == len(rounds)
     if not complete:
         required.update(rounds[next_round]['options'])
-    catalogue = choice_card_catalogue(required)
+    catalogue = choice_card_catalogue(required, allow_live=draft.get('allow_live', False))
     if not required <= catalogue.keys():
         raise ShopRefusal('Install the required card catalogue and art to continue this choice pack.')
     # Both open and submit use 0xe5b0f0. At completion, 0xe5bd20 tests

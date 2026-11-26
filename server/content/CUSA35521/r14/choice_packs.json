@@ -1012,5 +1012,434 @@
         ]
       }
     ]
+  },
+  {
+    "id": 515001,
+    "name": "WBC 90 Reward Pack",
+    "description": "Local World Baseball Classic reward. Choose two from the 90 OVR program pool.",
+    "texture": "CPACK_WBC_90",
+    "source": "update",
+    "cost": 0,
+    "partial_pool": true,
+    "rounds": [
+      {
+        "picks": 2,
+        "options": [
+          57463,
+          56837,
+          57470,
+          56617,
+          56820,
+          56432,
+          56692,
+          56384,
+          56836,
+          56832,
+          56485,
+          56833
+        ]
+      }
+    ]
+  },
+  {
+    "id": 515002,
+    "name": "WBC 95 Choice Pack",
+    "description": "Local World Baseball Classic reward. Choose two from the 95 OVR program pool.",
+    "texture": "CPACK_WBC_95",
+    "source": "update",
+    "cost": 0,
+    "partial_pool": true,
+    "rounds": [
+      {
+        "picks": 2,
+        "options": [
+          56484,
+          56486,
+          56879,
+          56878,
+          56388,
+          56372,
+          56387,
+          56834,
+          56385
+        ]
+      }
+    ]
+  },
+  {
+    "id": 515003,
+    "name": "Pennant Chase MVP Reward",
+    "description": "Program reward. Choose one of three 99 OVR Pennant Chase Awards cards.",
+    "texture": "CPACK_PENNANTCHASE",
+    "source": "update",
+    "cost": 0,
+    "partial_pool": true,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          60081,
+          60082,
+          60083
+        ]
+      }
+    ]
+  },
+  {
+    "id": 515004,
+    "name": "May Monthly Awards 95 Reward",
+    "description": "Program reward. Choose one 95 OVR May Monthly Awards card.",
+    "texture": "CPACK_MONTHLYAWARDS_MAY_95",
+    "source": "update",
+    "cost": 0,
+    "partial_pool": true,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          58507,
+          58519,
+          58506,
+          58514,
+          58509,
+          58517
+        ]
+      }
+    ]
+  },
+  {
+    "id": 515005,
+    "name": "May Monthly Awards 97 Reward",
+    "description": "Program reward. Choose one 97 OVR May Monthly Awards card.",
+    "texture": "CPACK_MONTHLYAWARDS_MAY_97",
+    "source": "update",
+    "cost": 0,
+    "partial_pool": true,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          58516,
+          58534,
+          58520,
+          58512,
+          58513,
+          58511
+        ]
+      }
+    ]
+  },
+  {
+    "id": 515006,
+    "name": "Charisma Program Choice Pack",
+    "description": "Local Charisma program reward. Choose one 99 OVR Charisma card.",
+    "texture": "CPACK_XP1_CHARISMA",
+    "source": "update",
+    "cost": 0,
+    "partial_pool": true,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          56358,
+          56735,
+          56408,
+          56703,
+          56719,
+          56734
+        ]
+      }
+    ]
+  },
+  {
+    "id": 515010,
+    "name": "AL East Team Affinity Choice Pack",
+    "description": "Local Team Affinity reward. Choose a Charisma card from this division.",
+    "texture": "CPACK_TA1_BOSS_ALEAST",
+    "source": "update",
+    "cost": 0,
+    "partial_pool": true,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          55925,
+          55926,
+          56722,
+          55928,
+          55929
+        ]
+      }
+    ],
+    "affinity_division": 0
+  },
+  {
+    "id": 515011,
+    "name": "AL Central Team Affinity Choice Pack",
+    "description": "Local Team Affinity reward. Choose a Charisma card from this division.",
+    "texture": "CPACK_TA1_BOSS_ALCENTRAL",
+    "source": "update",
+    "cost": 0,
+    "partial_pool": true,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          55930,
+          55932,
+          55933,
+          55965,
+          55966
+        ]
+      }
+    ],
+    "affinity_division": 1
+  },
+  {
+    "id": 515012,
+    "name": "AL West Team Affinity Choice Pack",
+    "description": "Local Team Affinity reward. Choose a Charisma card from this division.",
+    "texture": "CPACK_TA1_BOSS_ALWEST",
+    "source": "update",
+    "cost": 0,
+    "partial_pool": true,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          55967,
+          55968,
+          56316,
+          56001,
+          56002
+        ]
+      }
+    ],
+    "affinity_division": 2
+  },
+  {
+    "id": 515013,
+    "name": "NL East Team Affinity Choice Pack",
+    "description": "Local Team Affinity reward. Choose a Charisma card from this division.",
+    "texture": "CPACK_TA1_BOSS_NLEAST",
+    "source": "update",
+    "cost": 0,
+    "partial_pool": true,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          55919,
+          56463,
+          55922,
+          55924,
+          55931
+        ]
+      }
+    ],
+    "affinity_division": 3
+  },
+  {
+    "id": 515014,
+    "name": "NL Central Team Affinity Choice Pack",
+    "description": "Local Team Affinity reward. Choose a Charisma card from this division.",
+    "texture": "CPACK_TA1_BOSS_NLCENTRAL",
+    "source": "update",
+    "cost": 0,
+    "partial_pool": true,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          55934,
+          55935,
+          55936,
+          55937,
+          56407
+        ]
+      }
+    ],
+    "affinity_division": 4
+  },
+  {
+    "id": 515015,
+    "name": "NL West Team Affinity Choice Pack",
+    "description": "Local Team Affinity reward. Choose a Charisma card from this division.",
+    "texture": "CPACK_TA1_BOSS_NLWEST",
+    "source": "update",
+    "cost": 0,
+    "partial_pool": true,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          55939,
+          55947,
+          55961,
+          55962,
+          56451
+        ]
+      }
+    ],
+    "affinity_division": 5
+  },
+  {
+    "id": 516001,
+    "name": "Topps Now Reward Choice Pack",
+    "description": "Local Topps Now program reward. Choose one of 6 player editions.",
+    "texture": "CPACK_DIAMOND_PLAYER",
+    "source": "base",
+    "cost": 0,
+    "partial_pool": true,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          60511,
+          60893,
+          60257,
+          60134,
+          60411,
+          60144
+        ]
+      }
+    ]
+  },
+  {
+    "id": 516002,
+    "name": "Kaiju Reward Choice Pack",
+    "description": "Local Kaiju program reward. Choose one of 6 player editions.",
+    "texture": "CPACK_KAIJUTAKEOVER_01",
+    "source": "update",
+    "cost": 0,
+    "partial_pool": true,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          57751,
+          58395,
+          58394,
+          58385,
+          58388,
+          58387
+        ]
+      }
+    ]
+  },
+  {
+    "id": 516003,
+    "name": "Future Stars Reward Choice Pack",
+    "description": "Local Future Stars program reward. Choose one of 10 player editions.",
+    "texture": "CPACK_MYSHOW_2",
+    "source": "update",
+    "cost": 0,
+    "partial_pool": true,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          56841,
+          56610,
+          56583,
+          56580,
+          56614,
+          56600,
+          56599,
+          56603,
+          56601,
+          56596
+        ]
+      }
+    ]
+  },
+  {
+    "id": 516004,
+    "name": "Incognito Reward Choice Pack",
+    "description": "Local Incognito program reward. Choose one of 9 player editions.",
+    "texture": "CPACK_ALTEREGO_03",
+    "source": "update",
+    "cost": 0,
+    "partial_pool": true,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          57307,
+          57732,
+          57731,
+          57730,
+          57729,
+          57728,
+          57727,
+          57435,
+          57725
+        ]
+      }
+    ]
+  },
+  {
+    "id": 516005,
+    "name": "Career Tribute Reward Choice Pack",
+    "description": "Local Career Tribute program reward. Choose one of 3 player editions.",
+    "texture": "CPACK_CAREERTRIBUTE",
+    "source": "update",
+    "cost": 0,
+    "partial_pool": true,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          60184,
+          39323,
+          51432
+        ]
+      }
+    ]
+  },
+  {
+    "id": 516006,
+    "name": "Great Race of '98 Reward Choice Pack",
+    "description": "Local Great Race of '98 program reward. Choose one of 8 player editions.",
+    "texture": "CPACK_GR98",
+    "source": "update",
+    "cost": 0,
+    "partial_pool": true,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          59912,
+          59911,
+          59913,
+          59914,
+          59915,
+          59916,
+          59917,
+          59918
+        ]
+      }
+    ]
+  },
+  {
+    "id": 516007,
+    "name": "Finest Reward Choice Pack",
+    "description": "Local Finest program reward. Choose one of 5 player editions.",
+    "texture": "CPACK_2023FINEST_01",
+    "source": "update",
+    "cost": 0,
+    "partial_pool": true,
+    "rounds": [
+      {
+        "picks": 1,
+        "options": [
+          60460,
+          60699,
+          60691,
+          60697,
+          60701
+        ]
+      }
+    ]
   }
 ]
