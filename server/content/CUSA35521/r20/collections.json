@@ -1,0 +1,4935 @@
+{
+  "groups": [
+    {
+      "id": 2,
+      "name": "Starter Collections",
+      "texture": "COLLECT_STARTER"
+    },
+    {
+      "id": 1,
+      "name": "Live Series",
+      "texture": "COLLECT_LIVESERIES"
+    },
+    {
+      "id": 4,
+      "name": "Team Affinity",
+      "texture": "COLLECT_TEAMAFFINITY_TALL"
+    },
+    {
+      "id": 5,
+      "name": "Finders Keepers",
+      "texture": "COLLECT_SERIES"
+    },
+    {
+      "id": 8,
+      "name": "G.O.A.T.EST",
+      "texture": "COLLECT_GOATEST_TALL"
+    },
+    {
+      "id": 3,
+      "name": "Set Collections",
+      "texture": "COLLECT_SERIES"
+    },
+    {
+      "id": 6,
+      "name": "Uniforms",
+      "texture": "COLLECT_UNIFORMS"
+    },
+    {
+      "id": 7,
+      "name": "Unlockables & Equipment",
+      "texture": "COLLECT_UNLOCKABLES_EQUIPMENT"
+    }
+  ],
+  "collections": [
+    {
+      "id": 301,
+      "group_id": 2,
+      "name": "Your First Collection",
+      "texture": "COLLECT_STARTER_FIRST",
+      "description": "Collect the following items to complete your first collection.",
+      "selector": {
+        "members": {
+          "Player": [
+            "8721e34eb69d3e80c3e43c752b67620b"
+          ],
+          "Unlockable": [
+            "a21512d0b882bd7e83e9a62a6b174552"
+          ]
+        }
+      },
+      "tiers": [
+        {
+          "threshold": 1,
+          "reward": {
+            "kind": "currency",
+            "stubs": 125
+          }
+        },
+        {
+          "threshold": 2,
+          "reward": {
+            "kind": "currency",
+            "stubs": 250
+          }
+        }
+      ]
+    },
+    {
+      "id": 302,
+      "group_id": 2,
+      "name": "Collect Common Players",
+      "texture": "COLLECT_STARTER_PLAYERS",
+      "description": "Collect any 5 Common Live Series players.",
+      "selector": {
+        "live_rarities": [
+          "Common"
+        ]
+      },
+      "tiers": [
+        {
+          "threshold": 1,
+          "reward": {
+            "kind": "currency",
+            "stubs": 50
+          }
+        },
+        {
+          "threshold": 3,
+          "reward": {
+            "kind": "currency",
+            "stubs": 100
+          }
+        },
+        {
+          "threshold": 5,
+          "reward": {
+            "kind": "currency",
+            "stubs": 150
+          }
+        }
+      ]
+    },
+    {
+      "id": 303,
+      "group_id": 2,
+      "name": "Collect Infielders",
+      "texture": "COLLECT_STARTER_INFIELD",
+      "description": "Collect any 10 Common or Bronze Live Series Infielders.",
+      "selector": {
+        "live_rarities": [
+          "Common",
+          "Bronze"
+        ],
+        "positions": [
+          "1B",
+          "2B",
+          "3B",
+          "SS"
+        ]
+      },
+      "tiers": [
+        {
+          "threshold": 1,
+          "reward": {
+            "kind": "currency",
+            "stubs": 50
+          }
+        },
+        {
+          "threshold": 3,
+          "reward": {
+            "kind": "currency",
+            "stubs": 100
+          }
+        },
+        {
+          "threshold": 5,
+          "reward": {
+            "kind": "currency",
+            "stubs": 150
+          }
+        },
+        {
+          "threshold": 10,
+          "reward": {
+            "kind": "currency",
+            "stubs": 300
+          }
+        }
+      ]
+    },
+    {
+      "id": 304,
+      "group_id": 2,
+      "name": "Collect Outfielders",
+      "texture": "COLLECT_STARTER_OUTFIELD",
+      "description": "Collect any 10 Common or Bronze Live Series Outfielders.",
+      "selector": {
+        "live_rarities": [
+          "Common",
+          "Bronze"
+        ],
+        "positions": [
+          "LF",
+          "CF",
+          "RF"
+        ]
+      },
+      "tiers": [
+        {
+          "threshold": 1,
+          "reward": {
+            "kind": "currency",
+            "stubs": 50
+          }
+        },
+        {
+          "threshold": 3,
+          "reward": {
+            "kind": "currency",
+            "stubs": 100
+          }
+        },
+        {
+          "threshold": 5,
+          "reward": {
+            "kind": "currency",
+            "stubs": 150
+          }
+        },
+        {
+          "threshold": 10,
+          "reward": {
+            "kind": "currency",
+            "stubs": 300
+          }
+        }
+      ]
+    },
+    {
+      "id": 305,
+      "group_id": 2,
+      "name": "Collect Pitchers",
+      "texture": "COLLECT_STARTER_PITCHER",
+      "description": "Collect any 15 Bronze Live Series pitchers.",
+      "selector": {
+        "live_rarities": [
+          "Bronze"
+        ],
+        "positions": [
+          "SP",
+          "RP",
+          "CP"
+        ]
+      },
+      "tiers": [
+        {
+          "threshold": 3,
+          "reward": {
+            "kind": "currency",
+            "stubs": 50
+          }
+        },
+        {
+          "threshold": 5,
+          "reward": {
+            "kind": "currency",
+            "stubs": 150
+          }
+        },
+        {
+          "threshold": 10,
+          "reward": {
+            "kind": "currency",
+            "stubs": 250
+          }
+        },
+        {
+          "threshold": 15,
+          "reward": {
+            "kind": "currency",
+            "stubs": 500
+          }
+        }
+      ]
+    },
+    {
+      "id": 306,
+      "group_id": 2,
+      "name": "Collect Equipment",
+      "texture": "COLLECT_STARTER_EQUIPMENT",
+      "description": "Collect Collect Equipment items to earn rewards!",
+      "selector": {
+        "inventory": "Equipment",
+        "rarity": "Silver",
+        "skin": false
+      },
+      "tiers": [
+        {
+          "threshold": 1,
+          "reward": {
+            "kind": "currency",
+            "stubs": 50
+          }
+        },
+        {
+          "threshold": 3,
+          "reward": {
+            "kind": "currency",
+            "stubs": 150
+          }
+        },
+        {
+          "threshold": 5,
+          "reward": {
+            "kind": "currency",
+            "stubs": 250
+          }
+        }
+      ]
+    },
+    {
+      "id": 307,
+      "group_id": 2,
+      "name": "Collect Unlockables",
+      "texture": "COLLECT_STARTER_UNLOCKABLE",
+      "description": "Collect Collect Unlockables items to earn rewards!",
+      "selector": {
+        "inventory": "Unlockable",
+        "rarity": "Silver"
+      },
+      "tiers": [
+        {
+          "threshold": 1,
+          "reward": {
+            "kind": "currency",
+            "stubs": 50
+          }
+        },
+        {
+          "threshold": 3,
+          "reward": {
+            "kind": "currency",
+            "stubs": 150
+          }
+        },
+        {
+          "threshold": 5,
+          "reward": {
+            "kind": "currency",
+            "stubs": 250
+          }
+        }
+      ]
+    },
+    {
+      "id": 308,
+      "group_id": 2,
+      "name": "Collect Bat Skins",
+      "texture": "COLLECT_STARTER_BATSKIN",
+      "description": "Collect Collect Bat Skins items to earn rewards!",
+      "selector": {
+        "inventory": "Equipment",
+        "skin": true
+      },
+      "tiers": [
+        {
+          "threshold": 1,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510001
+            ],
+            "stubs": 100
+          }
+        }
+      ]
+    },
+    {
+      "id": 309,
+      "group_id": 2,
+      "name": "Collect Uniforms",
+      "texture": "COLLECT_STARTER_UNIFORMS",
+      "description": "Collect Collect Uniforms items to earn rewards!",
+      "selector": {
+        "inventory": "Unlockable",
+        "subcategory": [
+          10008
+        ]
+      },
+      "tiers": [
+        {
+          "threshold": 1,
+          "reward": {
+            "kind": "currency",
+            "stubs": 50
+          }
+        },
+        {
+          "threshold": 3,
+          "reward": {
+            "kind": "currency",
+            "stubs": 150
+          }
+        },
+        {
+          "threshold": 5,
+          "reward": {
+            "kind": "currency",
+            "stubs": 250
+          }
+        }
+      ]
+    },
+    {
+      "id": 131,
+      "group_id": 1,
+      "name": "MLB",
+      "texture": "COLLECT_MLB",
+      "description": "Collect Live Series players from all 30 MLB clubs.",
+      "selector": {
+        "live_teams": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18,
+          19,
+          20,
+          21,
+          22,
+          23,
+          24,
+          25,
+          26,
+          27,
+          28,
+          29
+        ]
+      },
+      "tiers": [
+        {
+          "threshold": 100,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510001
+            ],
+            "quantity": 5,
+            "stubs": 2500,
+            "xp": 5000
+          }
+        },
+        {
+          "threshold": 300,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510001
+            ],
+            "quantity": 10,
+            "stubs": 5000,
+            "xp": 10000
+          }
+        },
+        {
+          "threshold": 600,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510001
+            ],
+            "quantity": 20,
+            "stubs": 10000,
+            "xp": 15000
+          }
+        },
+        {
+          "threshold": "all",
+          "reward": {
+            "kind": "card",
+            "uuid": "e5b5b6a7b2a65b8f8f1d7c4657b8fc75",
+            "name": "Derek Jeter",
+            "stubs": 25000,
+            "xp": 25000
+          }
+        }
+      ]
+    },
+    {
+      "id": 132,
+      "group_id": 1,
+      "name": "American League",
+      "texture": "COLLECT_AL",
+      "description": "Collect Live Series players from the American League.",
+      "selector": {
+        "live_teams": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14
+        ]
+      },
+      "tiers": [
+        {
+          "threshold": 50,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510001
+            ],
+            "quantity": 3,
+            "stubs": 1500,
+            "xp": 2500
+          }
+        },
+        {
+          "threshold": 150,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510001
+            ],
+            "quantity": 5,
+            "stubs": 3000,
+            "xp": 5000
+          }
+        },
+        {
+          "threshold": 300,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510001
+            ],
+            "quantity": 10,
+            "stubs": 5000,
+            "xp": 10000
+          }
+        },
+        {
+          "threshold": "all",
+          "reward": {
+            "kind": "card",
+            "uuid": "ebfb99ced54e42fd2cc0a018daf9da6f",
+            "name": "Mark McGwire",
+            "stubs": 10000,
+            "xp": 15000
+          }
+        }
+      ]
+    },
+    {
+      "id": 133,
+      "group_id": 1,
+      "name": "National League",
+      "texture": "COLLECT_NL",
+      "description": "Collect Live Series players from the National League.",
+      "selector": {
+        "live_teams": [
+          15,
+          16,
+          17,
+          18,
+          19,
+          20,
+          21,
+          22,
+          23,
+          24,
+          25,
+          26,
+          27,
+          28,
+          29
+        ]
+      },
+      "tiers": [
+        {
+          "threshold": 50,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510001
+            ],
+            "quantity": 3,
+            "stubs": 1500,
+            "xp": 2500
+          }
+        },
+        {
+          "threshold": 150,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510001
+            ],
+            "quantity": 5,
+            "stubs": 3000,
+            "xp": 5000
+          }
+        },
+        {
+          "threshold": 300,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510001
+            ],
+            "quantity": 10,
+            "stubs": 5000,
+            "xp": 10000
+          }
+        },
+        {
+          "threshold": "all",
+          "reward": {
+            "kind": "card",
+            "uuid": "d3f93ce1ca1b6b4136abee05ace0fd94",
+            "name": "Sammy Sosa",
+            "stubs": 10000,
+            "xp": 15000
+          }
+        }
+      ]
+    },
+    {
+      "id": 134,
+      "group_id": 1,
+      "name": "AL East",
+      "texture": "COLLECT_ALEAST",
+      "description": "Collect Live Series players from the AL East.",
+      "selector": {
+        "live_teams": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "tiers": [
+        {
+          "threshold": 25,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510010
+            ],
+            "stubs": 750,
+            "xp": 1000
+          }
+        },
+        {
+          "threshold": 60,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510010
+            ],
+            "quantity": 3,
+            "stubs": 1500,
+            "xp": 2500
+          }
+        },
+        {
+          "threshold": 100,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510001
+            ],
+            "quantity": 5,
+            "stubs": 2500,
+            "xp": 5000
+          }
+        },
+        {
+          "threshold": "all",
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510001
+            ],
+            "quantity": 10,
+            "stubs": 5000,
+            "xp": 7500
+          }
+        }
+      ]
+    },
+    {
+      "id": 135,
+      "group_id": 1,
+      "name": "AL Central",
+      "texture": "COLLECT_ALCENTRAL",
+      "description": "Collect Live Series players from the AL Central.",
+      "selector": {
+        "live_teams": [
+          5,
+          6,
+          7,
+          8,
+          9
+        ]
+      },
+      "tiers": [
+        {
+          "threshold": 25,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510011
+            ],
+            "stubs": 750,
+            "xp": 1000
+          }
+        },
+        {
+          "threshold": 60,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510011
+            ],
+            "quantity": 3,
+            "stubs": 1500,
+            "xp": 2500
+          }
+        },
+        {
+          "threshold": 100,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510001
+            ],
+            "quantity": 5,
+            "stubs": 2500,
+            "xp": 5000
+          }
+        },
+        {
+          "threshold": "all",
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510001
+            ],
+            "quantity": 10,
+            "stubs": 5000,
+            "xp": 7500
+          }
+        }
+      ]
+    },
+    {
+      "id": 136,
+      "group_id": 1,
+      "name": "AL West",
+      "texture": "COLLECT_ALWEST",
+      "description": "Collect Live Series players from the AL West.",
+      "selector": {
+        "live_teams": [
+          10,
+          11,
+          12,
+          13,
+          14
+        ]
+      },
+      "tiers": [
+        {
+          "threshold": 25,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510012
+            ],
+            "stubs": 750,
+            "xp": 1000
+          }
+        },
+        {
+          "threshold": 60,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510012
+            ],
+            "quantity": 3,
+            "stubs": 1500,
+            "xp": 2500
+          }
+        },
+        {
+          "threshold": 100,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510001
+            ],
+            "quantity": 5,
+            "stubs": 2500,
+            "xp": 5000
+          }
+        },
+        {
+          "threshold": "all",
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510001
+            ],
+            "quantity": 10,
+            "stubs": 5000,
+            "xp": 7500
+          }
+        }
+      ]
+    },
+    {
+      "id": 137,
+      "group_id": 1,
+      "name": "NL East",
+      "texture": "COLLECT_NLEAST",
+      "description": "Collect Live Series players from the NL East.",
+      "selector": {
+        "live_teams": [
+          15,
+          16,
+          17,
+          18,
+          19
+        ]
+      },
+      "tiers": [
+        {
+          "threshold": 25,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510013
+            ],
+            "stubs": 750,
+            "xp": 1000
+          }
+        },
+        {
+          "threshold": 60,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510013
+            ],
+            "quantity": 3,
+            "stubs": 1500,
+            "xp": 2500
+          }
+        },
+        {
+          "threshold": 100,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510001
+            ],
+            "quantity": 5,
+            "stubs": 2500,
+            "xp": 5000
+          }
+        },
+        {
+          "threshold": "all",
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510001
+            ],
+            "quantity": 10,
+            "stubs": 5000,
+            "xp": 7500
+          }
+        }
+      ]
+    },
+    {
+      "id": 138,
+      "group_id": 1,
+      "name": "NL Central",
+      "texture": "COLLECT_NLCENTRAL",
+      "description": "Collect Live Series players from the NL Central.",
+      "selector": {
+        "live_teams": [
+          20,
+          21,
+          22,
+          23,
+          24
+        ]
+      },
+      "tiers": [
+        {
+          "threshold": 25,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510014
+            ],
+            "stubs": 750,
+            "xp": 1000
+          }
+        },
+        {
+          "threshold": 60,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510014
+            ],
+            "quantity": 3,
+            "stubs": 1500,
+            "xp": 2500
+          }
+        },
+        {
+          "threshold": 100,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510001
+            ],
+            "quantity": 5,
+            "stubs": 2500,
+            "xp": 5000
+          }
+        },
+        {
+          "threshold": "all",
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510001
+            ],
+            "quantity": 10,
+            "stubs": 5000,
+            "xp": 7500
+          }
+        }
+      ]
+    },
+    {
+      "id": 139,
+      "group_id": 1,
+      "name": "NL West",
+      "texture": "COLLECT_NLWEST",
+      "description": "Collect Live Series players from the NL West.",
+      "selector": {
+        "live_teams": [
+          25,
+          26,
+          27,
+          28,
+          29
+        ]
+      },
+      "tiers": [
+        {
+          "threshold": 25,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510015
+            ],
+            "stubs": 750,
+            "xp": 1000
+          }
+        },
+        {
+          "threshold": 60,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510015
+            ],
+            "quantity": 3,
+            "stubs": 1500,
+            "xp": 2500
+          }
+        },
+        {
+          "threshold": 100,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510001
+            ],
+            "quantity": 5,
+            "stubs": 2500,
+            "xp": 5000
+          }
+        },
+        {
+          "threshold": "all",
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510001
+            ],
+            "quantity": 10,
+            "stubs": 5000,
+            "xp": 7500
+          }
+        }
+      ]
+    },
+    {
+      "id": 140,
+      "group_id": 1,
+      "name": "Free Agents",
+      "texture": "COLLECT_FREEAGENTS",
+      "description": "Collect Live Series Free Agents.",
+      "selector": {
+        "live_teams": [
+          -1
+        ]
+      },
+      "tiers": [
+        {
+          "threshold": 25,
+          "reward": {
+            "kind": "currency",
+            "stubs": 500
+          }
+        },
+        {
+          "threshold": 50,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510001
+            ],
+            "stubs": 750
+          }
+        },
+        {
+          "threshold": 100,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510001
+            ],
+            "quantity": 3,
+            "stubs": 1500
+          }
+        },
+        {
+          "threshold": 200,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510001
+            ],
+            "quantity": 5,
+            "stubs": 2500
+          }
+        },
+        {
+          "threshold": 400,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510001
+            ],
+            "quantity": 10,
+            "stubs": 5000
+          }
+        }
+      ]
+    },
+    {
+      "id": 101,
+      "group_id": 1,
+      "name": "Baltimore Orioles",
+      "texture": "COLLECT_ORIOLES",
+      "description": "Collect Orioles Live Series players.",
+      "selector": {
+        "live_teams": [
+          0
+        ]
+      },
+      "tiers": [
+        {
+          "threshold": 10,
+          "reward": {
+            "kind": "currency",
+            "stubs": 200
+          }
+        },
+        {
+          "threshold": 20,
+          "reward": {
+            "kind": "currency",
+            "stubs": 200
+          }
+        },
+        {
+          "threshold": 30,
+          "reward": {
+            "kind": "currency",
+            "stubs": 400
+          }
+        },
+        {
+          "threshold": "all",
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510010
+            ],
+            "stubs": 750,
+            "xp": 1500
+          }
+        }
+      ]
+    },
+    {
+      "id": 102,
+      "group_id": 1,
+      "name": "Boston Red Sox",
+      "texture": "COLLECT_REDSOX",
+      "description": "Collect Red Sox Live Series players.",
+      "selector": {
+        "live_teams": [
+          1
+        ]
+      },
+      "tiers": [
+        {
+          "threshold": 10,
+          "reward": {
+            "kind": "currency",
+            "stubs": 200
+          }
+        },
+        {
+          "threshold": 20,
+          "reward": {
+            "kind": "currency",
+            "stubs": 200
+          }
+        },
+        {
+          "threshold": 30,
+          "reward": {
+            "kind": "currency",
+            "stubs": 400
+          }
+        },
+        {
+          "threshold": "all",
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510010
+            ],
+            "stubs": 750,
+            "xp": 1500
+          }
+        }
+      ]
+    },
+    {
+      "id": 103,
+      "group_id": 1,
+      "name": "New York Yankees",
+      "texture": "COLLECT_YANKEES",
+      "description": "Collect Yankees Live Series players.",
+      "selector": {
+        "live_teams": [
+          2
+        ]
+      },
+      "tiers": [
+        {
+          "threshold": 10,
+          "reward": {
+            "kind": "currency",
+            "stubs": 200
+          }
+        },
+        {
+          "threshold": 20,
+          "reward": {
+            "kind": "currency",
+            "stubs": 200
+          }
+        },
+        {
+          "threshold": 30,
+          "reward": {
+            "kind": "currency",
+            "stubs": 400
+          }
+        },
+        {
+          "threshold": "all",
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510010
+            ],
+            "stubs": 750,
+            "xp": 1500
+          }
+        }
+      ]
+    },
+    {
+      "id": 104,
+      "group_id": 1,
+      "name": "Tampa Bay Rays",
+      "texture": "COLLECT_RAYS",
+      "description": "Collect Rays Live Series players.",
+      "selector": {
+        "live_teams": [
+          3
+        ]
+      },
+      "tiers": [
+        {
+          "threshold": 10,
+          "reward": {
+            "kind": "currency",
+            "stubs": 200
+          }
+        },
+        {
+          "threshold": 20,
+          "reward": {
+            "kind": "currency",
+            "stubs": 200
+          }
+        },
+        {
+          "threshold": 30,
+          "reward": {
+            "kind": "currency",
+            "stubs": 400
+          }
+        },
+        {
+          "threshold": "all",
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510010
+            ],
+            "stubs": 750,
+            "xp": 1500
+          }
+        }
+      ]
+    },
+    {
+      "id": 105,
+      "group_id": 1,
+      "name": "Toronto Blue Jays",
+      "texture": "COLLECT_BLUEJAYS",
+      "description": "Collect Blue Jays Live Series players.",
+      "selector": {
+        "live_teams": [
+          4
+        ]
+      },
+      "tiers": [
+        {
+          "threshold": 10,
+          "reward": {
+            "kind": "currency",
+            "stubs": 200
+          }
+        },
+        {
+          "threshold": 20,
+          "reward": {
+            "kind": "currency",
+            "stubs": 200
+          }
+        },
+        {
+          "threshold": 30,
+          "reward": {
+            "kind": "currency",
+            "stubs": 400
+          }
+        },
+        {
+          "threshold": "all",
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510010
+            ],
+            "stubs": 750,
+            "xp": 1500
+          }
+        }
+      ]
+    },
+    {
+      "id": 106,
+      "group_id": 1,
+      "name": "Chicago White Sox",
+      "texture": "COLLECT_WHITESOX",
+      "description": "Collect White Sox Live Series players.",
+      "selector": {
+        "live_teams": [
+          5
+        ]
+      },
+      "tiers": [
+        {
+          "threshold": 10,
+          "reward": {
+            "kind": "currency",
+            "stubs": 200
+          }
+        },
+        {
+          "threshold": 20,
+          "reward": {
+            "kind": "currency",
+            "stubs": 200
+          }
+        },
+        {
+          "threshold": 30,
+          "reward": {
+            "kind": "currency",
+            "stubs": 400
+          }
+        },
+        {
+          "threshold": "all",
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510011
+            ],
+            "stubs": 750,
+            "xp": 1500
+          }
+        }
+      ]
+    },
+    {
+      "id": 107,
+      "group_id": 1,
+      "name": "Cleveland Guardians",
+      "texture": "COLLECT_GUARDIANS",
+      "description": "Collect Guardians Live Series players.",
+      "selector": {
+        "live_teams": [
+          6
+        ]
+      },
+      "tiers": [
+        {
+          "threshold": 10,
+          "reward": {
+            "kind": "currency",
+            "stubs": 200
+          }
+        },
+        {
+          "threshold": 20,
+          "reward": {
+            "kind": "currency",
+            "stubs": 200
+          }
+        },
+        {
+          "threshold": 30,
+          "reward": {
+            "kind": "currency",
+            "stubs": 400
+          }
+        },
+        {
+          "threshold": "all",
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510011
+            ],
+            "stubs": 750,
+            "xp": 1500
+          }
+        }
+      ]
+    },
+    {
+      "id": 108,
+      "group_id": 1,
+      "name": "Detroit Tigers",
+      "texture": "COLLECT_TIGERS",
+      "description": "Collect Tigers Live Series players.",
+      "selector": {
+        "live_teams": [
+          7
+        ]
+      },
+      "tiers": [
+        {
+          "threshold": 10,
+          "reward": {
+            "kind": "currency",
+            "stubs": 200
+          }
+        },
+        {
+          "threshold": 20,
+          "reward": {
+            "kind": "currency",
+            "stubs": 200
+          }
+        },
+        {
+          "threshold": 30,
+          "reward": {
+            "kind": "currency",
+            "stubs": 400
+          }
+        },
+        {
+          "threshold": "all",
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510011
+            ],
+            "stubs": 750,
+            "xp": 1500
+          }
+        }
+      ]
+    },
+    {
+      "id": 109,
+      "group_id": 1,
+      "name": "Kansas City Royals",
+      "texture": "COLLECT_ROYALS",
+      "description": "Collect Royals Live Series players.",
+      "selector": {
+        "live_teams": [
+          8
+        ]
+      },
+      "tiers": [
+        {
+          "threshold": 10,
+          "reward": {
+            "kind": "currency",
+            "stubs": 200
+          }
+        },
+        {
+          "threshold": 20,
+          "reward": {
+            "kind": "currency",
+            "stubs": 200
+          }
+        },
+        {
+          "threshold": 30,
+          "reward": {
+            "kind": "currency",
+            "stubs": 400
+          }
+        },
+        {
+          "threshold": "all",
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510011
+            ],
+            "stubs": 750,
+            "xp": 1500
+          }
+        }
+      ]
+    },
+    {
+      "id": 110,
+      "group_id": 1,
+      "name": "Minnesota Twins",
+      "texture": "COLLECT_TWINS",
+      "description": "Collect Twins Live Series players.",
+      "selector": {
+        "live_teams": [
+          9
+        ]
+      },
+      "tiers": [
+        {
+          "threshold": 10,
+          "reward": {
+            "kind": "currency",
+            "stubs": 200
+          }
+        },
+        {
+          "threshold": 20,
+          "reward": {
+            "kind": "currency",
+            "stubs": 200
+          }
+        },
+        {
+          "threshold": 30,
+          "reward": {
+            "kind": "currency",
+            "stubs": 400
+          }
+        },
+        {
+          "threshold": "all",
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510011
+            ],
+            "stubs": 750,
+            "xp": 1500
+          }
+        }
+      ]
+    },
+    {
+      "id": 111,
+      "group_id": 1,
+      "name": "Houston Astros",
+      "texture": "COLLECT_ASTROS",
+      "description": "Collect Astros Live Series players.",
+      "selector": {
+        "live_teams": [
+          10
+        ]
+      },
+      "tiers": [
+        {
+          "threshold": 10,
+          "reward": {
+            "kind": "currency",
+            "stubs": 200
+          }
+        },
+        {
+          "threshold": 20,
+          "reward": {
+            "kind": "currency",
+            "stubs": 200
+          }
+        },
+        {
+          "threshold": 30,
+          "reward": {
+            "kind": "currency",
+            "stubs": 400
+          }
+        },
+        {
+          "threshold": "all",
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510012
+            ],
+            "stubs": 750,
+            "xp": 1500
+          }
+        }
+      ]
+    },
+    {
+      "id": 112,
+      "group_id": 1,
+      "name": "Los Angeles Angels",
+      "texture": "COLLECT_ANGELS",
+      "description": "Collect Angels Live Series players.",
+      "selector": {
+        "live_teams": [
+          11
+        ]
+      },
+      "tiers": [
+        {
+          "threshold": 10,
+          "reward": {
+            "kind": "currency",
+            "stubs": 200
+          }
+        },
+        {
+          "threshold": 20,
+          "reward": {
+            "kind": "currency",
+            "stubs": 200
+          }
+        },
+        {
+          "threshold": 30,
+          "reward": {
+            "kind": "currency",
+            "stubs": 400
+          }
+        },
+        {
+          "threshold": "all",
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510012
+            ],
+            "stubs": 750,
+            "xp": 1500
+          }
+        }
+      ]
+    },
+    {
+      "id": 113,
+      "group_id": 1,
+      "name": "Oakland Athletics",
+      "texture": "COLLECT_ATHLETICS",
+      "description": "Collect Athletics Live Series players.",
+      "selector": {
+        "live_teams": [
+          12
+        ]
+      },
+      "tiers": [
+        {
+          "threshold": 10,
+          "reward": {
+            "kind": "currency",
+            "stubs": 200
+          }
+        },
+        {
+          "threshold": 20,
+          "reward": {
+            "kind": "currency",
+            "stubs": 200
+          }
+        },
+        {
+          "threshold": 30,
+          "reward": {
+            "kind": "currency",
+            "stubs": 400
+          }
+        },
+        {
+          "threshold": "all",
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510012
+            ],
+            "stubs": 750,
+            "xp": 1500
+          }
+        }
+      ]
+    },
+    {
+      "id": 114,
+      "group_id": 1,
+      "name": "Seattle Mariners",
+      "texture": "COLLECT_MARINERS",
+      "description": "Collect Mariners Live Series players.",
+      "selector": {
+        "live_teams": [
+          13
+        ]
+      },
+      "tiers": [
+        {
+          "threshold": 10,
+          "reward": {
+            "kind": "currency",
+            "stubs": 200
+          }
+        },
+        {
+          "threshold": 20,
+          "reward": {
+            "kind": "currency",
+            "stubs": 200
+          }
+        },
+        {
+          "threshold": 30,
+          "reward": {
+            "kind": "currency",
+            "stubs": 400
+          }
+        },
+        {
+          "threshold": "all",
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510012
+            ],
+            "stubs": 750,
+            "xp": 1500
+          }
+        }
+      ]
+    },
+    {
+      "id": 115,
+      "group_id": 1,
+      "name": "Texas Rangers",
+      "texture": "COLLECT_RANGERS",
+      "description": "Collect Rangers Live Series players.",
+      "selector": {
+        "live_teams": [
+          14
+        ]
+      },
+      "tiers": [
+        {
+          "threshold": 10,
+          "reward": {
+            "kind": "currency",
+            "stubs": 200
+          }
+        },
+        {
+          "threshold": 20,
+          "reward": {
+            "kind": "currency",
+            "stubs": 200
+          }
+        },
+        {
+          "threshold": 30,
+          "reward": {
+            "kind": "currency",
+            "stubs": 400
+          }
+        },
+        {
+          "threshold": "all",
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510012
+            ],
+            "stubs": 750,
+            "xp": 1500
+          }
+        }
+      ]
+    },
+    {
+      "id": 116,
+      "group_id": 1,
+      "name": "Atlanta Braves",
+      "texture": "COLLECT_BRAVES",
+      "description": "Collect Braves Live Series players.",
+      "selector": {
+        "live_teams": [
+          15
+        ]
+      },
+      "tiers": [
+        {
+          "threshold": 10,
+          "reward": {
+            "kind": "currency",
+            "stubs": 200
+          }
+        },
+        {
+          "threshold": 20,
+          "reward": {
+            "kind": "currency",
+            "stubs": 200
+          }
+        },
+        {
+          "threshold": 30,
+          "reward": {
+            "kind": "currency",
+            "stubs": 400
+          }
+        },
+        {
+          "threshold": "all",
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510013
+            ],
+            "stubs": 750,
+            "xp": 1500
+          }
+        }
+      ]
+    },
+    {
+      "id": 117,
+      "group_id": 1,
+      "name": "Miami Marlins",
+      "texture": "COLLECT_MARLINS",
+      "description": "Collect Marlins Live Series players.",
+      "selector": {
+        "live_teams": [
+          16
+        ]
+      },
+      "tiers": [
+        {
+          "threshold": 10,
+          "reward": {
+            "kind": "currency",
+            "stubs": 200
+          }
+        },
+        {
+          "threshold": 20,
+          "reward": {
+            "kind": "currency",
+            "stubs": 200
+          }
+        },
+        {
+          "threshold": 30,
+          "reward": {
+            "kind": "currency",
+            "stubs": 400
+          }
+        },
+        {
+          "threshold": "all",
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510013
+            ],
+            "stubs": 750,
+            "xp": 1500
+          }
+        }
+      ]
+    },
+    {
+      "id": 118,
+      "group_id": 1,
+      "name": "New York Mets",
+      "texture": "COLLECT_METS",
+      "description": "Collect Mets Live Series players.",
+      "selector": {
+        "live_teams": [
+          17
+        ]
+      },
+      "tiers": [
+        {
+          "threshold": 10,
+          "reward": {
+            "kind": "currency",
+            "stubs": 200
+          }
+        },
+        {
+          "threshold": 20,
+          "reward": {
+            "kind": "currency",
+            "stubs": 200
+          }
+        },
+        {
+          "threshold": 30,
+          "reward": {
+            "kind": "currency",
+            "stubs": 400
+          }
+        },
+        {
+          "threshold": "all",
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510013
+            ],
+            "stubs": 750,
+            "xp": 1500
+          }
+        }
+      ]
+    },
+    {
+      "id": 119,
+      "group_id": 1,
+      "name": "Philadelphia Phillies",
+      "texture": "COLLECT_PHILLIES",
+      "description": "Collect Phillies Live Series players.",
+      "selector": {
+        "live_teams": [
+          18
+        ]
+      },
+      "tiers": [
+        {
+          "threshold": 10,
+          "reward": {
+            "kind": "currency",
+            "stubs": 200
+          }
+        },
+        {
+          "threshold": 20,
+          "reward": {
+            "kind": "currency",
+            "stubs": 200
+          }
+        },
+        {
+          "threshold": 30,
+          "reward": {
+            "kind": "currency",
+            "stubs": 400
+          }
+        },
+        {
+          "threshold": "all",
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510013
+            ],
+            "stubs": 750,
+            "xp": 1500
+          }
+        }
+      ]
+    },
+    {
+      "id": 120,
+      "group_id": 1,
+      "name": "Washington Nationals",
+      "texture": "COLLECT_NATIONALS",
+      "description": "Collect Nationals Live Series players.",
+      "selector": {
+        "live_teams": [
+          19
+        ]
+      },
+      "tiers": [
+        {
+          "threshold": 10,
+          "reward": {
+            "kind": "currency",
+            "stubs": 200
+          }
+        },
+        {
+          "threshold": 20,
+          "reward": {
+            "kind": "currency",
+            "stubs": 200
+          }
+        },
+        {
+          "threshold": 30,
+          "reward": {
+            "kind": "currency",
+            "stubs": 400
+          }
+        },
+        {
+          "threshold": "all",
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510013
+            ],
+            "stubs": 750,
+            "xp": 1500
+          }
+        }
+      ]
+    },
+    {
+      "id": 121,
+      "group_id": 1,
+      "name": "Chicago Cubs",
+      "texture": "COLLECT_CUBS",
+      "description": "Collect Cubs Live Series players.",
+      "selector": {
+        "live_teams": [
+          20
+        ]
+      },
+      "tiers": [
+        {
+          "threshold": 10,
+          "reward": {
+            "kind": "currency",
+            "stubs": 200
+          }
+        },
+        {
+          "threshold": 20,
+          "reward": {
+            "kind": "currency",
+            "stubs": 200
+          }
+        },
+        {
+          "threshold": 30,
+          "reward": {
+            "kind": "currency",
+            "stubs": 400
+          }
+        },
+        {
+          "threshold": "all",
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510014
+            ],
+            "stubs": 750,
+            "xp": 1500
+          }
+        }
+      ]
+    },
+    {
+      "id": 122,
+      "group_id": 1,
+      "name": "Cincinnati Reds",
+      "texture": "COLLECT_REDS",
+      "description": "Collect Reds Live Series players.",
+      "selector": {
+        "live_teams": [
+          21
+        ]
+      },
+      "tiers": [
+        {
+          "threshold": 10,
+          "reward": {
+            "kind": "currency",
+            "stubs": 200
+          }
+        },
+        {
+          "threshold": 20,
+          "reward": {
+            "kind": "currency",
+            "stubs": 200
+          }
+        },
+        {
+          "threshold": 30,
+          "reward": {
+            "kind": "currency",
+            "stubs": 400
+          }
+        },
+        {
+          "threshold": "all",
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510014
+            ],
+            "stubs": 750,
+            "xp": 1500
+          }
+        }
+      ]
+    },
+    {
+      "id": 123,
+      "group_id": 1,
+      "name": "Milwaukee Brewers",
+      "texture": "COLLECT_BREWERS",
+      "description": "Collect Brewers Live Series players.",
+      "selector": {
+        "live_teams": [
+          22
+        ]
+      },
+      "tiers": [
+        {
+          "threshold": 10,
+          "reward": {
+            "kind": "currency",
+            "stubs": 200
+          }
+        },
+        {
+          "threshold": 20,
+          "reward": {
+            "kind": "currency",
+            "stubs": 200
+          }
+        },
+        {
+          "threshold": 30,
+          "reward": {
+            "kind": "currency",
+            "stubs": 400
+          }
+        },
+        {
+          "threshold": "all",
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510014
+            ],
+            "stubs": 750,
+            "xp": 1500
+          }
+        }
+      ]
+    },
+    {
+      "id": 124,
+      "group_id": 1,
+      "name": "Pittsburgh Pirates",
+      "texture": "COLLECT_PIRATES",
+      "description": "Collect Pirates Live Series players.",
+      "selector": {
+        "live_teams": [
+          23
+        ]
+      },
+      "tiers": [
+        {
+          "threshold": 10,
+          "reward": {
+            "kind": "currency",
+            "stubs": 200
+          }
+        },
+        {
+          "threshold": 20,
+          "reward": {
+            "kind": "currency",
+            "stubs": 200
+          }
+        },
+        {
+          "threshold": 30,
+          "reward": {
+            "kind": "currency",
+            "stubs": 400
+          }
+        },
+        {
+          "threshold": "all",
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510014
+            ],
+            "stubs": 750,
+            "xp": 1500
+          }
+        }
+      ]
+    },
+    {
+      "id": 125,
+      "group_id": 1,
+      "name": "St. Louis Cardinals",
+      "texture": "COLLECT_CARDINALS",
+      "description": "Collect Cardinals Live Series players.",
+      "selector": {
+        "live_teams": [
+          24
+        ]
+      },
+      "tiers": [
+        {
+          "threshold": 10,
+          "reward": {
+            "kind": "currency",
+            "stubs": 200
+          }
+        },
+        {
+          "threshold": 20,
+          "reward": {
+            "kind": "currency",
+            "stubs": 200
+          }
+        },
+        {
+          "threshold": 30,
+          "reward": {
+            "kind": "currency",
+            "stubs": 400
+          }
+        },
+        {
+          "threshold": "all",
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510014
+            ],
+            "stubs": 750,
+            "xp": 1500
+          }
+        }
+      ]
+    },
+    {
+      "id": 126,
+      "group_id": 1,
+      "name": "Arizona Diamondbacks",
+      "texture": "COLLECT_DIAMONDBACKS",
+      "description": "Collect Diamondbacks Live Series players.",
+      "selector": {
+        "live_teams": [
+          25
+        ]
+      },
+      "tiers": [
+        {
+          "threshold": 10,
+          "reward": {
+            "kind": "currency",
+            "stubs": 200
+          }
+        },
+        {
+          "threshold": 20,
+          "reward": {
+            "kind": "currency",
+            "stubs": 200
+          }
+        },
+        {
+          "threshold": 30,
+          "reward": {
+            "kind": "currency",
+            "stubs": 400
+          }
+        },
+        {
+          "threshold": "all",
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510015
+            ],
+            "stubs": 750,
+            "xp": 1500
+          }
+        }
+      ]
+    },
+    {
+      "id": 127,
+      "group_id": 1,
+      "name": "Colorado Rockies",
+      "texture": "COLLECT_ROCKIES",
+      "description": "Collect Rockies Live Series players.",
+      "selector": {
+        "live_teams": [
+          26
+        ]
+      },
+      "tiers": [
+        {
+          "threshold": 10,
+          "reward": {
+            "kind": "currency",
+            "stubs": 200
+          }
+        },
+        {
+          "threshold": 20,
+          "reward": {
+            "kind": "currency",
+            "stubs": 200
+          }
+        },
+        {
+          "threshold": 30,
+          "reward": {
+            "kind": "currency",
+            "stubs": 400
+          }
+        },
+        {
+          "threshold": "all",
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510015
+            ],
+            "stubs": 750,
+            "xp": 1500
+          }
+        }
+      ]
+    },
+    {
+      "id": 128,
+      "group_id": 1,
+      "name": "Los Angeles Dodgers",
+      "texture": "COLLECT_DODGERS",
+      "description": "Collect Dodgers Live Series players.",
+      "selector": {
+        "live_teams": [
+          27
+        ]
+      },
+      "tiers": [
+        {
+          "threshold": 10,
+          "reward": {
+            "kind": "currency",
+            "stubs": 200
+          }
+        },
+        {
+          "threshold": 20,
+          "reward": {
+            "kind": "currency",
+            "stubs": 200
+          }
+        },
+        {
+          "threshold": 30,
+          "reward": {
+            "kind": "currency",
+            "stubs": 400
+          }
+        },
+        {
+          "threshold": "all",
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510015
+            ],
+            "stubs": 750,
+            "xp": 1500
+          }
+        }
+      ]
+    },
+    {
+      "id": 129,
+      "group_id": 1,
+      "name": "San Diego Padres",
+      "texture": "COLLECT_PADRES",
+      "description": "Collect Padres Live Series players.",
+      "selector": {
+        "live_teams": [
+          28
+        ]
+      },
+      "tiers": [
+        {
+          "threshold": 10,
+          "reward": {
+            "kind": "currency",
+            "stubs": 200
+          }
+        },
+        {
+          "threshold": 20,
+          "reward": {
+            "kind": "currency",
+            "stubs": 200
+          }
+        },
+        {
+          "threshold": 30,
+          "reward": {
+            "kind": "currency",
+            "stubs": 400
+          }
+        },
+        {
+          "threshold": "all",
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510015
+            ],
+            "stubs": 750,
+            "xp": 1500
+          }
+        }
+      ]
+    },
+    {
+      "id": 130,
+      "group_id": 1,
+      "name": "San Francisco Giants",
+      "texture": "COLLECT_GIANTS",
+      "description": "Collect Giants Live Series players.",
+      "selector": {
+        "live_teams": [
+          29
+        ]
+      },
+      "tiers": [
+        {
+          "threshold": 10,
+          "reward": {
+            "kind": "currency",
+            "stubs": 200
+          }
+        },
+        {
+          "threshold": 20,
+          "reward": {
+            "kind": "currency",
+            "stubs": 200
+          }
+        },
+        {
+          "threshold": 30,
+          "reward": {
+            "kind": "currency",
+            "stubs": 400
+          }
+        },
+        {
+          "threshold": "all",
+          "reward": {
+            "kind": "card",
+            "uuid": "7402cb2c21f5494aa4af22a631ca8e22",
+            "name": "Matt Cain",
+            "stubs": 500
+          }
+        }
+      ]
+    },
+    {
+      "id": 205,
+      "group_id": 3,
+      "name": "Set 5 Collection",
+      "texture": "COLLECT_SET5",
+      "description": "Collect Set 5 Legends and Flashbacks to earn a choice pack with Bo Bichette, Shohei Ohtani and William Contreras.",
+      "selector": {
+        "set": "SET 5"
+      },
+      "tiers": [
+        {
+          "threshold": 50,
+          "reward": {
+            "kind": "card",
+            "uuid": "2b543e31c62ae0f32ce7427ff2db8e42",
+            "name": "Tanner Scott",
+            "stubs": 2500,
+            "xp": 5000
+          }
+        },
+        {
+          "threshold": 75,
+          "reward": {
+            "kind": "card",
+            "uuid": "5ddc335a3ffda583d15bef0ad722687d",
+            "name": "J.R. Richard",
+            "xp": 5000
+          }
+        },
+        {
+          "threshold": 100,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              514009
+            ],
+            "xp": 10000
+          }
+        },
+        {
+          "threshold": 120,
+          "reward": {
+            "kind": "card",
+            "uuid": "a1dbaf0b478ece4e74c08f37ed97cce8",
+            "name": "Isaac Paredes",
+            "xp": 7500
+          }
+        },
+        {
+          "threshold": 140,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              514009
+            ],
+            "xp": 10000
+          }
+        },
+        {
+          "threshold": 150,
+          "reward": {
+            "kind": "card",
+            "uuid": "eed0a51f1373a39858cc2249e28ac96e",
+            "name": "Tim Raines",
+            "stubs": 2500,
+            "xp": 5000
+          }
+        },
+        {
+          "threshold": 160,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510065
+            ],
+            "stubs": 2500,
+            "xp": 5000
+          }
+        },
+        {
+          "threshold": 170,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              514009
+            ],
+            "xp": 10000
+          }
+        }
+      ]
+    },
+    {
+      "id": 206,
+      "group_id": 3,
+      "name": "Core Collection",
+      "texture": "COLLECT_CORE",
+      "description": "Collect Core Legends and Flashbacks to earn Kaiju Corey Seager and 2023 Finest Ozzie Albies.",
+      "selector": {
+        "set": "CORE"
+      },
+      "tiers": [
+        {
+          "threshold": 45,
+          "reward": {
+            "kind": "currency",
+            "xp": 5000
+          }
+        },
+        {
+          "threshold": 90,
+          "reward": {
+            "kind": "currency",
+            "stubs": 1500,
+            "xp": 5000
+          }
+        },
+        {
+          "threshold": 135,
+          "reward": {
+            "kind": "currency",
+            "stubs": 2500,
+            "xp": 5000
+          }
+        },
+        {
+          "threshold": 180,
+          "reward": {
+            "kind": "card",
+            "uuid": "e00df739a79ace45b32c4f1b55818525",
+            "name": "Corey Seager",
+            "xp": 5000
+          }
+        },
+        {
+          "threshold": 250,
+          "reward": {
+            "kind": "card",
+            "uuid": "43b65ec0fcf8be9f52da06cb016cd11c",
+            "name": "Ozzie Albies",
+            "stubs": 5000
+          }
+        }
+      ]
+    },
+    {
+      "id": 204,
+      "group_id": 3,
+      "name": "Set 4 Collection",
+      "texture": "COLLECT_SET4",
+      "description": "Collect Set 4 Legends and Flashbacks to earn a choice pack with Jimmie Foxx, Corey Kluber and Mookie Betts.",
+      "selector": {
+        "set": "SET 4"
+      },
+      "tiers": [
+        {
+          "threshold": 50,
+          "reward": {
+            "kind": "card",
+            "uuid": "13e727404649f09563d0588143a8cbfc",
+            "name": "Ryan Helsley",
+            "stubs": 2500,
+            "xp": 5000
+          }
+        },
+        {
+          "threshold": 75,
+          "reward": {
+            "kind": "card",
+            "uuid": "06a3f7b19bba9c4f69dfa2f1b8488e0e",
+            "name": "Ryan Howard",
+            "xp": 5000
+          }
+        },
+        {
+          "threshold": 105,
+          "reward": {
+            "kind": "card",
+            "uuid": "cfe44f1b8cda9f97385b07824ef4efe3",
+            "name": "Rickey Henderson",
+            "xp": 7500
+          }
+        },
+        {
+          "threshold": 135,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              514008
+            ],
+            "xp": 10000
+          }
+        },
+        {
+          "threshold": 170,
+          "reward": {
+            "kind": "card",
+            "uuid": "5cd52f3f5648f829d82b2c262b8d4355",
+            "name": "Clayton Kershaw",
+            "stubs": 2500,
+            "xp": 5000
+          }
+        },
+        {
+          "threshold": 200,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              514008
+            ],
+            "xp": 10000
+          }
+        },
+        {
+          "threshold": 230,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510065
+            ],
+            "stubs": 2500,
+            "xp": 5000
+          }
+        },
+        {
+          "threshold": 260,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              514008
+            ],
+            "xp": 10000
+          }
+        }
+      ]
+    },
+    {
+      "id": 203,
+      "group_id": 3,
+      "name": "Set 3 Collection",
+      "texture": "COLLECT_SET3",
+      "description": "Collect Set 3 Legends and Flashbacks to earn a choice pack with Adley Rutschman, Ronald Acuna Jr. and Martin Dihigo.",
+      "selector": {
+        "set": "SET 3"
+      },
+      "tiers": [
+        {
+          "threshold": 50,
+          "reward": {
+            "kind": "card",
+            "uuid": "cb02cce59df9e0bcdc119314599f9dc9",
+            "name": "Alexis Diaz",
+            "stubs": 2500,
+            "xp": 5000
+          }
+        },
+        {
+          "threshold": 90,
+          "reward": {
+            "kind": "card",
+            "uuid": "ea48666e1a067bf8fea7683f2d81f265",
+            "name": "Hilton Smith",
+            "xp": 5000
+          }
+        },
+        {
+          "threshold": 120,
+          "reward": {
+            "kind": "card",
+            "uuid": "7626051f62ed396b34abd92fc91a7814",
+            "name": "Jackie Robinson",
+            "xp": 7500
+          }
+        },
+        {
+          "threshold": 150,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              514023
+            ],
+            "xp": 10000
+          }
+        },
+        {
+          "threshold": 190,
+          "reward": {
+            "kind": "card",
+            "uuid": "4b7a2cf08c2e361d9f8c481c7eaac2e8",
+            "name": "Austin Riley",
+            "stubs": 2500,
+            "xp": 5000
+          }
+        },
+        {
+          "threshold": 230,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              514023
+            ],
+            "xp": 10000
+          }
+        },
+        {
+          "threshold": 265,
+          "reward": {
+            "kind": "currency",
+            "stubs": 2500,
+            "xp": 5000
+          }
+        },
+        {
+          "threshold": 300,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              514023
+            ],
+            "xp": 10000
+          }
+        }
+      ]
+    },
+    {
+      "id": 202,
+      "group_id": 3,
+      "name": "Set 2 Collection",
+      "texture": "COLLECT_SET2",
+      "description": "Collect Set 2 Legends and Flashbacks to earn a choice pack with The Big Unit, Hammerin Hank and David Wright.",
+      "selector": {
+        "set": "SET 2"
+      },
+      "tiers": [
+        {
+          "threshold": 50,
+          "reward": {
+            "kind": "currency",
+            "stubs": 2500,
+            "xp": 5000
+          }
+        },
+        {
+          "threshold": 95,
+          "reward": {
+            "kind": "card",
+            "uuid": "71bcaba8ce14f5224da6b38b2db3c81b",
+            "name": "Rich Gossage",
+            "xp": 5000
+          }
+        },
+        {
+          "threshold": 130,
+          "reward": {
+            "kind": "card",
+            "uuid": "9037c8d6516fc5f9a5e1e7fd30459de2",
+            "name": "Big Papi",
+            "xp": 7500
+          }
+        },
+        {
+          "threshold": 160,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              514022
+            ],
+            "xp": 10000
+          }
+        },
+        {
+          "threshold": 195,
+          "reward": {
+            "kind": "currency",
+            "stubs": 2500,
+            "xp": 5000
+          }
+        },
+        {
+          "threshold": 230,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              514022
+            ],
+            "xp": 10000
+          }
+        },
+        {
+          "threshold": 265,
+          "reward": {
+            "kind": "currency",
+            "stubs": 2500,
+            "xp": 5000
+          }
+        },
+        {
+          "threshold": 300,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              514022
+            ],
+            "xp": 10000
+          }
+        }
+      ]
+    },
+    {
+      "id": 201,
+      "group_id": 3,
+      "name": "Set 1 Collection",
+      "texture": "COLLECT_SET1",
+      "description": "Collect Set 1 Legends and Flashbacks to earn a choice pack with Chipper Jones, Babe Ruth and Pedro Martinez.",
+      "selector": {
+        "set": "SET 1"
+      },
+      "tiers": [
+        {
+          "threshold": 30,
+          "reward": {
+            "kind": "currency",
+            "stubs": 2500,
+            "xp": 5000
+          }
+        },
+        {
+          "threshold": 75,
+          "reward": {
+            "kind": "card",
+            "uuid": "bfb1698524840a3978889ae25769e87e",
+            "name": "Jazz Chisholm Jr.",
+            "xp": 5000
+          }
+        },
+        {
+          "threshold": 110,
+          "reward": {
+            "kind": "card",
+            "uuid": "c5f310321fc01f6e2f153dfb7443e435",
+            "name": "Trea Turner",
+            "xp": 10000
+          }
+        },
+        {
+          "threshold": 140,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              514021
+            ],
+            "xp": 15000
+          }
+        },
+        {
+          "threshold": 170,
+          "reward": {
+            "kind": "currency",
+            "stubs": 2500,
+            "xp": 10000
+          }
+        },
+        {
+          "threshold": 200,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              514021
+            ],
+            "xp": 15000
+          }
+        },
+        {
+          "threshold": 230,
+          "reward": {
+            "kind": "currency",
+            "stubs": 2500,
+            "xp": 5000
+          }
+        },
+        {
+          "threshold": 260,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              514021
+            ],
+            "stubs": 5000
+          }
+        }
+      ]
+    },
+    {
+      "id": 405,
+      "group_id": 4,
+      "name": "Team Affinity Set 5",
+      "texture": "COLLECT_TA5",
+      "description": "Collect Team Affinity Season 5 player items to earn rewards.",
+      "selector": {
+        "affinity": 5
+      },
+      "tiers": [
+        {
+          "threshold": 20,
+          "reward": {
+            "kind": "card",
+            "uuid": "2d1c29e79148a1251d30fbdadee4dfc2",
+            "name": "Pete Alonso"
+          }
+        },
+        {
+          "threshold": 40,
+          "reward": {
+            "kind": "card",
+            "uuid": "c93a16e73f0e88c6790b8c6fd9f9ed81",
+            "name": "Emmanuel Clase"
+          }
+        },
+        {
+          "threshold": 60,
+          "reward": {
+            "kind": "card",
+            "uuid": "dfb7acb95bc071ce5fe5bd5fbd4a9313",
+            "name": "Bryan Reynolds"
+          }
+        },
+        {
+          "threshold": 75,
+          "reward": {
+            "kind": "card",
+            "uuid": "24226a9744b31820e21fa7afd49d1cae",
+            "name": "Gleyber Torres"
+          }
+        },
+        {
+          "threshold": 90,
+          "reward": {
+            "kind": "card",
+            "uuid": "9ba86874e2da983005ed7beaab5de7c9",
+            "name": "Cody Bellinger"
+          }
+        }
+      ]
+    },
+    {
+      "id": 404,
+      "group_id": 4,
+      "name": "Team Affinity Set 4",
+      "texture": "COLLECT_TA4",
+      "description": "Collect Team Affinity Season 4 player items to earn rewards.",
+      "selector": {
+        "affinity": 4
+      },
+      "tiers": [
+        {
+          "threshold": 15,
+          "reward": {
+            "kind": "card",
+            "uuid": "16389be3b1467d0b7f1cc7bb7b6ec32d",
+            "name": "Tom Henke"
+          }
+        },
+        {
+          "threshold": 20,
+          "reward": {
+            "kind": "card",
+            "uuid": "dfd5c1858164dccfb952e544fd135d07",
+            "name": "Jazz Chisholm Jr."
+          }
+        },
+        {
+          "threshold": 30,
+          "reward": {
+            "kind": "card",
+            "uuid": "8a69b9601f4e96f380382822d6c3a325",
+            "name": "Joey Votto"
+          }
+        },
+        {
+          "threshold": 50,
+          "reward": {
+            "kind": "card",
+            "uuid": "8f71dcdcfd43f4ac0f51a751ddcac943",
+            "name": "Walter Johnson"
+          }
+        },
+        {
+          "threshold": 70,
+          "reward": {
+            "kind": "card",
+            "uuid": "4d1f8cf92b6d907e7a4c95dfeaf8ef0c",
+            "name": "Brandon Crawford"
+          }
+        },
+        {
+          "threshold": 80,
+          "reward": {
+            "kind": "card",
+            "uuid": "ff5f5e2ce61b0f814334c84f3982b770",
+            "name": "Charlie Blackmon"
+          }
+        },
+        {
+          "threshold": 90,
+          "reward": {
+            "kind": "card",
+            "uuid": "eb08ce5517dd014cfd89790f5c982d51",
+            "name": "Nolan Ryan"
+          }
+        }
+      ]
+    },
+    {
+      "id": 403,
+      "group_id": 4,
+      "name": "Team Affinity Set 3",
+      "texture": "COLLECT_TA3",
+      "description": "Collect Team Affinity Season 3 player items to earn rewards.",
+      "selector": {
+        "affinity": 3
+      },
+      "tiers": [
+        {
+          "threshold": 15,
+          "reward": {
+            "kind": "card",
+            "uuid": "174d645586b6c18faa17d8d3a48e7180",
+            "name": "Freddie Freeman"
+          }
+        },
+        {
+          "threshold": 20,
+          "reward": {
+            "kind": "card",
+            "uuid": "f6bebf6733d9f6e591987187528d9c4d",
+            "name": "Spencer Strider"
+          }
+        },
+        {
+          "threshold": 30,
+          "reward": {
+            "kind": "card",
+            "uuid": "7acd9244e76fa577d678acb95a423131",
+            "name": "Shane McClanahan"
+          }
+        },
+        {
+          "threshold": 50,
+          "reward": {
+            "kind": "card",
+            "uuid": "0a1cf196f96b84bee97e93520f0db72d",
+            "name": "Luis Arraez"
+          }
+        },
+        {
+          "threshold": 70,
+          "reward": {
+            "kind": "card",
+            "uuid": "62f08ee46f15836deb7fb1438fae7b29",
+            "name": "Matt Olson"
+          }
+        },
+        {
+          "threshold": 80,
+          "reward": {
+            "kind": "card",
+            "uuid": "325def1d9a6e9bddf0f89a23a5330e88",
+            "name": "Jose Ramirez"
+          }
+        },
+        {
+          "threshold": 90,
+          "reward": {
+            "kind": "card",
+            "uuid": "5cc92cf9bf67d760d9081abf26e6af1d",
+            "name": "Corbin Carroll"
+          }
+        }
+      ]
+    },
+    {
+      "id": 402,
+      "group_id": 4,
+      "name": "Team Affinity Set 2",
+      "texture": "COLLECT_SET2",
+      "description": "Collect Team Affinity Season 2 player items to earn rewards.",
+      "selector": {
+        "affinity": 2
+      },
+      "tiers": [
+        {
+          "threshold": 15,
+          "reward": {
+            "kind": "currency",
+            "stubs": 1000,
+            "xp": 2500
+          }
+        },
+        {
+          "threshold": 30,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510001
+            ],
+            "quantity": 5,
+            "stubs": 2000,
+            "xp": 5000
+          }
+        },
+        {
+          "threshold": 60,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510065
+            ],
+            "stubs": 3000,
+            "xp": 7500
+          }
+        },
+        {
+          "threshold": "all",
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510065
+            ],
+            "quantity": 3,
+            "stubs": 5000,
+            "xp": 10000
+          }
+        }
+      ]
+    },
+    {
+      "id": 401,
+      "group_id": 4,
+      "name": "Team Affinity Set 1",
+      "texture": "COLLECT_SET1",
+      "description": "Collect Team Affinity Season 1 player items to earn rewards.",
+      "selector": {
+        "affinity": 1
+      },
+      "tiers": [
+        {
+          "threshold": 15,
+          "reward": {
+            "kind": "currency",
+            "stubs": 1000,
+            "xp": 2500
+          }
+        },
+        {
+          "threshold": 30,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510001
+            ],
+            "quantity": 5,
+            "stubs": 2000,
+            "xp": 5000
+          }
+        },
+        {
+          "threshold": 60,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510065
+            ],
+            "stubs": 3000,
+            "xp": 7500
+          }
+        },
+        {
+          "threshold": "all",
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510065
+            ],
+            "quantity": 3,
+            "stubs": 5000,
+            "xp": 10000
+          }
+        }
+      ]
+    },
+    {
+      "id": 501,
+      "group_id": 5,
+      "name": "Finders Keepers",
+      "texture": "COLLECT_SET5",
+      "description": "Collect these Set 5 Legends and Flashbacks to earn Retro Finest Steve Finley.",
+      "selector": {
+        "members": {
+          "Player": [
+            "364c1f1f41ddae3a5e1ef9e1f2c85e18",
+            "fdfe1d11266cfbb4936ddcc8d5c97f97",
+            "1e8104634a61ffdedaf3568890107eea",
+            "224a11929d9b0e4f98f3b471891c78ee",
+            "06c18b3b6efcda74c9893bb840acd28e",
+            "f9ded756d1737b4c1ae127b8359ee1a8",
+            "ca56c1c01e22b357e4aa3676d3eff6c0",
+            "d0e98b043981d95898b7aa85f8e4978f",
+            "f1df453fb4902d9a802fdb2928ab4b2e",
+            "fb84d75636489084adb17deb22e76120",
+            "db19900caadae6927b693bf6527886b5",
+            "c9758b9ceb9543ef87d38e31dc03a8fd",
+            "e598039f4c6732496509b03ffa20546c",
+            "9cacfa4d0d1c38780d43ab64589b2872",
+            "0220922634b6650e23c431eb31d9f352",
+            "387f986aa69488ec2c81b7b83e1dd2ad",
+            "f4d4d9691daf97b75d1b2fccbff9d66d",
+            "fc92a1bd5b74317dca6b5938ede5843d",
+            "c20edeee50b6af6131e72a6cf12ad8b3"
+          ]
+        }
+      },
+      "tiers": [
+        {
+          "threshold": 7,
+          "reward": {
+            "kind": "card",
+            "uuid": "e1e10f61cc9f744786ad49b82db93461",
+            "name": "Kyle Seager",
+            "stubs": 1000,
+            "xp": 1000
+          }
+        },
+        {
+          "threshold": 15,
+          "reward": {
+            "kind": "card",
+            "uuid": "325e58f8c73d5792e2a873d288e485cc",
+            "name": "Brian Roberts",
+            "stubs": 1000,
+            "xp": 1000
+          }
+        },
+        {
+          "threshold": 19,
+          "reward": {
+            "kind": "card",
+            "uuid": "cdc0cf7132126c77529bed7d6422b056",
+            "name": "Steve Finley",
+            "stubs": 1000,
+            "xp": 1000
+          }
+        }
+      ]
+    },
+    {
+      "id": 801,
+      "group_id": 8,
+      "name": "G.O.A.T. Collection",
+      "texture": "COLLECT_GOATEST",
+      "description": "Collect these player items and the Battle Royale banner to earn G.O.A.T. unlockables.",
+      "selector": {
+        "members": {
+          "Player": [
+            "a506c3765a95255c79e4b07f88db7873",
+            "624d41a9dca174f3b96b197de9f6a6fa",
+            "5d50ce1186262f4c6574794b7666e666",
+            "55796460dd9a41f45b2c8fe05a555fe6",
+            "26cfc548f9e843b3e1769b2d13e9f465",
+            "582acb16fad542bca597ccb805629749",
+            "045a55c409fd464e10585c925532138b",
+            "fcbee6ab5decc1a098af13544f2934c3",
+            "be9e0dd298dcf4979ea1dd3d226e0bfa",
+            "f11f64946b8f5b6d8d3b28cc3cb91ae5",
+            "858e66a10200f607a33d0967ebbc0c64",
+            "ee1db97a3997cdd575a42d2930402069",
+            "58b481d9dbc5b5b2fdabb5d12dece1a9",
+            "0b7d6a00ea82ab2daf51d4d126dc40fb",
+            "cf7a21eb92376ba35e3f31b7cbf90519",
+            "9ba86874e2da983005ed7beaab5de7c9",
+            "eb08ce5517dd014cfd89790f5c982d51",
+            "5cc92cf9bf67d760d9081abf26e6af1d",
+            "e00df739a79ace45b32c4f1b55818525",
+            "e5b5b6a7b2a65b8f8f1d7c4657b8fc75",
+            "43b65ec0fcf8be9f52da06cb016cd11c"
+          ],
+          "Unlockable": [
+            "57990ea703eff0f2408e8bac75f342d3"
+          ]
+        }
+      },
+      "tiers": [
+        {
+          "threshold": 4,
+          "reward": {
+            "kind": "substitute",
+            "name": "G.O.A.T. unlockable",
+            "stubs": 500
+          }
+        },
+        {
+          "threshold": 5,
+          "reward": {
+            "kind": "item",
+            "item_type": "Unlockable",
+            "uuid": "b58b6413173d60d06c392b7f1e77d2c9",
+            "name": "G.O.A.T. Banner",
+            "stubs": 1000
+          }
+        },
+        {
+          "threshold": 6,
+          "reward": {
+            "kind": "item",
+            "item_type": "Unlockable",
+            "uuid": "803a22a4f895443f75e211ea30d19c7f",
+            "name": "G.O.A.T. Icon",
+            "stubs": 1500
+          }
+        },
+        {
+          "threshold": 7,
+          "reward": {
+            "kind": "currency",
+            "stubs": 2500
+          }
+        },
+        {
+          "threshold": 8,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510001
+            ],
+            "quantity": 10
+          }
+        },
+        {
+          "threshold": 9,
+          "reward": {
+            "kind": "item",
+            "item_type": "Unlockable",
+            "uuid": "4eedc1eca39d613ed16ab2a1cdb2cf35",
+            "name": "G.O.A.T.ER Banner",
+            "stubs": 3000
+          }
+        },
+        {
+          "threshold": 10,
+          "reward": {
+            "kind": "item",
+            "item_type": "Unlockable",
+            "uuid": "4575b9b026b3a8ad63406363c8e9e5e5",
+            "name": "G.O.A.T.ER Icon"
+          }
+        },
+        {
+          "threshold": 11,
+          "reward": {
+            "kind": "currency",
+            "stubs": 3500
+          }
+        },
+        {
+          "threshold": 12,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510001
+            ],
+            "quantity": 50
+          }
+        },
+        {
+          "threshold": 13,
+          "reward": {
+            "kind": "item",
+            "item_type": "Unlockable",
+            "uuid": "b3d9bf9a49e562737fa785a78c7c2380",
+            "name": "G.O.A.T.EST Banner"
+          }
+        },
+        {
+          "threshold": 14,
+          "reward": {
+            "kind": "item",
+            "item_type": "Unlockable",
+            "uuid": "b81d9ded61fa448d2533a00e5e308ab7",
+            "name": "G.O.A.T.EST Icon"
+          }
+        },
+        {
+          "threshold": 15,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510006
+            ],
+            "quantity": 5
+          }
+        },
+        {
+          "threshold": 16,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510001
+            ],
+            "quantity": 20,
+            "stubs": 10000
+          }
+        },
+        {
+          "threshold": 17,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510001
+            ],
+            "quantity": 50,
+            "stubs": 10000
+          }
+        },
+        {
+          "threshold": 18,
+          "reward": {
+            "kind": "currency",
+            "stubs": 15000
+          }
+        },
+        {
+          "threshold": 19,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510001
+            ],
+            "quantity": 10
+          }
+        },
+        {
+          "threshold": 20,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510065
+            ]
+          }
+        },
+        {
+          "threshold": 21,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510001
+            ],
+            "quantity": 50
+          }
+        },
+        {
+          "threshold": 22,
+          "reward": {
+            "kind": "currency",
+            "stubs": 75000
+          }
+        }
+      ]
+    },
+    {
+      "id": 601,
+      "group_id": 6,
+      "name": "A.L. Throwbacks",
+      "texture": "COLLECT_UNIFORMS_AL_DIAMOND_THROWBACKS",
+      "description": "Collect A.L. Throwbacks items to earn rewards!",
+      "selector": {
+        "inventory": "Unlockable",
+        "subcategory": [
+          10008
+        ],
+        "uniform": "al_throwbacks"
+      },
+      "tiers": [
+        {
+          "threshold": 5,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510001
+            ],
+            "stubs": 500
+          }
+        },
+        {
+          "threshold": 10,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510001
+            ],
+            "quantity": 5,
+            "stubs": 1000
+          }
+        },
+        {
+          "threshold": 20,
+          "reward": {
+            "kind": "item",
+            "item_type": "Unlockable",
+            "uuid": "8e4374a54f3a61fa403d8d70c99bca08",
+            "name": "Mid-Century Groundbreakers Road",
+            "stubs": 1500
+          }
+        },
+        {
+          "threshold": 30,
+          "reward": {
+            "kind": "item",
+            "item_type": "Unlockable",
+            "uuid": "c2fc6713c56f7786d9b388ebbf78e8d9",
+            "name": "Mid-Century Groundbreakers Home",
+            "stubs": 3000
+          }
+        },
+        {
+          "threshold": 60,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510001
+            ],
+            "quantity": 10,
+            "stubs": 4000
+          }
+        },
+        {
+          "threshold": 100,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510001
+            ],
+            "quantity": 20,
+            "stubs": 5000
+          }
+        }
+      ]
+    },
+    {
+      "id": 602,
+      "group_id": 6,
+      "name": "N.L. Throwbacks",
+      "texture": "COLLECT_UNIFORMS_NL_DIAMOND_THROWBACKS",
+      "description": "Collect N.L. Throwbacks items to earn rewards!",
+      "selector": {
+        "inventory": "Unlockable",
+        "subcategory": [
+          10008
+        ],
+        "uniform": "nl_throwbacks"
+      },
+      "tiers": [
+        {
+          "threshold": 5,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510001
+            ],
+            "stubs": 500
+          }
+        },
+        {
+          "threshold": 10,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510001
+            ],
+            "quantity": 5,
+            "stubs": 1000
+          }
+        },
+        {
+          "threshold": 20,
+          "reward": {
+            "kind": "item",
+            "item_type": "Unlockable",
+            "uuid": "f9f0cd50df8a94019fc0391c61b96f3b",
+            "name": "Expansion Era Boomers Road",
+            "stubs": 1500
+          }
+        },
+        {
+          "threshold": 30,
+          "reward": {
+            "kind": "item",
+            "item_type": "Unlockable",
+            "uuid": "e4807834012f253392148c5bfdcb8020",
+            "name": "Expansion Era Boomers Home",
+            "stubs": 3000
+          }
+        },
+        {
+          "threshold": 60,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510001
+            ],
+            "quantity": 10,
+            "stubs": 4000
+          }
+        },
+        {
+          "threshold": 100,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510001
+            ],
+            "quantity": 20,
+            "stubs": 5000
+          }
+        }
+      ]
+    },
+    {
+      "id": 603,
+      "group_id": 6,
+      "name": "MLB Alternates",
+      "texture": "COLLECT_UNIFORMS_MLB_DIAMOND_ALT",
+      "description": "Collect MLB Alternates items to earn rewards!",
+      "selector": {
+        "inventory": "Unlockable",
+        "subcategory": [
+          10008
+        ],
+        "uniform": "alternates"
+      },
+      "tiers": [
+        {
+          "threshold": 5,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510001
+            ],
+            "stubs": 500
+          }
+        },
+        {
+          "threshold": 10,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510001
+            ],
+            "quantity": 5,
+            "stubs": 1000
+          }
+        },
+        {
+          "threshold": 20,
+          "reward": {
+            "kind": "item",
+            "item_type": "Unlockable",
+            "uuid": "1b061b1cec6b5898e5326992d9461610",
+            "name": "Long Ball Beasts Road",
+            "stubs": 1500
+          }
+        },
+        {
+          "threshold": 30,
+          "reward": {
+            "kind": "item",
+            "item_type": "Unlockable",
+            "uuid": "5438361912d394a4650e9d40cef63c78",
+            "name": "Long Ball Beasts Home",
+            "stubs": 3000
+          }
+        },
+        {
+          "threshold": 60,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510001
+            ],
+            "quantity": 10,
+            "stubs": 4000
+          }
+        }
+      ]
+    },
+    {
+      "id": 604,
+      "group_id": 6,
+      "name": "MLB Home, Road & BP",
+      "texture": "COLLECT_UNIFORMS_MLB_GOLD",
+      "description": "Collect MLB Home, Road & BP items to earn rewards!",
+      "selector": {
+        "inventory": "Unlockable",
+        "subcategory": [
+          10008
+        ],
+        "uniform": "standard"
+      },
+      "tiers": [
+        {
+          "threshold": 15,
+          "reward": {
+            "kind": "currency",
+            "stubs": 250
+          }
+        },
+        {
+          "threshold": 30,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510001
+            ],
+            "stubs": 500
+          }
+        },
+        {
+          "threshold": 60,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510001
+            ],
+            "quantity": 5,
+            "stubs": 1000
+          }
+        },
+        {
+          "threshold": 120,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510001
+            ],
+            "quantity": 10,
+            "stubs": 2000
+          }
+        }
+      ]
+    },
+    {
+      "id": 605,
+      "group_id": 6,
+      "name": "MiLB Uniforms",
+      "texture": "COLLECT_UNIFORMS_MILB",
+      "description": "Collect MiLB Uniforms items to earn rewards!",
+      "selector": {
+        "inventory": "Unlockable",
+        "subcategory": [
+          10008
+        ],
+        "uniform": "milb"
+      },
+      "tiers": [
+        {
+          "threshold": 15,
+          "reward": {
+            "kind": "currency",
+            "stubs": 250
+          }
+        },
+        {
+          "threshold": 30,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510001
+            ],
+            "stubs": 500
+          }
+        },
+        {
+          "threshold": 60,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510001
+            ],
+            "quantity": 5,
+            "stubs": 1000
+          }
+        },
+        {
+          "threshold": 120,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510001
+            ],
+            "quantity": 10,
+            "stubs": 2000
+          }
+        }
+      ]
+    },
+    {
+      "id": 701,
+      "group_id": 7,
+      "name": "Animations & Celebrations",
+      "texture": "COLLECT_UNLOCKABLES_ANIMATIONS",
+      "description": "Collect Animations & Celebrations items to earn rewards!",
+      "selector": {
+        "inventory": "Unlockable",
+        "subcategory": [
+          10000,
+          10004
+        ]
+      },
+      "tiers": [
+        {
+          "threshold": 10,
+          "reward": {
+            "kind": "substitute",
+            "name": "Ballplayer animations",
+            "stubs": 500
+          }
+        },
+        {
+          "threshold": 20,
+          "reward": {
+            "kind": "substitute",
+            "name": "Ballplayer animations",
+            "stubs": 1000
+          }
+        },
+        {
+          "threshold": 30,
+          "reward": {
+            "kind": "substitute",
+            "name": "Ballplayer Celebrations",
+            "stubs": 1500
+          }
+        },
+        {
+          "threshold": 50,
+          "reward": {
+            "kind": "substitute",
+            "name": "Ballplayer Bat Slams",
+            "stubs": 2500
+          }
+        }
+      ]
+    },
+    {
+      "id": 702,
+      "group_id": 7,
+      "name": "Audio Calls",
+      "texture": "COLLECT_UNLOCKABLES_AUDIOCALLS",
+      "description": "Collect Audio Calls items to earn rewards!",
+      "selector": {
+        "inventory": "Unlockable",
+        "subcategory": [
+          10002,
+          10003
+        ]
+      },
+      "tiers": [
+        {
+          "threshold": 10,
+          "reward": {
+            "kind": "currency",
+            "stubs": 500
+          }
+        },
+        {
+          "threshold": 15,
+          "reward": {
+            "kind": "currency",
+            "stubs": 750
+          }
+        },
+        {
+          "threshold": 20,
+          "reward": {
+            "kind": "item",
+            "item_type": "Unlockable",
+            "uuid": "bcd738dc8f20a6df8f40c4490e2053b0",
+            "name": "Just Like The Ex-Girlfriend",
+            "stubs": 1000
+          }
+        },
+        {
+          "threshold": 30,
+          "reward": {
+            "kind": "item",
+            "item_type": "Unlockable",
+            "uuid": "adcf964dc675106763e656dcd371299f",
+            "name": "Get up! Get Outta Here!",
+            "stubs": 2000
+          }
+        }
+      ]
+    },
+    {
+      "id": 703,
+      "group_id": 7,
+      "name": "Bat Grips",
+      "texture": "COLLECT_EQUIPMENT_BATGRIPS",
+      "description": "Collect Bat Grips items to earn rewards!",
+      "selector": {
+        "inventory": "Equipment",
+        "slots": [
+          "Bat Grips"
+        ]
+      },
+      "tiers": [
+        {
+          "threshold": 1,
+          "reward": {
+            "kind": "currency",
+            "stubs": 100
+          }
+        },
+        {
+          "threshold": 2,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510042
+            ],
+            "stubs": 250
+          }
+        },
+        {
+          "threshold": 4,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510042
+            ],
+            "stubs": 500
+          }
+        },
+        {
+          "threshold": 6,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510042
+            ],
+            "stubs": 1000
+          }
+        },
+        {
+          "threshold": 10,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510042
+            ],
+            "stubs": 1500
+          }
+        }
+      ]
+    },
+    {
+      "id": 704,
+      "group_id": 7,
+      "name": "Batting Gloves",
+      "texture": "COLLECT_EQUIPMENT_BATTINGGLOVES",
+      "description": "Collect Batting Gloves items to earn rewards!",
+      "selector": {
+        "inventory": "Equipment",
+        "slots": [
+          "Batting Gloves"
+        ]
+      },
+      "tiers": [
+        {
+          "threshold": 10,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510001
+            ],
+            "stubs": 250
+          }
+        },
+        {
+          "threshold": 15,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510042
+            ],
+            "stubs": 500
+          }
+        },
+        {
+          "threshold": 20,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510042
+            ],
+            "stubs": 750
+          }
+        },
+        {
+          "threshold": 40,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510042
+            ],
+            "stubs": 1500
+          }
+        }
+      ]
+    },
+    {
+      "id": 705,
+      "group_id": 7,
+      "name": "Catcher Masks",
+      "texture": "COLLECT_EQUIPMENT_CATCHERMASKS",
+      "description": "Collect Catcher Masks items to earn rewards!",
+      "selector": {
+        "inventory": "Equipment",
+        "slots": [
+          "Catcher Masks"
+        ]
+      },
+      "tiers": [
+        {
+          "threshold": 1,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510042
+            ],
+            "stubs": 250
+          }
+        },
+        {
+          "threshold": 2,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510042
+            ],
+            "stubs": 500
+          }
+        },
+        {
+          "threshold": 4,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510042
+            ],
+            "stubs": 750
+          }
+        },
+        {
+          "threshold": "all",
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510042
+            ],
+            "stubs": 1500
+          }
+        }
+      ]
+    },
+    {
+      "id": 706,
+      "group_id": 7,
+      "name": "Compression Sleeves",
+      "texture": "COLLECT_EQUIPMENT_COMPRESSIONSLEEVES",
+      "description": "Collect Compression Sleeves items to earn rewards!",
+      "selector": {
+        "inventory": "Equipment",
+        "slots": [
+          "Compression Sleeve"
+        ]
+      },
+      "tiers": [
+        {
+          "threshold": 1,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510001
+            ],
+            "stubs": 50
+          }
+        },
+        {
+          "threshold": 3,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510042
+            ],
+            "stubs": 150
+          }
+        },
+        {
+          "threshold": 6,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510042
+            ],
+            "stubs": 300
+          }
+        },
+        {
+          "threshold": "all",
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510042
+            ],
+            "stubs": 750
+          }
+        }
+      ]
+    },
+    {
+      "id": 707,
+      "group_id": 7,
+      "name": "Elbow Guards",
+      "texture": "COLLECT_EQUIPMENT_ELBOWGUARDS",
+      "description": "Collect Elbow Guards items to earn rewards!",
+      "selector": {
+        "inventory": "Equipment",
+        "slots": [
+          "Elbow Guard"
+        ]
+      },
+      "tiers": [
+        {
+          "threshold": 3,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510001
+            ],
+            "stubs": 150
+          }
+        },
+        {
+          "threshold": 6,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510042
+            ],
+            "stubs": 300
+          }
+        },
+        {
+          "threshold": 9,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510042
+            ],
+            "stubs": 750
+          }
+        },
+        {
+          "threshold": "all",
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510042
+            ],
+            "stubs": 1500
+          }
+        }
+      ]
+    },
+    {
+      "id": 708,
+      "group_id": 7,
+      "name": "Eyewear",
+      "texture": "COLLECT_EQUIPMENT_EYEWEAR",
+      "description": "Collect Eyewear items to earn rewards!",
+      "selector": {
+        "inventory": "Equipment",
+        "slots": [
+          "Eyewear"
+        ]
+      },
+      "tiers": [
+        {
+          "threshold": 3,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510001
+            ],
+            "stubs": 150
+          }
+        },
+        {
+          "threshold": 6,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510042
+            ],
+            "stubs": 300
+          }
+        },
+        {
+          "threshold": 9,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510042
+            ],
+            "stubs": 750
+          }
+        },
+        {
+          "threshold": "all",
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510042
+            ],
+            "stubs": 1500
+          }
+        }
+      ]
+    },
+    {
+      "id": 709,
+      "group_id": 7,
+      "name": "Fielding Gloves",
+      "texture": "COLLECT_EQUIPMENT_FIELDINGGLOVES",
+      "description": "Collect Fielding Gloves items to earn rewards!",
+      "selector": {
+        "inventory": "Equipment",
+        "slots": [
+          "Fielding Glove"
+        ]
+      },
+      "tiers": [
+        {
+          "threshold": 5,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510001
+            ],
+            "stubs": 250
+          }
+        },
+        {
+          "threshold": 10,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510042
+            ],
+            "stubs": 500
+          }
+        },
+        {
+          "threshold": 15,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510042
+            ],
+            "stubs": 750
+          }
+        },
+        {
+          "threshold": 30,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510042
+            ],
+            "stubs": 1500
+          }
+        }
+      ]
+    },
+    {
+      "id": 710,
+      "group_id": 7,
+      "name": "Ritual Items",
+      "texture": "COLLECT_EQUIPMENT_RITUALS",
+      "description": "Collect Ritual Items items to earn rewards!",
+      "selector": {
+        "inventory": "Equipment",
+        "slots": [
+          "Ritual"
+        ]
+      },
+      "tiers": [
+        {
+          "threshold": 10,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510042
+            ],
+            "stubs": 250
+          }
+        },
+        {
+          "threshold": 20,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510042
+            ],
+            "stubs": 500
+          }
+        },
+        {
+          "threshold": 25,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510042
+            ],
+            "stubs": 1000
+          }
+        },
+        {
+          "threshold": "all",
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510042
+            ],
+            "stubs": 2500
+          }
+        }
+      ]
+    },
+    {
+      "id": 711,
+      "group_id": 7,
+      "name": "Shin Guards",
+      "texture": "COLLECT_EQUIPMENT_SHINGUARDS",
+      "description": "Collect Shin Guards items to earn rewards!",
+      "selector": {
+        "inventory": "Equipment",
+        "slots": [
+          "Shin Guard"
+        ]
+      },
+      "tiers": [
+        {
+          "threshold": 1,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510001
+            ],
+            "stubs": 100
+          }
+        },
+        {
+          "threshold": 3,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510042
+            ],
+            "stubs": 250
+          }
+        },
+        {
+          "threshold": 6,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510042
+            ],
+            "stubs": 500
+          }
+        },
+        {
+          "threshold": "all",
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510042
+            ],
+            "stubs": 1000
+          }
+        }
+      ]
+    },
+    {
+      "id": 712,
+      "group_id": 7,
+      "name": "Socks",
+      "texture": "COLLECT_EQUIPMENT_SOCKS",
+      "description": "Collect Socks items to earn rewards!",
+      "selector": {
+        "inventory": "Equipment",
+        "slots": [
+          "Socks"
+        ]
+      },
+      "tiers": [
+        {
+          "threshold": 2,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510042
+            ],
+            "stubs": 500
+          }
+        },
+        {
+          "threshold": 3,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510042
+            ],
+            "stubs": 750
+          }
+        },
+        {
+          "threshold": 6,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510042
+            ],
+            "stubs": 1000
+          }
+        },
+        {
+          "threshold": 12,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510042
+            ],
+            "stubs": 1500
+          }
+        }
+      ]
+    },
+    {
+      "id": 713,
+      "group_id": 7,
+      "name": "Wrist Guards",
+      "texture": "COLLECT_EQUIPMENT_WRISTGUARDS",
+      "description": "Collect Wrist Guards items to earn rewards!",
+      "selector": {
+        "inventory": "Equipment",
+        "slots": [
+          "Wrist Guard"
+        ]
+      },
+      "tiers": [
+        {
+          "threshold": 1,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510001
+            ],
+            "stubs": 50
+          }
+        },
+        {
+          "threshold": 2,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510042
+            ],
+            "stubs": 150
+          }
+        },
+        {
+          "threshold": 4,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510042
+            ],
+            "stubs": 300
+          }
+        },
+        {
+          "threshold": "all",
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510042
+            ],
+            "stubs": 500
+          }
+        }
+      ]
+    },
+    {
+      "id": 714,
+      "group_id": 7,
+      "name": "Bat Skins",
+      "texture": "COLLECT_EQUIPMENT_BATSKINS",
+      "description": "Collect Bat Skins items to earn rewards!",
+      "selector": {
+        "inventory": "Equipment",
+        "slots": [
+          "Bat"
+        ],
+        "skin": true
+      },
+      "tiers": [
+        {
+          "threshold": 5,
+          "reward": {
+            "kind": "currency",
+            "stubs": 500
+          }
+        },
+        {
+          "threshold": 10,
+          "reward": {
+            "kind": "currency",
+            "stubs": 1000
+          }
+        },
+        {
+          "threshold": 15,
+          "reward": {
+            "kind": "item",
+            "item_type": "Equipment",
+            "uuid": "06d2cbe86d50e46350c9cfe53a7e1356",
+            "name": "Shattered Glass",
+            "stubs": 1500
+          }
+        },
+        {
+          "threshold": 30,
+          "reward": {
+            "kind": "item",
+            "item_type": "Equipment",
+            "uuid": "a918c09a70e4ad5ac372921a45c29d7c",
+            "name": "Topps",
+            "stubs": 3000
+          }
+        }
+      ]
+    },
+    {
+      "id": 715,
+      "group_id": 7,
+      "name": "Bats",
+      "texture": "COLLECT_EQUIPMENT_BATS",
+      "description": "Collect Bats items to earn rewards!",
+      "selector": {
+        "inventory": "Equipment",
+        "slots": [
+          "Bat"
+        ],
+        "skin": false
+      },
+      "tiers": [
+        {
+          "threshold": 10,
+          "reward": {
+            "kind": "currency",
+            "stubs": 250
+          }
+        },
+        {
+          "threshold": 20,
+          "reward": {
+            "kind": "currency",
+            "stubs": 500
+          }
+        },
+        {
+          "threshold": 30,
+          "reward": {
+            "kind": "item",
+            "item_type": "Equipment",
+            "uuid": "6d35d6ac358e104936a500559001531f",
+            "name": "MLB Pro Prime TM16 Trey Mancini F16HT Against Colon Cancer",
+            "stubs": 1000
+          }
+        },
+        {
+          "threshold": 40,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510042
+            ],
+            "stubs": 2500
+          }
+        }
+      ]
+    },
+    {
+      "id": 716,
+      "group_id": 7,
+      "name": "Chest Protectors",
+      "texture": "COLLECT_EQUIPMENT_CHESTPROTECTORS",
+      "description": "Collect Chest Protectors items to earn rewards!",
+      "selector": {
+        "inventory": "Equipment",
+        "slots": [
+          "Chest Protector"
+        ]
+      },
+      "tiers": [
+        {
+          "threshold": 1,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510042
+            ],
+            "stubs": 150
+          }
+        },
+        {
+          "threshold": 2,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510042
+            ],
+            "stubs": 300
+          }
+        },
+        {
+          "threshold": 4,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510042
+            ],
+            "stubs": 500
+          }
+        },
+        {
+          "threshold": "all",
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510042
+            ],
+            "stubs": 1000
+          }
+        }
+      ]
+    },
+    {
+      "id": 717,
+      "group_id": 7,
+      "name": "Classic Stadiums",
+      "texture": "COLLECT_STADIUMS_CLASSIC",
+      "description": "Collect Classic Stadiums items to earn rewards!",
+      "selector": {
+        "members": {
+          "Stadium": [
+            "aa475604668730af60a0a87cc92604da",
+            "7520fa31d14f45add6d61e52df5a03ff",
+            "f52a7b2610fb4d3f74b4106fb80b233d",
+            "f5c59267dae7d123f54b741a76f28f84",
+            "524265e8b942930fbbe8a5d979d29205",
+            "20bcff97cc5fb24cbe58ebb037401bd9",
+            "6375f34725de10852675ac6ee7dc9e40",
+            "50698c07f91c611904a467b4892806a2",
+            "b7c2ef08997828f54b6aaf75ec07637d",
+            "4c859737028fd7781247eaa13a4ea759",
+            "197e342c9fbad962dbe6d3322f723ca6"
+          ]
+        }
+      },
+      "tiers": [
+        {
+          "threshold": 1,
+          "reward": {
+            "kind": "currency",
+            "stubs": 100
+          }
+        },
+        {
+          "threshold": 3,
+          "reward": {
+            "kind": "currency",
+            "stubs": 300
+          }
+        },
+        {
+          "threshold": 7,
+          "reward": {
+            "kind": "currency",
+            "stubs": 500
+          }
+        },
+        {
+          "threshold": "all",
+          "reward": {
+            "kind": "item",
+            "item_type": "Stadium",
+            "uuid": "ed45e77e699645c84f3f27b7b5ad1e2d",
+            "name": "Polo Grounds",
+            "stubs": 1000
+          }
+        }
+      ]
+    },
+    {
+      "id": 718,
+      "group_id": 7,
+      "name": "Cleats",
+      "texture": "COLLECT_EQUIPMENT_CLEATS",
+      "description": "Collect Cleats items to earn rewards!",
+      "selector": {
+        "inventory": "Equipment",
+        "slots": [
+          "Cleats"
+        ]
+      },
+      "tiers": [
+        {
+          "threshold": 3,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510001
+            ],
+            "stubs": 250
+          }
+        },
+        {
+          "threshold": 5,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510042
+            ],
+            "stubs": 500
+          }
+        },
+        {
+          "threshold": 10,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510042
+            ],
+            "stubs": 750
+          }
+        },
+        {
+          "threshold": 15,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510042
+            ],
+            "stubs": 1500
+          }
+        }
+      ]
+    },
+    {
+      "id": 719,
+      "group_id": 7,
+      "name": "Leg Guards",
+      "texture": "COLLECT_EQUIPMENT_LEGGUARDS",
+      "description": "Collect Leg Guards items to earn rewards!",
+      "selector": {
+        "inventory": "Equipment",
+        "slots": [
+          "Leg Guards"
+        ]
+      },
+      "tiers": [
+        {
+          "threshold": 1,
+          "reward": {
+            "kind": "currency",
+            "stubs": 50
+          }
+        },
+        {
+          "threshold": 2,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510001
+            ],
+            "stubs": 100
+          }
+        },
+        {
+          "threshold": 4,
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510042
+            ],
+            "stubs": 250
+          }
+        },
+        {
+          "threshold": "all",
+          "reward": {
+            "kind": "pack",
+            "products": [
+              510042
+            ],
+            "stubs": 500
+          }
+        }
+      ]
+    },
+    {
+      "id": 720,
+      "group_id": 7,
+      "name": "Stadium Sounds",
+      "texture": "COLLECT_UNLOCKABLES_STADIUMSOUNDS",
+      "description": "Collect Stadium Sounds items to earn rewards!",
+      "selector": {
+        "inventory": "Unlockable",
+        "subcategory": [
+          10001
+        ]
+      },
+      "tiers": [
+        {
+          "threshold": 15,
+          "reward": {
+            "kind": "currency",
+            "stubs": 500
+          }
+        },
+        {
+          "threshold": 30,
+          "reward": {
+            "kind": "currency",
+            "stubs": 1000
+          }
+        },
+        {
+          "threshold": 45,
+          "reward": {
+            "kind": "item",
+            "item_type": "Unlockable",
+            "uuid": "308877223a4c6c51b8dc76441cd414bc",
+            "name": "Nice Try Ramone",
+            "stubs": 2000
+          }
+        },
+        {
+          "threshold": 60,
+          "reward": {
+            "kind": "item",
+            "item_type": "Unlockable",
+            "uuid": "d4b42304f98e8c0760723c747006a5a4",
+            "name": "DJ Air Horn",
+            "stubs": 3000
+          }
+        }
+      ]
+    }
+  ]
+}

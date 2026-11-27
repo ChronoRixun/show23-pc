@@ -793,7 +793,10 @@ def program_tier_row(parent, tier, tickets, claimed):
     row = mini_node(parent, 'reward', id=item_id, level=tier.level, name=name,
                     type_id=type_id, tickets_required=tier.threshold, cur_val=tickets,
                     start_of_stage=0, no_sell=1, is_featured=0,
-                    display_index=0 if has_item else 1, label_index=1 if has_item else 2,
+                    # The track widget picks its tile by display_index: 0 = the fixed 'unknownitem'
+                    # texture (the '?'), 1 = the shared Card (player or pack art), 2 = extras only
+                    # (Stubs/XP), 3 = Card plus extras.
+                    display_index=1 if has_item else 2, label_index=1 if has_item else 2,
                     is_claimed=int(claimed), status_index=int(claimed),
                     stage_level_9irt____=tier.level,  # script 0x86784c76
                     reward_status_aafaaa9agx_5=tier.threshold)  # script 0xbb1f070a
@@ -928,7 +931,7 @@ def add_bonus_xp(params):
     return '<response><bonus_xp amount="0"/></response>'
 
 
-MISSION_CONTENT_DIR = Path(HERE) / 'content' / 'CUSA35521' / 'r19'
+MISSION_CONTENT_DIR = Path(HERE) / 'content' / 'CUSA35521' / 'r20'
 DAILY_GOAL_GROUP_ID = 730000
 MISSION_REROLL_FLAG = 'reward_flag_ab_dkxi'  # 0x35fa44, hash 0xbc667a79 gates Get New Mission
 # Type-0 detail indexes the global slot vector. Keep one small ordered board.
@@ -973,6 +976,7 @@ class TitleContent(NamedTuple):
     season_path: SeasonPath | None = None
     choice_packs: dict | None = None
     team_affinity: dict | None = None
+    collections: dict | None = None
 
 
 # Ordinary Moment stats: batting R (0xae1005), HR (0xae12ab), OUTS (0xae14fd),
@@ -1023,8 +1027,8 @@ def load_title_content(directory):
     if not isinstance(manifest, dict) or manifest.keys() != {'schema_version', 'title', 'revision', 'files'}:
         raise invalid('manifest.json must contain schema_version, title, revision and files')
     version = manifest['schema_version']
-    if type(version) is not int or not 1 <= version <= 15:
-        raise invalid('manifest.json schema_version must be an integer from 1 through 15')
+    if type(version) is not int or not 1 <= version <= 16:
+        raise invalid('manifest.json schema_version must be an integer from 1 through 16')
     if manifest['title'] != 'CUSA35521' or manifest['revision'] != directory.name:
         raise invalid(f'manifest.json must identify title CUSA35521 and revision {directory.name}')
     expected_files = {'missions.json'} if version == 1 else {'missions.json', 'programs.json'}
@@ -1040,6 +1044,8 @@ def load_title_content(directory):
         expected_files.add('choice_packs.json')
     if version >= 14:
         expected_files.add('team_affinity.json')
+    if version >= 16:
+        expected_files.add('collections.json')
     files = manifest['files']
     if (not isinstance(files, list) or len(files) != len(expected_files)
             or any(not isinstance(name, str) for name in files) or set(files) != expected_files):
@@ -1145,8 +1151,10 @@ def load_title_content(directory):
                                            multiple=version >= 8)
                  if version >= 6 else {})
     season = validate_season_path(read_json('season_path.json'), invalid) if version >= 11 else None
+    collections = (validate_collection_content(read_json('collections.json'), SHOP_PACKS.keys() | choices.keys(),
+                                               invalid) if version >= 16 else None)
     return TitleContent(mission_index, programs, moments, situations, conquest, showdowns, groups,
-                        season, choices, affinity)
+                        season, choices, affinity, collections)
 
 
 def validate_choice_packs(products, invalid, *, program_rewards=False):
@@ -3472,7 +3480,7 @@ def load_disc_cards():
     prepare_disc_roster()
     with open(derived_roster_path('disc-cards.json'), encoding='utf-8') as file:
         pool = sorted(json.load(file), key=lambda c: (-c['ovr'], c['name'], c['roster_player_id']))
-    starter = load_state().get('disc_starter')
+    starter = load_state(migrate_team=False).get('disc_starter')
     if starter is None:
         starter, _ = choose_disc_starter(pool)
     starter = set(starter)
@@ -6028,8 +6036,9 @@ def owned_inventory_rows(kind, state=None):
     if state is None:
         state = load_state()
     gains = state.get('pack_shop', {}).get('gained_items', {}).get(kind, {})
+    locked = collection_locked_uuids(state)
     if not gains:
-        return base
+        return [dict(row, no_sell=1) if row['uuid'] in locked else row for row in base] if locked else base
     by_uuid = {row['uuid']: row for row in base}
     for row in inventory['catalogue'].get(kind, []):
         card_id = row['uuid']
@@ -6038,7 +6047,7 @@ def owned_inventory_rows(kind, state=None):
             original = by_uuid.get(card_id)
             by_uuid[card_id] = dict(original or row, quantity=(original['quantity'] if original else 0) + gained,
                                     no_sell=original.get('no_sell', 0) if original else 1)
-    return list(by_uuid.values())
+    return [dict(row, no_sell=1) if row['uuid'] in locked else row for row in by_uuid.values()]
 
 
 # Definition-backed equipment. These are JSON model types, not inventory slot IDs.
@@ -6877,8 +6886,10 @@ def player_collection(query, *, search=False):
         start = page * COLLECTION_PAGE_SIZE
         owned = owned[start:start + COLLECTION_PAGE_SIZE]
     parallels = owned_parallel_levels(state, owned)
+    locked = collection_locked_uuids(state)
     items = ''.join('<item %s/>' % card_attrs(c, parallels=parallels, type_id=0, order=i + 1, seq_level=0,
-                                             is_live_set=0, **{'captain': 0, 'captained': 0, **captain_flags(c)})
+                                             is_live_set=0, no_sell=int(c['uuid'] in locked),
+                                             **{'captain': 0, 'captained': 0, **captain_flags(c)})
                     for i, c in enumerate(owned))
     body = '<items count="%d" total="%d" page="%d" pages="%d" items_collected="%d" items_total="%d">%s</items>' % (
         len(owned), collected, page + 1, pages, collected, catalogue_count, items)
@@ -7213,52 +7224,449 @@ def view_by_team(params):
     return team_reply(showdown_cpu_squad(index), cpu_team(index))
 
 
-def collections_reply(name, params):
-    """Collect > Collections (study: reports\\online\\proposals\\collections.md, 2026-11-19).
+COLLECTION_ITEM_TYPES = ('Player', 'Equipment', 'Unlockable', 'Stadium')
+COLLECTION_UNIFORM_TYPES = ('standard', 'alternates', 'al_throwbacks', 'nl_throwbacks', 'milb')
+COLLECTION_SET_NAMES = ('CORE', 'SET 1', 'SET 2', 'SET 3', 'SET 4', 'SET 5')
 
-    collection.view_groups (0xeff5d0) stashes response/collection_groups as DATA_CGS; view_collections
-    (0xeff670) stashes response/collections as DATA_CS; collection.view (0xeff730) stashes response/collection
-    and each collection/items/item as CARD<n>, reads rewards.progress_max and, with one reward holding an item,
-    the reward item. Tiles draw UTILS.TEXTURE[texture_name] from the disc's CROSS\\LIVE\\COLLECT_*.WEBP (bare
-    stem). An item's collection_index is a STATE: 0 not collected, 1 collected, 2 picked locally; quantity > 0
-    lets it be picked. collection.advance (lock-in) is refused in reply_body. Ids, membership and rewards are
-    our choice: one group "Live Series" (id 1), one collection per MLB club (id 101 + club number)."""
-    q = params_of(params)
-    stem = lambda i: 'COLLECT_' + MLB_TEAMS[i][2].upper().replace(' ', '').replace('.', '')
+
+def collection_uuid(value):
+    return isinstance(value, str) and re.fullmatch(r'[0-9a-f]{32}', value) is not None
+
+
+def collection_values(value, allowed):
+    return (isinstance(value, list) and bool(value)
+            and all(type(member) is type(allowed[0]) and member in allowed for member in value)
+            and len(value) == len(set(value)))
+
+
+def valid_collection_selector(selector):
+    if not isinstance(selector, dict):
+        return False
+    if 'live_teams' in selector:
+        return (content_record(selector, {'live_teams'})
+                and collection_values(selector['live_teams'], tuple(range(-1, len(MLB_TEAMS)))))
+    if 'set' in selector:
+        return content_record(selector, {'set'}) and selector['set'] in COLLECTION_SET_NAMES
+    if 'affinity' in selector:
+        return (content_record(selector, {'affinity'}) and type(selector['affinity']) is int
+                and 1 <= selector['affinity'] <= AFFINITY_SEASON)
+    if 'live_rarities' in selector:
+        return (selector.keys() <= {'live_rarities', 'positions'}
+                and collection_values(selector['live_rarities'], tuple(RARITY_ID))
+                and ('positions' not in selector or collection_values(selector['positions'], tuple(FIELD_NUMBER))))
+    if 'members' in selector:
+        members = selector['members']
+        return (content_record(selector, {'members'}) and isinstance(members, dict) and bool(members)
+                and members.keys() <= set(COLLECTION_ITEM_TYPES)
+                and all(isinstance(ids, list) and bool(ids) and all(collection_uuid(uuid) for uuid in ids)
+                        and len(ids) == len(set(ids)) for ids in members.values()))
+    kind = selector.get('inventory')
+    if kind == 'Equipment':
+        return (selector.keys() <= {'inventory', 'rarity', 'skin', 'slots'} and len(selector) > 1
+                and ('rarity' not in selector or selector['rarity'] in tuple(RARITY_ID))
+                and ('skin' not in selector or type(selector['skin']) is bool)
+                and ('slots' not in selector or
+                     isinstance(selector['slots'], list) and bool(selector['slots'])
+                     and all(content_text(slot) for slot in selector['slots'])
+                     and len(selector['slots']) == len(set(selector['slots']))))
+    if kind == 'Unlockable':
+        return (selector.keys() <= {'inventory', 'rarity', 'subcategory', 'uniform'} and len(selector) > 1
+                and ('rarity' not in selector or selector['rarity'] in tuple(RARITY_ID))
+                and ('subcategory' not in selector or
+                     collection_values(selector['subcategory'], tuple(range(10000, 10009))))
+                and ('uniform' not in selector or selector['uniform'] in COLLECTION_UNIFORM_TYPES
+                     and selector.get('subcategory') == [10008]))
+    return False
+
+
+def validate_collection_content(data, packs, invalid):
+    if not content_record(data, {'groups', 'collections'}):
+        raise invalid('collections.json needs groups and collections')
+    groups, collections = {}, {}
+    for key, index, fields in (
+        ('groups', groups, {'id', 'name', 'texture'}),
+        ('collections', collections, {'id', 'name', 'texture', 'group_id', 'description', 'selector', 'tiers'}),
+    ):
+        records = data[key]
+        if not isinstance(records, list) or not records:
+            raise invalid(f'collections.json {key} must be a nonempty list')
+        for number, record in enumerate(records, 1):
+            if (not content_record(record, fields) or not content_positive(record['id'])
+                    or record['id'] in index or not content_text(record['name'])
+                    or not isinstance(record['texture'], str)
+                    or not re.fullmatch(r'COLLECT_[A-Z0-9_]+', record['texture'])):
+                raise invalid(f'collections.json {key} row {number} needs a unique ID, name and collection texture')
+            index[record['id']] = record
+    if any(not content_positive(row['group_id']) or row['group_id'] not in groups for row in collections.values()):
+        raise invalid('collections.json collection references an unknown group')
+    if {row['group_id'] for row in collections.values()} != groups.keys():
+        raise invalid('collections.json every group needs at least one collection')
+    for row in collections.values():
+        label = f"collections.json collection {row['id']}"
+        if not content_text(row['description']) or not valid_collection_selector(row['selector']):
+            raise invalid(f'{label} needs a description and a valid membership selector')
+        tiers = row['tiers']
+        if not isinstance(tiers, list) or not tiers:
+            raise invalid(f'{label} needs reward tiers')
+        previous = 0
+        for number, tier in enumerate(tiers, 1):
+            if not content_record(tier, {'threshold', 'reward'}):
+                raise invalid(f'{label} tier {number} needs a threshold and reward')
+            threshold, reward = tier['threshold'], tier['reward']
+            if threshold != 'all' or number != len(tiers):
+                if not content_positive(threshold) or threshold <= previous:
+                    raise invalid(f'{label} tiers must increase and only the final tier may require All')
+                previous = threshold
+            kind = reward.get('kind') if isinstance(reward, dict) else None
+            if kind in ('currency', 'pack'):
+                validate_expanded_reward(reward, packs, label, invalid)
+                if kind == 'pack' and (len(reward['products']) != 1
+                                       or not reward.keys() <= {'kind', 'products', 'quantity', 'stubs', 'xp'}):
+                    raise invalid(f'{label} tier {number} needs one pack product')
+                continue
+            fields = {'kind', 'name'}
+            if kind in ('card', 'item'):
+                fields.add('uuid')
+            if kind == 'item':
+                fields.add('item_type')
+            if (kind not in ('card', 'item', 'substitute')
+                    or not fields <= reward.keys() <= fields | {'stubs', 'xp'}
+                    or not content_text(reward['name'])
+                    or 'uuid' in fields and not collection_uuid(reward['uuid'])
+                    or kind == 'item' and reward['item_type'] not in COLLECTION_ITEM_TYPES[1:]
+                    or any(not content_positive(reward[key]) for key in ('stubs', 'xp') if key in reward)):
+                raise invalid(f'{label} tier {number} needs a valid item reward or substitute')
+    return {'groups': groups, 'collections': collections}
+
+
+def collection_saved(state, collection_id):
+    return state.get('collections', {}).get(str(collection_id), {})
+
+
+def collection_locked_uuids(state):
+    return {uuid for saved in state.get('collections', {}).values() for uuid in saved.get('locked', ())}
+
+
+def collection_uniform_type(row):
+    name = row['name'].strip().casefold()
+    if name.startswith('cleveland '):
+        name = re.sub(r'^cleveland (?!guardians )', 'cleveland guardians ', name)
+    for club, (_, city, nick) in enumerate(MLB_TEAMS):
+        prefix = f'{city} {nick} '.casefold()
+        if not name.startswith(prefix):
+            continue
+        suffix = name[len(prefix):]
+        if re.fullmatch(r'(?:home|road|alternate|digital camo).* \d{4}', suffix):
+            return 'al_throwbacks' if club < 15 else 'nl_throwbacks'
+        if suffix in ('home', 'road', 'bp home', 'bp road'):
+            return 'standard'
+        if suffix.startswith(('alternate', 'digital camo')):
+            return 'alternates'
+        return None
+    if row.get('rarity') == 'Silver' and name.endswith((' home', ' road')):
+        return 'milb'
+    return None
+
+
+def collection_inventory_match(selector, row):
+    if 'rarity' in selector and row.get('rarity') != selector['rarity']:
+        return False
+    if 'slots' in selector and row.get('slot') not in selector['slots']:
+        return False
+    if 'skin' in selector:
+        skin = ('batskin' in _item_key(row.get('name', ''))
+                or _item_key(row.get('brand', '')) in ('batskin', 'batskins')
+                or _item_key(row.get('slot', '')) in ('batskin', 'batskins'))
+        if skin != selector['skin']:
+            return False
+    if ('subcategory' in selector
+            and exchange_card_number(row.get('sub_category_id')) not in selector['subcategory']):
+        return False
+    return 'uniform' not in selector or collection_uniform_type(row) == selector['uniform']
+
+
+def collection_item_face(kind, row, **fields):
+    if kind == 'Player':
+        return ET.fromstring('<item %s/>' % card_attrs(row, type_id=0, **fields))
+    face = inventory_item(kind, row, **fields)
+    return ET.fromstring(face) if face else None
+
+
+def collection_affinity_members(season):
+    content = active_title_content()
+    item_ids = {item_id
+                for track in content.team_affinity.values() if track.season == season
+                for product_id in track.choices.values()
+                for item_id in choice_pack_options(content.choice_packs[product_id])}
+    return {hashlib.md5(str(item_id).encode('ascii'), usedforsecurity=False).hexdigest() for item_id in item_ids}
+
+
+def collection_members(selector):
+    if 'members' in selector:
+        for kind, identities in selector['members'].items():
+            rows = all_cards() if kind == 'Player' else inventory_data()['catalogue'].get(kind, ())
+            uuids = set(identities)
+            for row in rows:
+                if row['uuid'] in uuids and (kind == 'Player' or collection_item_face(kind, row) is not None):
+                    yield kind, row
+        return
+    if 'inventory' in selector:
+        kind = selector['inventory']
+        for row in inventory_data()['catalogue'].get(kind, ()):
+            if collection_inventory_match(selector, row) and collection_item_face(kind, row) is not None:
+                yield kind, row
+        return
+    affinity = collection_affinity_members(selector['affinity']) if 'affinity' in selector else set()
+    for card in all_cards():
+        live = card.get('series') in ('Live', 'Live Series')
+        if 'live_teams' in selector:
+            match = live and card['team_id'] in selector['live_teams']
+        elif 'set' in selector:
+            match = (not live and card.get('series') != 'Ballplayer'
+                     and card.get('set_name') == selector['set'])
+        elif 'live_rarities' in selector:
+            match = (live and card['rarity'] in selector['live_rarities']
+                     and ('positions' not in selector or card['display_position'] in selector['positions']))
+        else:
+            match = card['uuid'] in affinity
+        if match:
+            yield 'Player', card
+
+
+def collection_texture(record):
+    texture = record['texture']
+    for folder in (LAYOUT.base, UPDATE_DIR):
+        if folder and (Path(folder) / 'CROSS' / 'LIVE' / (texture + '.WEBP')).is_file():
+            return texture
+    return 'COLLECT_SERIES'
+
+
+def collection_tiers(definition, count):
+    authored = definition['tiers']
+    final = authored[-1]['threshold']
+    for tier in authored:
+        threshold = tier['threshold']
+        if final != 'all' or threshold == 'all' or threshold < count:
+            yield str(threshold), count if threshold == 'all' else threshold, tier['reward']
+
+
+def collection_progress(definition, members, saved):
+    locked = set(saved.get('locked', ()))
+    count = sum(row['uuid'] in locked for _, row in members)
+    total = definition['tiers'][-1]['threshold']
+    return min(count, total) if total != 'all' else count, len(members) if total == 'all' else total
+
+
+def collection_inventory(state, members):
+    kinds = {kind for kind, _ in members}
+    return {(kind, row['uuid']): row
+            for kind in kinds
+            for row in (cards(state) if kind == 'Player' else equip_owned_rows(kind, state))
+            if row['quantity'] > 0}
+
+
+class CollectionReward(NamedTuple):
+    stubs: int
+    xp: int
+    kind: str
+    row: dict | None = None
+    product: int = 0
+    quantity: int = 1
+
+
+def collection_reward(reward):
+    stubs, xp, kind = reward.get('stubs', 0), reward.get('xp', 0), reward['kind']
+    if kind == 'currency':
+        return CollectionReward(stubs, xp, 'currency')
+    if kind == 'card':
+        card = next((row for row in all_cards() if row['uuid'] == reward['uuid']), None)
+        if card and card.get('roster_player_id', 0) > 0 and card['display_position'] in FIELD_NUMBER:
+            handle, art_id = player_art()['override'].get(card['item_id'], ('', 0))
+            native_uuid = hashlib.md5(str(art_id).encode('ascii'), usedforsecurity=False).hexdigest()
+            if handle and handle != 'ACTIONGENERIC' and (art_id == card['item_id'] or native_uuid == card['uuid']):
+                return CollectionReward(stubs, xp, 'Player', card)
+    elif kind == 'item':
+        item_type = reward['item_type']
+        row = next((row for row in inventory_data()['catalogue'].get(item_type, ())
+                    if row['uuid'] == reward['uuid']), None)
+        if row and collection_item_face(item_type, row) is not None:
+            return CollectionReward(stubs, xp, item_type, row)
+    elif kind == 'pack':
+        product = reward['products'][0]
+        if product in SHOP_PACKS:
+            available = shop_reward_pools(SHOP_PACKS[product]) is not None
+        else:
+            try:
+                choice_pack_offer(choice_pack_products()[product])
+            except ShopRefusal:
+                available = False
+            else:
+                available = True
+        if available:
+            return CollectionReward(stubs, xp, 'pack', product=product, quantity=reward.get('quantity', 1))
+    return CollectionReward(stubs + AFFINITY_CARD_FALLBACK_STUBS, xp, 'currency')
+
+
+def collection_reward_face(reward):
+    fields = dict(collection_index=0, slot_type_id=0, sub_category_id=0, seq_level=0)
+    if reward.row is not None:
+        # The source face supplies category and slot for non-player types.
+        face = collection_item_face(reward.kind, reward.row, quantity=1, no_sell=1, collection_index=0, seq_level=0)
+        face.attrib.setdefault('slot_type_id', '0')
+        face.attrib.setdefault('sub_category_id', '0')
+        face.attrib.setdefault('short_description', face.get('name', ''))
+        return face
+    if reward.product:
+        product = SHOP_PACKS.get(reward.product)
+        if product is None:
+            choice = choice_pack_products()[reward.product]
+            name, type_id = choice['name'], 6
+            texture = choice['texture'] if choice['texture'] in shop_pack_art(UPDATE_DIR)['names'] else 'PACK_THESHOW'
+        else:
+            name, type_id = product.name, 4
+            texture = product.texture if shop_picture_available(product) else 'PACK_THESHOW'
+        return mini_node(ET.Element('preview'), 'item', id=reward.product, item_id=reward.product, type_id=type_id,
+                         name=name, short_description=name, texture_name=texture, rarity_id=RARITY_ID['Diamond'],
+                         rank=0, quantity=reward.quantity, no_sell=1, **fields)
+    return None
+
+
+def collection_detail(definition, members, state, gained=(), resolved=None):
+    response = ET.Element('response')
+    saved = collection_saved(state, definition['id'])
+    progress, total = collection_progress(definition, members, saved)
+    detail = mini_node(response, 'collection', id=definition['id'], name=definition['name'],
+                       description=definition['description'], is_complete=str(progress >= total).lower())
+    if gained:
+        detail.set('gained_item_ids', ','.join(map(str, gained)))
+    items = ET.SubElement(detail, 'items')
+    inventory = collection_inventory(state, members)
+    parallels = owned_parallel_levels(state, [row for (kind, _), row in inventory.items() if kind == 'Player'])
+    locked = set(saved.get('locked', ()))
+    no_sell = collection_locked_uuids(state)
+    for kind, row in members:
+        current = inventory.get((kind, row['uuid']))
+        fields = dict(quantity=current['quantity'] if current else 0, collection_index=int(row['uuid'] in locked),
+                      no_sell=int(bool(current) and (row['uuid'] in no_sell or row.get('is_sellable') is False
+                                                    or str(current.get('no_sell', 0)).lower() in ('1', 'true'))),
+                      seq_level=0)
+        if kind == 'Player':
+            fields.update(parallels=parallels, short_description='Player card', set_name=row.get('set_name') or '',
+                          series_name='Live Series' if row.get('series') == 'Live' else row.get('series', ''),
+                          series_texture_name=row.get('series_texture_name') or '')
+        item = collection_item_face(kind, row, **fields)
+        item.attrib.setdefault('slot_type_id', '0')
+        item.attrib.setdefault('sub_category_id', '0')
+        items.append(item)
+    rewards = mini_node(detail, 'rewards', progress_current=progress, progress_max=total)
+    claimed = set(saved.get('paid', ()))
+    for key, threshold, reward in reversed(list(collection_tiers(definition, len(members)))):
+        tier = resolved[key] if resolved and key in resolved else collection_reward(reward)
+        face = collection_reward_face(tier)
+        element = mini_node(rewards, 'reward', item_id=face.get('item_id') if face is not None else 0,
+                            qty_required=0 if key == 'all' else threshold, has_collected=str(key in claimed).lower(),
+                            xp=tier.xp, stubs=tier.stubs)
+        if face is not None:
+            element.append(face)
+    return mini_xml(response)
+
+
+class CollectionRefusal(Exception):
+    """A collection request could not be applied."""
+
+
+def collection_advance(definition, members, state, item_ids):
+    by_id = {row['item_id']: (kind, row['uuid']) for kind, row in members}
+    if not isinstance(item_ids, str) or len(item_ids) > 11 * len(by_id):
+        raise CollectionRefusal('Select owned items to collect.')
+    selected = [exchange_card_number(value) for value in item_ids.split(',')]
+    if len(set(selected)) != len(selected) or any(value not in by_id for value in selected):
+        raise CollectionRefusal('The selection has invalid or ineligible items.')
+    inventory = collection_inventory(state, members)
+    if any(by_id[value] not in inventory for value in selected):
+        raise CollectionRefusal('You must own every selected item.')
+    saved = collection_saved(state, definition['id'])
+    locked = set(saved.get('locked', ()))
+    new = {by_id[value][1] for value in selected} - locked
+    if not new:
+        return collection_detail(definition, members, state)
+    count, total = collection_progress(definition, members, saved)
+    if count + len(new) > total:
+        raise CollectionRefusal('The selection exceeds the remaining collection requirement.')
+    saved = state.setdefault('collections', {}).setdefault(str(definition['id']), {})
+    saved['locked'] = sorted(locked | new)
+    claimed = set(saved.get('paid', ()))
+    profile = state.setdefault('profile', {})
+    gained, resolved = [], {}
+    for key, threshold, reward in collection_tiers(definition, len(members)):
+        if key in claimed or threshold > count + len(new):
+            continue
+        tier = resolved[key] = collection_reward(reward)
+        if tier.kind == 'Player':
+            grant_card_copies(state, tier.row, 1)
+            gained.append(tier.row['item_id'])
+        elif tier.kind == 'pack':
+            shop = state.setdefault('pack_shop', {})
+            for _ in range(tier.quantity):
+                gained.append(grant_owned_pack(shop, tier.product))
+        elif tier.row is not None:
+            items = state.setdefault('pack_shop', {}).setdefault('gained_items', {})
+            gains = items.setdefault(tier.kind, {})
+            uuid = tier.row['uuid']
+            gains[uuid] = gains.get(uuid, 0) + 1
+            gained.append(tier.row['item_id'])
+        if tier.stubs:
+            profile['stubs'] = profile.get('stubs', 0) + tier.stubs
+        if tier.xp:
+            queue_profile_xp(profile, tier.xp)
+        claimed.add(key)
+    saved['paid'] = sorted(claimed)
+    # Complete the synchronous transaction only after the reply is serializable.
+    reply = collection_detail(definition, members, state, gained, resolved)
+    save_state(state)
+    return reply
+
+
+def collections_reply(name, params):
+    """Collect > Collections. See reports/online/dd-content/collections.md for the wire contract."""
+    query = params_of(params)
+    content = active_title_content().collections
+    if not isinstance(query, dict) or content is None:
+        return None
+    groups, definitions = content['groups'], content['collections']
+    response = ET.Element('response')
     if name == 'collection.view_groups':
-        return ('<response><collection_groups><collection_group id="1" name="Live Series" texture_name="COLLECT_LIVESERIES"/>'
-                '</collection_groups></response>')
+        parent = ET.SubElement(response, 'collection_groups')
+        for group_id, group in groups.items():
+            if any(next(collection_members(row['selector']), None) is not None
+                   for row in definitions.values() if row['group_id'] == group_id):
+                mini_node(parent, 'collection_group', id=group_id, name=group['name'],
+                          texture_name=collection_texture(group))
+        return mini_xml(response)
     if name == 'collection.view_collections':
-        if str(q.get('collection_group_id')) != '1':
-            return '<response><collections/></response>'
-        return '<response><collections>%s</collections></response>' % ''.join(
-            '<collection id="%d" name="%s %s" texture_name="%s" is_complete="false"/>' % (101 + i, city, nick, stem(i))
-            for i, (short, city, nick) in enumerate(MLB_TEAMS))
+        parent = ET.SubElement(response, 'collections')
+        group_id = exchange_card_number(query.get('collection_group_id'))
+        if group_id in groups:
+            state = load_state(migrate_team=False)
+            for row in definitions.values():
+                if row['group_id'] != group_id:
+                    continue
+                members = list(collection_members(row['selector']))
+                if members:
+                    progress, total = collection_progress(row, members, collection_saved(state, row['id']))
+                    mini_node(parent, 'collection', id=row['id'], name=row['name'],
+                              texture_name=collection_texture(row), is_complete=str(progress >= total).lower())
+        return mini_xml(response)
+    collection_id = exchange_card_number(query.get('collection_id'))
+    definition = definitions.get(collection_id)
+    members = list(collection_members(definition['selector'])) if definition else []
+    if not members:
+        return None
+    state = load_state(migrate_team=False)
+    if name == 'collection.advance':
+        return collection_advance(definition, members, state, query.get('item_ids'))
     if name == 'collection.view':
-        try:
-            i = int(q.get('collection_id', 0)) - 101
-        except (TypeError, ValueError):
-            return None
-        if not 0 <= i < len(MLB_TEAMS):
-            return None
-        team = [c for c in all_cards() if c.get('series') == 'Live' and c['team_id'] == i]
-        if not team:
-            return None
-        state = load_state()
-        inventory = cards(state)
-        owned = {c['item_id']: c['quantity'] for c in inventory}
-        parallels = owned_parallel_levels(state, inventory)
-        def item(c, levels=None):
-            return '<item %s/>' % card_attrs(c, parallels=levels, quantity=owned.get(c['item_id'], 0),
-                                              collection_index=0, type_id=0, slot_type_id=0, sub_category_id=0,
-                                              seq_level=0, short_description='Player card')
-        top = max(team, key=lambda c: c['ovr'])
-        n = len(team)
-        return ('<response><collection id="%d" name="%s %s" description="Live Series %s. Collecting is view-only on the local server.">'
-                '<items>%s</items><rewards progress_current="0" progress_max="%d">'
-                '<reward item_id="%d" qty_required="%d" has_collected="false" xp="0" stubs="0">%s</reward></rewards></collection></response>'
-                % (101 + i, MLB_TEAMS[i][1], MLB_TEAMS[i][2], MLB_TEAMS[i][2], ''.join(item(c, parallels) for c in team), n,
-                   top['item_id'], n, item(top)))
+        return collection_detail(definition, members, state)
     return None
 
 
@@ -7274,8 +7682,14 @@ def home_panels(params):
     slots = {c.get('lineup_pos'): c for c in lineup + dh}
     if starters:
         slots[0] = starters[0]
-    season = ('<curr_season><season name="Season 1" short_name="1" time_remaining="0" all_sets_eligible="1"><sets/></season>'
-              '</curr_season>')
+    # The season never expires locally: it rolls over every 30 days from a fixed start.
+    period = 30 * 86400
+    remaining = period - int(time.time() - 1679961600) % period  # 2023-03-28 00:00 UTC
+    season = ('<curr_season><season name="Season 1" short_name="1" time_remaining="%d" all_sets_eligible="1"><sets/></season>'
+              '</curr_season>' % remaining)
+    # The hub reads ARENA_PANELS.program.id / remaining_time for the Programs menu's "Ends In"
+    # (EXPIRED when the panel is missing; found by the Show 24 session).
+    season += '<program id="%d" remaining_time="%d"/>' % (PROGRAM_ID, remaining)
     state = load_state()
     affinity = affinity_home_panel(state)
     if any(i not in slots for i in range(10)):
@@ -7554,11 +7968,26 @@ def player_art():
                 _card_art['full_art_ids'].add(c['item_id'])
             counts[kind] += 1
     seen = set()
-    pool = cards()
+    owned = cards(load_state(migrate_team=False))
+    # A collection must be able to preview a prize the player has yet to earn.
+    collections = (active_title_content().collections or {}).get('collections', {})
+    rewards = {tier['reward']['uuid'] for row in collections.values()
+               for tier in row['tiers'] if tier['reward']['kind'] == 'card'}
+    missing = rewards - {card['uuid'] for card in owned}
+    pool = [*owned, *(card for card in all_cards() if card['uuid'] in missing)]
+    prize_cards = [card for card in pool if card['uuid'] in rewards]
+    if prize_cards:
+        importer = imported_cards_module()
+        prize_ids = importer.card_ids(prize_cards)
+        prize_pictures = importer.disc_pictures(LAYOUT.base, UPDATE_DIR)
+    else:
+        prize_ids, prize_pictures = {}, {}
     for c in pool:
         try:
-            # 1. A candidate from the update package (a WebP or a plain .tex action shot).
-            own = update_art(c)
+            # 1. An exact authored prize or a picture from the update package.
+            prize_id = prize_ids.get(c['uuid'])
+            prize = prize_pictures.get(prize_id)
+            own = (prize[0], prize_id, prize[1], 'webp') if prize else update_art(c)
             if own and (own[0], own[1]) not in seen:
                 seen.add((own[0], own[1]))
                 publish(c, own[0], own[1], '.' + own[3], open(own[2], 'rb').read(), 'update' if own[3] == 'webp' else 'update_tex')
@@ -7581,7 +8010,7 @@ def player_art():
             print('card art: %s skipped (%r)' % (c['name'], e))
     print('card art: %d from the update package (+%d action shots), %d from the website download'
           % (counts['update'], counts['update_tex'], counts['site']))
-    prepare_walkup_art(_card_art, pool)
+    prepare_walkup_art(_card_art, owned)
     return _card_art
 
 
@@ -7620,11 +8049,15 @@ def card_art():
         name for name in program_faces if name and name not in packs.get('names', ())
         and not Path(LAYOUT.base, 'CROSS', 'LIVE', name + '.WEBP').is_file()))
     program = authored_preview_art(UPDATE_DIR, program_textures, 'program', 521200)
+    collection_textures = tuple(dict.fromkeys(
+        row['texture'] for index in (content.collections or {}).values() for row in index.values()
+        if not Path(LAYOUT.base, 'CROSS', 'LIVE', row['texture'] + '.WEBP').is_file()))
+    collections = authored_preview_art(UPDATE_DIR, collection_textures, 'collection', 521400)
     gear = equipment_faces()
     return {'entries': (players['entries'] + packs['entries'] + affinity['entries'] + conquest['entries']
-                        + showdown['entries'] + gear['entries'] + program['entries']),
+                        + showdown['entries'] + gear['entries'] + program['entries'] + collections['entries']),
             'files': ChainMap(players['files'], packs['files'], affinity['files'], conquest['files'],
-                              showdown['files'], gear['files'], program['files']),
+                              showdown['files'], gear['files'], program['files'], collections['files']),
             'override': players['override']}
 
 
@@ -9747,6 +10180,7 @@ def grant_owned_pack(shop, product_id):
     item_id = shop.get('next_pack_id', 610001)
     shop['next_pack_id'] = item_id + 1
     shop.setdefault('owned_packs', {})[str(item_id)] = product_id
+    return item_id
 
 
 def grant_shop_bundle(shop, bundle):
@@ -10118,16 +10552,18 @@ def exchange_protected_cards(state):
     return protected
 
 
-def exchange_spare(card):
+def exchange_spare(card, locked=()):
     # The research collection keeps one copy of every card; with cards from the game folder a
     # player can trade any card that is not in a squad, as in the original game.
-    return card['quantity'] - (0 if CARD_SOURCE == 'disc' else 1)
+    reserve = CARD_SOURCE != 'disc' or card['uuid'] in locked
+    return card['quantity'] - int(reserve)
 
 
 def exchange_eligible(state, rule):
     protected = exchange_protected_cards(state)
+    locked = collection_locked_uuids(state)
     return {card['item_id']: card for card in cards(state)
-            if card['rarity'] == rule.rarity and exchange_spare(card) > 0
+            if card['rarity'] == rule.rarity and exchange_spare(card, locked) > 0
             and card['item_id'] not in protected and card['display_position'] in FIELD_NUMBER}
 
 
@@ -10142,8 +10578,9 @@ def exchange_feed(state, mission_id, page):
     description = rule.description if rule else 'Exchange unavailable'
     target = rule.target if rule else 1
     items = []
+    locked = collection_locked_uuids(state)
     for card in visible:
-        row = ET.fromstring(shop_revealed_card(card, exchange_spare(card), is_new=False))
+        row = ET.fromstring(shop_revealed_card(card, exchange_spare(card, locked), is_new=False))
         row.set('feed_value', str(rule.points))
         row.set(EXCHANGE_SHOW_POINTS, '1')
         row.set('is_feed', '0')
@@ -10197,7 +10634,8 @@ def exchange_advance(state, mission_id, query):
     if not rule.target <= points < rule.target + rule.points:
         return False
     eligible = exchange_eligible(state, rule)
-    if any(i not in eligible or qty > exchange_spare(eligible[i]) for i, qty in selection):
+    locked = collection_locked_uuids(state)
+    if any(i not in eligible or qty > exchange_spare(eligible[i], locked) for i, qty in selection):
         return False
     spent = exchange.setdefault('spent_cards', {})
     for i, qty in selection:
@@ -11089,6 +11527,12 @@ def conquest_service(state, run, service, query):
         if not battle and any((r['uuid'], r['source'], r['target']) == (key, a, d)
                               for r in run['receipts'].values()):
             return conquest_ack(run)
+        if (battle and battle.get('uuid') not in (None, key) and not battle.get('upload')
+                and battle['from'] == a and battle['to'] in (None, d)):
+            # The bound game never delivered an accepted result (a crash, a quit, or a refused
+            # upload), so nothing was settled for it: a new game for the same matchup replaces it.
+            battle.pop('uuid', None)
+            battle.pop('skill_level', None)
         if (not battle or battle['from'] != a or battle['to'] not in (None, d)
                 or battle.get('uuid', key) != key):
             raise ConquestRefusal('Select the Conquest matchup before starting the game.')
@@ -11440,8 +11884,14 @@ def reply_body(name, mode, params='', game_data=None):
         return shop
     if name.startswith(NOT_OFFERED):
         return envelope(status=1, message='This mode is not available on the local server yet.'), 'refused'
-    if name == 'collection.advance':     # sent with error mode "ignore": the message shows, the screen stays
-        return envelope(status=1, message='Collections are view-only on the local server.'), 'refused'
+    if name == 'collection.advance':
+        try:
+            inner = collections_reply(name, params)
+        except CollectionRefusal as error:
+            return envelope(status=1, message=str(error)), 'refused'
+        if inner is None:
+            return envelope(status=1, message='That collection is unavailable.'), 'refused'
+        return envelope(inner), 'made'
     if name in DYNAMIC:
         kwargs = {'game_data': game_data} if name == 'mlb_game.create' else {}
         inner = DYNAMIC[name](params, **kwargs)
