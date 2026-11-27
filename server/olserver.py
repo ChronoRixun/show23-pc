@@ -772,10 +772,12 @@ def program_choice_preview(pack_id):
     if pack is None:
         return ()
     try:
-        rounds, catalogue = choice_pack_offer(pack, require_complete=False)
+        rounds, catalogue = choice_pack_offer(pack)
     except ShopRefusal:
         return ()
-    return [catalogue[item] for item in rounds[0]['options'] if item in catalogue]
+    if 'inventory_rounds' not in pack and not pack.get('skip_missing_rounds'):
+        rounds = rounds[:1]
+    return [catalogue[item] for row in rounds for item in row['options'] if item in catalogue]
 
 
 def program_tier_row(parent, tier, tickets, claimed):
@@ -803,8 +805,13 @@ def program_tier_row(parent, tier, tickets, claimed):
     program_item(row, tier)
     if type_id == 6:
         exclusives = row.find('item/item_exclusives')
-        exclusives.extend(program_card_item(card, 1, tag='item_exclusive')
-                          for card in program_choice_preview(item_id))
+        for card in program_choice_preview(item_id):
+            if card.get('inventory_kind'):
+                face = affinity_inventory_face(card)
+                face.tag = 'item_exclusive'
+                exclusives.append(face)
+            else:
+                exclusives.append(program_card_item(card, 1, tag='item_exclusive'))
     elif os.environ.get('OLSERVER_PREVIEW_INDEX_PROBE') == '1':
         # Count Live Series Bryce Harpers and subtract 1 to read the zero-based reward index modulo 5.
         marker = next((card for card in all_cards() if card.get('roster_player_id') == 14580
@@ -931,7 +938,8 @@ def add_bonus_xp(params):
     return '<response><bonus_xp amount="0"/></response>'
 
 
-MISSION_CONTENT_DIR = Path(HERE) / 'content' / 'CUSA35521' / 'r20'
+MISSION_CONTENT_DIR = Path(HERE) / 'content' / 'CUSA35521' / 'r24'
+AFFINITY_R20_DIR = Path(HERE) / 'content' / 'CUSA35521' / 'r20'
 DAILY_GOAL_GROUP_ID = 730000
 MISSION_REROLL_FLAG = 'reward_flag_ab_dkxi'  # 0x35fa44, hash 0xbc667a79 gates Get New Mission
 # Type-0 detail indexes the global slot vector. Keep one small ordered board.
@@ -939,10 +947,12 @@ DAILY_SLOT_LIMIT = 10
 MISSION_MODES = (3, 6, 8)  # Play vs. CPU, Mini Seasons, Conquest
 CARD_MISSION_SERIES = ('Live Series', 'Monthly Awards', 'Topps Now', 'World Baseball Classic', 'Awards',
                        'Charisma', 'Kaiju', 'Incognito', 'Snapshot', "Great Race of '98", 'Captain',
-                       '2023 All-Star', '2023 Draft', '2023 Home Run Derby', '2023 Postseason', '2023 Finest')
+                       '2023 All-Star', '2023 Draft', '2023 Home Run Derby', '2023 Postseason', '2023 Finest',
+                       'Postseason')
 # Each tuple holds the display unit followed by the team/card stats to sum.
 STAT_MISSIONS = {
     'hits': ('Hits', 'hits'),
+    'on_base': ('OB', 'hits', 'walks'),
     'home_runs': ('HR', 'home_runs'),
     'extra_base_hits': ('XBH', 'doubles', 'triples', 'home_runs'),
     'rbi': ('RBI', 'rbi'),
@@ -1027,8 +1037,8 @@ def load_title_content(directory):
     if not isinstance(manifest, dict) or manifest.keys() != {'schema_version', 'title', 'revision', 'files'}:
         raise invalid('manifest.json must contain schema_version, title, revision and files')
     version = manifest['schema_version']
-    if type(version) is not int or not 1 <= version <= 16:
-        raise invalid('manifest.json schema_version must be an integer from 1 through 16')
+    if type(version) is not int or not 1 <= version <= 19:
+        raise invalid('manifest.json schema_version must be an integer from 1 through 19')
     if manifest['title'] != 'CUSA35521' or manifest['revision'] != directory.name:
         raise invalid(f'manifest.json must identify title CUSA35521 and revision {directory.name}')
     expected_files = {'missions.json'} if version == 1 else {'missions.json', 'programs.json'}
@@ -1046,6 +1056,8 @@ def load_title_content(directory):
         expected_files.add('team_affinity.json')
     if version >= 16:
         expected_files.add('collections.json')
+    if version >= 18:
+        expected_files.add('exchanges.json')
     files = manifest['files']
     if (not isinstance(files, list) or len(files) != len(expected_files)
             or any(not isinstance(name, str) for name in files) or set(files) != expected_files):
@@ -1084,6 +1096,10 @@ def load_title_content(directory):
                 fields |= mission.keys() & {'card_filter', 'min_margin'}
                 if version >= 15:
                     fields |= mission.keys() & {'single_game'}
+                if version >= 18 and mission.get('evaluator') == 'set_exchange':
+                    fields.add('set_name')
+                if version >= 19:
+                    fields |= mission.keys() & {'repeatable', 'voucher_batch'}
         if not content_record(mission, fields):
             raise invalid(f'{label} must contain {", ".join(sorted(fields))}')
         for field in ('id', 'target', 'slot_id') if 'slot_id' in fields else ('id', 'target'):
@@ -1107,12 +1123,31 @@ def load_title_content(directory):
         evaluator = mission['evaluator']
         if not isinstance(evaluator, str) or (
                 evaluator not in ('cpu_game_finished', 'cpu_game_won')
-                and (version < 3 or evaluator not in STAT_MISSIONS)):
+                and (version < 3 or evaluator not in STAT_MISSIONS)
+                and not (version >= 18 and evaluator == 'set_exchange')
+                and not (version >= 19 and evaluator == 'mini_season_voucher')):
             raise invalid(f'{label} has an unsupported evaluator')
-        if version >= 3:
+        if evaluator == 'set_exchange':
+            if (mission['shows_in'] != ['program'] or mission['modes'] != [] or mission['xp'] != 0
+                    or mission['set_name'] not in COLLECTION_SET_NAMES[1:]
+                    or mission.keys() & {'card_filter', 'min_margin', 'single_game'}):
+                raise invalid(f'{label} needs a program-only set exchange with no game modes or XP')
+        elif version >= 3:
             validate_mission_options(mission, label, invalid)
             if evaluator == 'pitching_outs' and mission['target'] % 3:
                 raise invalid(f'{label} innings targets must be whole innings expressed as outs')
+        if 'repeatable' in fields and (mission['repeatable'] is not True or mission['shows_in'] != ['program']
+                                       or evaluator not in ('parallel_xp', 'mini_season_voucher') or mission['xp']):
+            raise invalid(f'{label} repeatable needs a program-only PXP or voucher task without mission XP')
+        if evaluator == 'mini_season_voucher':
+            batch = mission.get('voucher_batch')
+            if (mission.get('repeatable') is not True or mission['target'] != 1 or mission['modes'] != [6]
+                    or not content_record(batch, {'id', 'count'})
+                    or not all(content_positive(value) for value in batch.values())
+                    or batch['count'] <= 1):
+                raise invalid(f'{label} needs a repeatable Mini Seasons voucher and a larger display batch')
+        elif 'voucher_batch' in fields:
+            raise invalid(f'{label} voucher_batch needs a Mini Seasons voucher')
         if mission['cadence'] != 'permanent':
             raise invalid(f'{label} cadence must be permanent')
         if 'reward' in fields:
@@ -1124,6 +1159,9 @@ def load_title_content(directory):
             if not content_positive(reward['amount']):
                 raise invalid(f'{label} reward.amount must be a positive integer within signed 32-bit range')
         mission_index[mission_id] = mission
+    batch_ids = [mission['voucher_batch']['id'] for mission in mission_index.values() if 'voucher_batch' in mission]
+    if len(batch_ids) != len(set(batch_ids)) or mission_index.keys() & set(batch_ids):
+        raise invalid('missions.json voucher batches need unused, distinct goal IDs')
     if len(slots) > DAILY_SLOT_LIMIT:
         raise invalid(f'missions.json daily board exceeds {DAILY_SLOT_LIMIT} slots')
     moments, situations, groups = (validate_moment_content(read_json('moments.json'), invalid, browser=version >= 7,
@@ -1131,18 +1169,28 @@ def load_title_content(directory):
                                    if version >= 4 else ({}, {}, {}))
     browser_moments = {mid for mid, moment in moments.items()
                        if moment['set_id'] in groups.get(moment['group_id'], {}).get('sets', {})}
-    affinity, affinity_products = (validate_affinity_content(read_json('team_affinity.json'), invalid)
+    exchange_tiers = validate_affinity_exchanges(read_json('exchanges.json'), invalid) if version >= 18 else ()
+    affinity, affinity_products = (validate_affinity_content(read_json('team_affinity.json'), invalid,
+                                                            revised=version >= 17, exchange_tiers=exchange_tiers)
                                    if version >= 14 else (None, []))
     choices = None
     if version >= 12:
         products = read_json('choice_packs.json')
         if isinstance(products, list):
             products.extend(affinity_products)
+            if version >= 17:
+                legacy = affinity_r20_content()
+                products.extend(legacy.choice_packs[item] for track in legacy.team_affinity.values()
+                                for item in track.choices.values())
         choices = validate_choice_packs(products, invalid, program_rewards=version >= 13)
     programs = (validate_authored_programs(read_json('programs.json'), mission_index, invalid,
                                            moments if version >= 4 else None, browser_moments=browser_moments,
                                            reward_packs=choices if version >= 13 else None, expanded=version >= 15)
                 if version >= 2 else {})
+    division_exchange_ids = {task.id for track in (affinity or {}).values()
+                             for task in track.groups.get('Exchanges', ())}
+    if division_exchange_ids & (mission_index.keys() | moments.keys() | EXCHANGE_RULES.keys()):
+        raise invalid('Team Affinity exchange IDs conflict with another mission')
     if moments.keys() & (mission_index.keys() | programs.keys()):
         raise invalid('moments.json moment ids cannot reuse a mission or program id')
     conquest = (validate_conquest_content(read_json('conquest.json'), programs, invalid, multi_club=version >= 8)
@@ -1166,7 +1214,8 @@ def validate_choice_packs(products, invalid, *, program_rewards=False):
         label = f'choice_packs.json product {number}'
         fields = {'id', 'name', 'description', 'cost', 'texture', 'source', 'rounds'}
         if program_rewards and isinstance(product, dict):
-            fields |= product.keys() & {'partial_pool', 'affinity_division', 'exact_pool'}
+            fields |= product.keys() & {'partial_pool', 'affinity_division', 'exact_pool',
+                                        'inventory_rounds', 'skip_missing_rounds'}
         if not content_record(product, fields):
             raise invalid(f'{label} has invalid fields')
         product_id = product['id']
@@ -1185,6 +1234,9 @@ def validate_choice_packs(products, invalid, *, program_rewards=False):
             raise invalid(f'{label} partial_pool requires a reward-only pack')
         if 'exact_pool' in product and (product['exact_pool'] is not True or not product.get('partial_pool')):
             raise invalid(f'{label} exact_pool requires a partial reward-only pack')
+        if 'skip_missing_rounds' in product and (product['skip_missing_rounds'] is not True
+                                                 or not product.get('exact_pool')):
+            raise invalid(f'{label} skip_missing_rounds requires an exact reward-only pool')
         if 'affinity_division' in product:
             division = product['affinity_division']
             if (type(division) is not int or not 0 <= division < len(AFFINITY_DIVISIONS)
@@ -1192,7 +1244,10 @@ def validate_choice_packs(products, invalid, *, program_rewards=False):
                 raise invalid(f'{label} needs a unique Team Affinity division on a reward-only pack')
             divisions.add(division)
         rounds = product['rounds']
-        if not isinstance(rounds, list) or not 1 <= len(rounds) <= 12:
+        if 'inventory_rounds' in product:
+            if rounds != [] or not product.get('exact_pool') or not valid_affinity_unlockables(product['inventory_rounds']):
+                raise invalid(f'{label} has invalid inventory rounds')
+        elif not isinstance(rounds, list) or not 1 <= len(rounds) <= 12:
             raise invalid(f'{label} needs 1 to 12 rounds')
         for round_number, row in enumerate(rounds, 1):
             if not content_record(row, {'picks', 'options'}):
@@ -1283,8 +1338,9 @@ def validate_mission_options(mission, label, invalid):
     if 'card_filter' in mission:
         filters = mission['card_filter']
         if (len(STAT_MISSIONS.get(evaluator, ())) <= 1 or not isinstance(filters, dict)
-                or not filters or filters.keys() - {'series', 'club', 'item_ids'}):
-            raise invalid(f'{label} card_filter needs a card statistic and a series, club or item list')
+                or not filters or filters.keys() - {'series', 'club', 'item_ids', 'bat_hand',
+                                                     'min_height', 'max_height', 'power_below', 'birthplace'}):
+            raise invalid(f'{label} card_filter needs a card statistic and supported filters')
         if 'series' in filters:
             series = filters['series']
             choices = series if isinstance(series, list) else [series]
@@ -1295,8 +1351,24 @@ def validate_mission_options(mission, label, invalid):
             if (not isinstance(ids, list) or not ids or not all(content_positive(item) for item in ids)
                     or len(set(ids)) != len(ids)):
                 raise invalid(f'{label} card_filter needs distinct player item IDs')
-        if 'club' in filters and filters['club'] not in tuple(team[0] for team in MLB_TEAMS):
-            raise invalid(f'{label} card_filter has an unknown club')
+        if 'club' in filters:
+            club = filters['club']
+            clubs = club if isinstance(club, list) else [club]
+            if not clubs or any(value not in tuple(team[0] for team in MLB_TEAMS) for value in clubs):
+                raise invalid(f'{label} card_filter has an unknown club')
+        if 'bat_hand' in filters and filters['bat_hand'] not in ('L', 'R', 'S'):
+            raise invalid(f'{label} card_filter has an invalid batting hand')
+        if any(not content_positive(filters[key]) for key in ('min_height', 'max_height', 'power_below')
+               if key in filters) or filters.get('min_height', 0) > filters.get('max_height', 120):
+            raise invalid(f'{label} card_filter has invalid height or power bounds')
+        if 'birthplace' in filters:
+            birth = filters['birthplace']
+            if (not content_record(birth, {'regions', 'codes'})
+                    or not isinstance(birth['regions'], list) or not birth['regions']
+                    or not all(content_text(region) for region in birth['regions'])
+                    or not isinstance(birth['codes'], list) or not birth['codes']
+                    or any(type(code) is not int or not 0 <= code <= 127 for code in birth['codes'])):
+                raise invalid(f'{label} card_filter has invalid birthplace regions or roster codes')
 
 
 def validate_moment_content(content, invalid, *, browser=False, require_run_criteria=False):
@@ -1503,6 +1575,10 @@ def validate_authored_programs(programs, missions, invalid, moments=None, *, bro
                     raise invalid(f'{label} goal references an unknown mission')
                 if 'program' not in missions[mid]['shows_in'] or mid in goal_ids:
                     raise invalid(f'{label} goal mission {mid} needs program placement and a unique reference')
+                if missions[mid]['evaluator'] == 'set_exchange' and (not parallel or mid in referenced):
+                    raise invalid(f'{label} set exchange {mid} needs one parallel program')
+                if missions[mid].get('repeatable') and not parallel:
+                    raise invalid(f'{label} repeatable mission {mid} needs a parallel program')
                 if not content_positive(goal['points']):
                     raise invalid(f'{label} goal points must be a positive integer')
                 goal_ids.add(mid)
@@ -1653,15 +1729,31 @@ def authored_program_status(program, saved, missions):
     for index, stage in enumerate(program['stages']):
         for goal in stage['goals']:
             mid = goal['mission_id']
-            if mission_count(units, str(mid)) >= missions[mid]['target']:
-                points += goal['points']
+            mission = missions[mid]
+            cycles = mission_count(units, str(mid)) // mission['target']
+            if cycles:
+                points += goal['points'] * (cycles if mission.get('repeatable') else 1)
             else:
                 current_stage = min(current_stage, index)
     total = program['total_points']
     return min(total, points), len(program['stages']) if points >= total else current_stage
 
 
-def authored_reward_tier(level, definition):
+def authored_reward_products(reward):
+    products = reward.get('products') or (reward['product_id'],)
+    choices = choice_pack_products()
+    available = []
+    for product in products:
+        if product in choices:
+            try:
+                choice_pack_offer(choices[product])
+            except ShopRefusal:
+                continue
+        available.append(product)
+    return available
+
+
+def authored_reward_tier(level, definition, *, products=None):
     reward = definition['reward']
     kind = reward['kind']
     stubs = reward.get('stubs', reward.get('amount', 0))
@@ -1686,8 +1778,13 @@ def authored_reward_tier(level, definition):
                     face.attrib.update(texture_name=texture, item_label_aaadeb49z9__=face.get('name'))
                     return PathTier(level, threshold, stubs, 0, xp=xp, inventory_item=face)
         stubs += AFFINITY_CARD_FALLBACK_STUBS
-    packs = reward.get('products') or (reward.get('product_id', 0),)
-    return PathTier(level, threshold, stubs, packs[0], xp=xp)
+    elif kind == 'pack':
+        if products is None:
+            products = authored_reward_products(reward)
+        if products:
+            return PathTier(level, threshold, stubs, products[0], xp=xp)
+        stubs += AFFINITY_CARD_FALLBACK_STUBS
+    return PathTier(level, threshold, stubs, 0, xp=xp)
 
 
 def authored_pack_preview(item, reward):
@@ -1742,15 +1839,31 @@ def authored_goal_xp(mission):
     return 0 if 'daily' in mission.get('shows_in', ()) else mission.get('xp', 0)
 
 
+def authored_voucher_batch(group, mission, points, redeemed):
+    batch = mission['voucher_batch']
+    size = batch['count']
+    batch_points = size * points
+    row = mini_node(group, 'goal', id=batch['id'], type=2, type_tab=0, mode_name='Mini Seasons',
+                    name=f'Exchange {size} Mini Seasons 2023 Postseason Vouchers',
+                    description=f'Every {size} automatic redemptions award {batch_points} stars in total.',
+                    tickets=batch_points, is_complete=0, progress_current=redeemed % size, progress_max=size,
+                    mission_criteria_id=0, preview_count=0, stat='Vouchers')
+    ET.SubElement(row, 'items')
+
+
 def authored_program_goals(parent, program, saved, missions, current_stage, *, include_moments=False):
     stages = ET.SubElement(parent, 'stages')
     units = saved.get('units')
     cpu_mode = 'Play vs. CPU'
     mini_mode = 'Play vs. CPU or Mini Seasons'
+    exchange_goals = [goal for stage in program['stages'] for goal in stage['goals']
+                      if missions[goal['mission_id']]['evaluator'] == 'set_exchange']
     for index, definition in enumerate(program['stages']):
         mini_goals = {goal['mission_id'] for goal in definition['goals']
                       if 6 in missions[goal['mission_id']].get('modes', ())}
-        mode = mini_mode if mini_goals else cpu_mode
+        voucher_stage = all(missions[goal['mission_id']]['evaluator'] == 'mini_season_voucher'
+                            for goal in definition['goals'])
+        mode = 'Mini Seasons' if voucher_stage else mini_mode if mini_goals else cpu_mode
         where = 'the modes listed on each goal' if 0 < len(mini_goals) < len(definition['goals']) else mode
         stage = mini_node(stages, 'stage', stage=index,
                           is_unlocked=int(program.get('parallel_goals') or index <= current_stage))
@@ -1761,23 +1874,35 @@ def authored_program_goals(parent, program, saved, missions, current_stage, *, i
         # would index the global daily DATA_M slots and show the wrong goals.
         for goal in definition['goals']:
             mission = missions[goal['mission_id']]
+            if mission['evaluator'] == 'set_exchange':
+                continue
             target = mission['target']
-            current = min(target, mission_count(units, str(mission['id'])))
+            units_earned = mission_count(units, str(mission['id']))
+            current = units_earned % target if mission.get('repeatable') else min(target, units_earned)
             complete = int(current == target)
             description = mission['description']
             xp = authored_goal_xp(mission)
             if xp:
                 description += f' Reward: {xp} XP.'
             display_scale = 3 if mission['evaluator'] == 'pitching_outs' else 1
+            voucher = mission['evaluator'] == 'mini_season_voucher'
             row = mini_node(goals, 'goal', id=mission['id'], type=2, type_tab=0,
-                            mode_name=mini_mode if mission['id'] in mini_goals else cpu_mode,
+                            mode_name='Mini Seasons' if voucher else mini_mode if mission['id'] in mini_goals else cpu_mode,
                             name=mission['name'], description=description,
                             is_complete=complete, tickets=goal['points'], progress_current=current // display_scale,
                             progress_max=target // display_scale, mission_criteria_id=0, preview_count=0,
-                            stat=mission_unit(mission))
+                            stat='Vouchers' if voucher else mission_unit(mission))
             ET.SubElement(row, 'items')
+            if voucher:
+                authored_voucher_batch(goals, mission, goal['points'], units_earned)
             if not complete:
                 goals.set('is_complete', '0')
+        # The action checks stage == current_stage. Parallel program exchanges
+        # are always on that stage's detail, with one canonical postgame row.
+        shown_exchanges = (exchange_goals if index == current_stage else []) if include_moments else [
+            goal for goal in definition['goals'] if missions[goal['mission_id']]['evaluator'] == 'set_exchange']
+        if shown_exchanges:
+            add_set_exchange_goals(stage, program, saved, shown_exchanges, missions)
         if include_moments and 'moment_goal' in definition:
             link = definition['moment_goal']
             moment = active_title_content().moments[link['moment_id']]
@@ -2202,10 +2327,21 @@ def affinity_record_game(state, receipt, clubs, won):
 
 # Seasonal Team Affinity uses the same wire paths as the older six-tile revision.
 AFFINITY_LAP_TA = 150000
-AFFINITY_LAP_STOPS = 31
 AFFINITY_CHOICE_BASE = 518000
+AFFINITY_R21_CHOICE_BASE = 518100
+AFFINITY_UNLOCK_CHOICE_BASE = 518200
 AFFINITY_ROLES = ('boss', 'secondary', 'captain')
 AFFINITY_PACK_REWARDS = {'show': 510001, 'unlock': 510043, 'ballin': 510005, 'box': 510001}
+AFFINITY_COSMETICS = {
+    'icon': ('Unlockable', (10005,)), 'banner': ('Unlockable', (10006,)),
+    'stadium_sound': ('Unlockable', (10001,)), 'uniform': ('Unlockable', (10007, 10008)),
+    'bat_skin': ('Equipment', ('Bat',)),
+}
+AFFINITY_COSMETIC_ROUNDS = {
+    1: ('icon', 'banner', 'stadium_sound', 'uniform'),
+    2: ('icon', 'bat_skin', 'uniform'),
+    3: ('uniform',), 4: ('uniform',), 5: ('uniform',),
+}
 AFFINITY_STAT_FIELDS = {
     'H': ('batting', ('hits',)), 'HR': ('batting', ('home_runs',)),
     'XBH': ('batting', ('doubles', 'triples', 'home_runs')),
@@ -2241,9 +2377,10 @@ class AffinityTrack(NamedTuple):
     choices: dict
     groups: dict
     voucher_ta: int
+    revised: bool
 
 
-def affinity_choice_definition(season, division, series, role, product_id, editions):
+def affinity_choice_definition(season, division, series, role, product_id, editions, *, revised):
     region = AFFINITY_DIVISIONS[division]
     suffix = region.replace(' ', '').upper()
     labels = {
@@ -2254,11 +2391,38 @@ def affinity_choice_definition(season, division, series, role, product_id, editi
     label, key = labels[role]
     texture = f'CPACK_TA{season}_{key}_{suffix}' if key else 'CPACK_DIAMOND_CLASSICS'
     picks = 2 if season == 1 and role == 'secondary' else 1
-    return dict(id=product_id, name=label, description=f'Choose {picks} player item(s).',
+    pack = dict(id=product_id, name=label, description=f'Choose {picks} player item(s).',
                 cost=0, texture=texture,
                 source='base' if role == 'captain' or (season == 1 and role == 'secondary') else 'update',
                 partial_pool=True, exact_pool=True,
                 rounds=[{'picks': min(picks, len(editions)), 'options': [row['item_id'] for row in editions]}])
+    if revised:
+        pack['description'] = 'Choose 1 of 5 Diamond player items.'
+        if season == 1 and role == 'secondary':
+            pack['description'] = 'Choose 1 of 5 Gold player items and 1 of 5 Diamond player items.'
+            pack['skip_missing_rounds'] = True
+            pack['rounds'] = [
+                {'picks': 1, 'options': options} for rarity in ('Gold', 'Diamond')
+                if (options := [row['item_id'] for row in editions if row['rarity'] == rarity])
+            ]
+        if season == 1 and role == 'boss':
+            pack['name'] = f'Charisma {region} Choice Pack'
+        if season == 2 and role == 'boss':
+            pack['name'] = f'Incognito {region} Choice Pack'
+    return pack
+
+
+def affinity_unlock_choice(season, product_id, rounds):
+    labels = [kind.replace('_', ' ').title() for kind in rounds]
+    if len(labels) == 1:
+        description = f'Choose 1 {labels[0]}.'
+    else:
+        description = 'Choose ' + ', '.join(f'1 {label}' for label in labels[:-1]) + f', and 1 {labels[-1]}.'
+    suffix = {1: 'TA_DIAMOND', 2: 'TA_DIAMOND3'}.get(season, 'DIAMOND')
+    return dict(id=product_id, name='Unlockables Choice Pack', description=description, cost=0,
+                texture=f'CPACK_UNLOCKABLES_{suffix}', source='update' if season == 2 else 'base',
+                partial_pool=True, exact_pool=True,
+                rounds=[], inventory_rounds=rounds)
 
 
 def affinity_moment_goal_text(goals):
@@ -2267,7 +2431,35 @@ def affinity_moment_goal_text(goals):
                         f'record {count} {AFFINITY_STAT_NAMES[stat]}' for stat, count in goals.items())
 
 
-def affinity_task_groups(season, division, series, team_pxp, pools, voucher_ta):
+AFFINITY_EXCHANGE_BASE = 740000
+AFFINITY_EXCHANGE_ROMANS = ('I', 'II', 'III', 'IV', 'V', 'VI', 'VII')
+
+
+def validate_affinity_exchanges(data, invalid):
+    rows = data.get('team_affinity') if content_record(data, {'team_affinity'}) else None
+    if (not isinstance(rows, list) or len(rows) != len(AFFINITY_EXCHANGE_ROMANS)
+            or any(not content_record(row, {'target', 'ta'})
+                   or not all(content_positive(value) for value in row.values()) for row in rows)
+            or sorted({row['target'] for row in rows}) != [row['target'] for row in rows]):
+        raise invalid('exchanges.json needs seven increasing Team Affinity targets with positive TA rewards')
+    return rows
+
+
+def affinity_exchange_tasks(season, division, tiers):
+    track_index = (AFFINITY_SEASON - season) * len(AFFINITY_DIVISIONS) + division
+    first_id = AFFINITY_EXCHANGE_BASE + track_index * len(AFFINITY_EXCHANGE_ROMANS)
+    clubs = list(affinity_division_clubs(division))
+    if division == 0:
+        clubs = [2, 1, 0, 3, 4]  # Retail AL East text order.
+    names = [MLB_TEAMS[club][2] for club in clubs]
+    description = f'Exchange Players from the {", ".join(names[:-1])}, and {names[-1]}'
+    return [AffinityTask(first_id + index, 'exchange',
+                         f'{AFFINITY_DIVISIONS[division]} Players {AFFINITY_EXCHANGE_ROMANS[index]}',
+                         description, row['target'], row['ta'])
+            for index, row in enumerate(tiers)]
+
+
+def affinity_task_groups(season, division, series, team_pxp, pools, voucher_ta, *, revised, exchange_tiers=()):
     region = AFFINITY_DIVISIONS[division]
     moments, captains, secondary, bosses = [], [], [], []
     clubs = [
@@ -2292,23 +2484,77 @@ def affinity_task_groups(season, division, series, team_pxp, pools, voucher_ta):
                                      f'Tally {target} {AFFINITY_STAT_NAMES[stat]} with Captain {entry["name"]}.',
                                      target, 3500, items=(entry['item_id'],)))
     for role, tasks in (('secondary', secondary), ('boss', bosses)):
+        if revised and season == 2 and role == 'boss':
+            continue
         for entry in pools[role]:
             label, target = f'{entry["series"]} {entry["name"]}', entry['target']
             tasks.append(AffinityTask(entry['item_id'], 'PXP', f'{target} PXP with {label}',
                                       f'Tally {target} Parallel XP (PXP) with {label}.',
                                       target, 3500, items=(entry['item_id'],)))
-    bosses.insert(0, AffinityTask(630000 + division, 'PXP', f'REPEATABLE: PXP with {region} Bosses',
-                                  f'Tally 1,000 Parallel XP (PXP) with {region} Team Affinity Bosses.',
+    boss_title = f'{region} Incognito Bosses' if revised and season == 2 else f'{region} Bosses'
+    bosses.insert(0, AffinityTask(630000 + division, 'PXP', f'REPEATABLE: PXP with {boss_title}',
+                                  f'Tally 1,000 Parallel XP (PXP) with {boss_title}.',
                                   1000, 5000, items=tuple(entry['item_id'] for entry in pools['boss'])))
-    voucher = AffinityTask(640000 + division, 'voucher', 'REPEATABLE: Redeem 1 Mini Seasons Voucher',
+    voucher_name = 'Team Affinity Voucher' if revised and season == 5 else 'Mini Seasons Voucher'
+    voucher = AffinityTask(640000 + division, 'voucher', f'REPEATABLE: Exchange 1 {voucher_name}',
                            'Finish a Mini Seasons game to redeem a voucher in every division program.',
                            1, voucher_ta)
-    return {f'{region} Moments': moments, 'Team Build PXP Missions': clubs, 'Captain Stat Missions': captains,
-            f'{series} PXP Missions': secondary, 'Incognito PXP Missions' if season == 2 else 'Boss PXP Missions': bosses,
-            'Mini Seasons Voucher Exchange': [voucher]}
+    vouchers = [voucher]
+    if revised:
+        vouchers.append(AffinityTask(640010 + division, 'voucher_total', f'REPEATABLE: Exchange 5 {voucher_name}s',
+                                     'Five automatic voucher redemptions award 20,000 TA in total.',
+                                     5, 5 * voucher_ta))
+    groups = {f'{region} Moments': moments, 'Team Build PXP Missions': clubs, 'Captain Stat Missions': captains,
+              f'{series} PXP Missions': secondary, 'Incognito PXP Missions' if season == 2 else 'Boss PXP Missions': bosses,
+              'Voucher Exchange' if revised and season == 5 else 'Mini Seasons Voucher Exchange': vouchers}
+    if exchange_tiers:
+        groups['Exchanges'] = affinity_exchange_tasks(season, division, exchange_tiers)
+    return groups
 
 
-def validate_affinity_content(seasons, invalid):
+def valid_affinity_unlockables(rounds):
+    return (isinstance(rounds, dict) and bool(rounds) and rounds.keys() <= AFFINITY_COSMETICS.keys()
+            and all(isinstance(items, list) and len(items) <= 5
+                    and all(isinstance(uuid, str) and re.fullmatch(r'[0-9a-f]{32}', uuid) for uuid in items)
+                    and len(set(items)) == len(items) for items in rounds.values()))
+
+
+def validate_affinity_tiers(tiers, label, invalid, *, revised):
+    minimum = 30 if revised else 31
+    limit = 33 if revised else 31
+    if not isinstance(tiers, list) or not minimum <= len(tiers) <= limit:
+        raise invalid(f'{label} needs between {minimum} and {limit} reward stops')
+    previous = 0
+    for tier in tiers:
+        fields = {'ta', 'reward', 'stubs', 'xp'}
+        rewards = (*AFFINITY_PACK_REWARDS, *AFFINITY_ROLES, 'division', 'stubs')
+        if revised:
+            fields |= {'quantity', 'featured', 'cosmetic', 'uuid'}
+            rewards += ('item',)
+        if (not isinstance(tier, dict) or not {'ta', 'reward'} <= tier.keys() or tier.keys() - fields
+                or not content_positive(tier['ta']) or tier['ta'] <= previous
+                or tier['reward'] not in rewards
+                or any(not content_positive(tier[key]) for key in tier.keys() & {'stubs', 'xp'})
+                or (tier['reward'] == 'stubs' and 'stubs' not in tier)
+                or ('quantity' in tier and (tier['reward'] not in ('division', 'show', 'ballin')
+                    or type(tier['quantity']) is not int or not 1 <= tier['quantity'] <= 5))
+                or ('featured' in tier and tier['featured'] is not True)):
+            raise invalid(f'{label} has an invalid or unordered reward stop')
+        item_fields = {'cosmetic', 'uuid'} & tier.keys()
+        if tier['reward'] == 'item':
+            if (item_fields != {'cosmetic', 'uuid'} or not isinstance(tier['cosmetic'], str)
+                    or tier['cosmetic'] not in AFFINITY_COSMETICS or not isinstance(tier['uuid'], str)
+                    or not re.fullmatch(r'[0-9a-f]{32}', tier['uuid'])):
+                raise invalid(f'{label} has an invalid cosmetic reward')
+        elif item_fields:
+            raise invalid(f'{label} has cosmetic data outside an item reward')
+        previous = tier['ta']
+    starts = (2500, 5000) if revised else (5000,)
+    if tiers[0]['ta'] not in starts or previous != AFFINITY_LAP_TA:
+        raise invalid(f'{label} has an invalid reward-track range')
+
+
+def validate_affinity_content(seasons, invalid, *, revised=False, exchange_tiers=()):
     if not isinstance(seasons, list) or len(seasons) != AFFINITY_SEASON:
         raise invalid('team_affinity.json needs five seasons')
     tracks, products = {}, []
@@ -2320,28 +2566,21 @@ def validate_affinity_content(seasons, invalid):
         if (not content_positive(season) or season > AFFINITY_SEASON or not content_text(series)
                 or not content_positive(team_pxp) or not content_positive(voucher_ta)):
             raise invalid('team_affinity.json has invalid season settings')
-        if not isinstance(tiers, list) or len(tiers) != AFFINITY_LAP_STOPS:
-            raise invalid(f'Team Affinity Season {season} needs {AFFINITY_LAP_STOPS} reward stops')
-        previous = 0
-        for tier in tiers:
-            if (not isinstance(tier, dict) or not {'ta', 'reward'} <= tier.keys()
-                    or tier.keys() - {'ta', 'reward', 'stubs', 'xp'}
-                    or not content_positive(tier['ta']) or tier['ta'] <= previous
-                    or tier['reward'] not in (*AFFINITY_PACK_REWARDS, *AFFINITY_ROLES, 'division', 'stubs')
-                    or any(not content_positive(tier[key]) for key in tier.keys() & {'stubs', 'xp'})
-                    or (tier['reward'] == 'stubs' and 'stubs' not in tier)):
-                raise invalid(f'Team Affinity Season {season} has an invalid or unordered reward stop')
-            previous = tier['ta']
-        if tiers[0]['ta'] != 5000 or previous != AFFINITY_LAP_TA:
-            raise invalid(f'Team Affinity Season {season} has an invalid reward-track range')
+        validate_affinity_tiers(tiers, f'Team Affinity Season {season}', invalid, revised=revised)
         if not isinstance(divisions, list) or len(divisions) != len(AFFINITY_DIVISIONS):
             raise invalid(f'Team Affinity Season {season} needs six division programs')
         for division, pools in enumerate(divisions):
             label = f'Team Affinity Season {season} {AFFINITY_DIVISIONS[division]}'
             index = (AFFINITY_SEASON - season) * len(AFFINITY_DIVISIONS) + division
             track_id = AFFINITY_PROGRAM_BASE + index
-            if track_id in tracks or not content_record(pools, set(AFFINITY_ROLES)):
+            fields = set(AFFINITY_ROLES)
+            if revised and isinstance(pools, dict):
+                fields |= {'unlockables'} | (pools.keys() & {'tiers'})
+            if track_id in tracks or not content_record(pools, fields):
                 raise invalid(f'{label} has an invalid or duplicate division record')
+            division_tiers = pools.get('tiers', tiers)
+            if 'tiers' in pools:
+                validate_affinity_tiers(division_tiers, label, invalid, revised=revised)
             choices, seen = {}, set()
             for offset, role in enumerate(AFFINITY_ROLES):
                 entries = pools[role]
@@ -2350,10 +2589,15 @@ def validate_affinity_content(seasons, invalid):
                 for entry in entries:
                     fields = {'item_id', 'name', 'series', 'target'}
                     fields |= {'moment'} if role == 'boss' else {'stat'} if role == 'captain' else set()
+                    split_pool = revised and season == 1 and role == 'secondary'
+                    if split_pool:
+                        fields.add('rarity')
                     if (not content_record(entry, fields) or not content_positive(entry['item_id'])
                             or entry['item_id'] in seen or not content_text(entry['name'])
                             or not content_text(entry['series']) or not content_positive(entry['target'])):
                         raise invalid(f'{label} has an invalid or duplicate {role} edition')
+                    if split_pool and entry['rarity'] not in ('Gold', 'Diamond'):
+                        raise invalid(f'{label} has an invalid Henchmen rarity')
                     if role == 'captain' and entry['stat'] not in AFFINITY_STAT_NAMES:
                         raise invalid(f'{label} captain mission has an unknown stat')
                     if role == 'boss':
@@ -2370,20 +2614,60 @@ def validate_affinity_content(seasons, invalid):
                                        for stat, amount in moment['goals'].items())):
                             raise invalid(f'{label} has an invalid Moment')
                     seen.add(entry['item_id'])
-                product_id = AFFINITY_CHOICE_BASE + index * len(AFFINITY_ROLES) + offset
-                products.append(affinity_choice_definition(season, division, series, role, product_id, entries))
+                base = AFFINITY_R21_CHOICE_BASE if revised else AFFINITY_CHOICE_BASE
+                product_id = base + index * len(AFFINITY_ROLES) + offset
+                products.append(affinity_choice_definition(season, division, series, role, product_id, entries,
+                                                           revised=revised))
                 choices[role] = product_id
-            groups = affinity_task_groups(season, division, series, team_pxp, pools, voucher_ta)
-            tracks[track_id] = AffinityTrack(track_id, season, division, tuple(tiers), choices, groups, voucher_ta)
+            if revised:
+                rounds = pools['unlockables']
+                if not valid_affinity_unlockables(rounds) or tuple(rounds) != AFFINITY_COSMETIC_ROUNDS[season]:
+                    raise invalid(f'{label} has invalid Unlockables choices')
+                choices['unlock'] = AFFINITY_UNLOCK_CHOICE_BASE + index
+                products.append(affinity_unlock_choice(season, choices['unlock'], rounds))
+            groups = affinity_task_groups(season, division, series, team_pxp, pools, voucher_ta,
+                                          revised=revised, exchange_tiers=exchange_tiers)
+            tracks[track_id] = AffinityTrack(track_id, season, division, tuple(division_tiers), choices,
+                                             groups, voucher_ta, revised)
     return dict(sorted(tracks.items())), products
+
+
+@lru_cache(maxsize=1)
+def affinity_r20_content():
+    return load_title_content(AFFINITY_R20_DIR)
 
 
 def migrate_seasonal_affinity(state, tracks):
     affinity = state.get('team_affinity', {})
     legacy_fields = {'points', 'task_credits', 'claims', 'division_claims', 'bonus_cycles'}
-    if 'tracks' in affinity or not legacy_fields.intersection(affinity):
+    revised = tracks[AFFINITY_PROGRAM_BASE].revised
+    if 'tracks' in affinity:
+        if not revised or affinity.get('track_claim_revision') == 21:
+            return False
+        old_tracks = affinity_r20_content().team_affinity
+        for track in tracks.values():
+            saved = affinity['tracks'].get(str(track.id))
+            if saved is None:
+                continue
+            old_tiers = old_tracks[track.id].tiers
+            old_paid = mission_count(saved, 'paid')
+            laps, levels = divmod(old_paid, len(old_tiers))
+            old_thresholds = {row['ta'] for row in old_tiers}
+            through = old_tiers[levels - 1]['ta'] if levels else 0
+            # The old prefix is inclusive at each paid threshold. Only new thresholds
+            # inside that prefix need a backfill. The ordinary settlement pays beyond it.
+            gaps = [row for row in track.tiers if row['ta'] not in old_thresholds]
+            if gaps:
+                affinity_pay_tiers(state, track, gaps * laps + [row for row in gaps if row['ta'] <= through])
+            saved['paid'] = laps * len(track.tiers) + sum(row['ta'] <= through for row in track.tiers)
+            seasonal_affinity_grant(state, track, saved)
+        affinity['track_claim_revision'] = 21
+        return True
+    if not legacy_fields.intersection(affinity):
         return False
     rows = affinity.setdefault('tracks', {})
+    if revised:
+        affinity['track_claim_revision'] = 21
     for division in range(len(AFFINITY_DIVISIONS)):
         track = tracks[AFFINITY_PROGRAM_BASE + division]
         points = affinity_division_points(state, division)
@@ -2418,7 +2702,7 @@ def seasonal_affinity_position(state, track):
 def seasonal_affinity_fields(state, track):
     total, points, lap = seasonal_affinity_position(state, track)
     reached = sum(tier['ta'] <= points for tier in track.tiers)
-    next_level = min(AFFINITY_LAP_STOPS, reached + 1)
+    next_level = min(len(track.tiers), reached + 1)
     division = AFFINITY_DIVISIONS[track.division]
     preferred = affinity_art_name(track.division, track.season)
     texture = preferred if preferred in affinity_tile_art(UPDATE_DIR)['names'] else affinity_art_name(track.division, 1)
@@ -2439,16 +2723,51 @@ def seasonal_affinity_fields(state, track):
 
 def affinity_available_choices(track, reward_roles):
     products = choice_pack_products()
-    pools = {role: products[track.choices[role]]['rounds'][0]['options'] for role in reward_roles}
-    ids = {item for items in pools.values() for item in items}
+    definitions = {role: products[track.choices[role]] for role in reward_roles if role in track.choices}
+    pools = {role: choice_pack_options(pack) for role, pack in definitions.items() if role != 'unlock'}
+    ids = set().union(*pools.values())
     available = choice_card_catalogue(ids) if ids else {}
-    return {role: [available[item] for item in items if item in available] for role, items in pools.items()}
+    offers = {role: sum(not available.keys().isdisjoint(row['options'])
+                        for row in definitions[role]['rounds']) for role in pools}
+    if 'unlock' in definitions:
+        rounds, _ = affinity_inventory_offer(definitions['unlock'])
+        offers['unlock'] = len(rounds)
+    return offers
+
+
+def affinity_inventory_face(item, **fields):
+    face = equip_face(item['inventory_kind'], item, no_sell=1, **fields)
+    if face is not None:
+        texture = face.get('texture_name') or face.get('texture_name_lg') or face.get('texture_name_sm')
+        face.attrib.update(texture_name=texture, item_label_aaadeb49z9__=face.get('name'))
+    return face
+
+
+def affinity_inventory_items(cosmetics, uuids):
+    kind, values = AFFINITY_COSMETICS[cosmetics]
+    field = 'slot' if kind == 'Equipment' else 'sub_category_id'
+    return {item['uuid']: row for item in inventory_data()['catalogue'].get(kind, ())
+            if item['uuid'] in uuids and item.get(field) in values
+            if affinity_inventory_face(row := dict(item, inventory_kind=kind)) is not None}
+
+
+def affinity_inventory_offer(pack):
+    rounds, catalogue = [], {}
+    for kind, options in pack['inventory_rounds'].items():
+        items = affinity_inventory_items(kind, set(options))
+        rows = [items[uuid] for uuid in options if uuid in items]
+        if rows:
+            rounds.append({'picks': 1, 'options': [row['item_id'] for row in rows]})
+            catalogue.update((row['item_id'], row) for row in rows)
+    return rounds, catalogue
 
 
 def affinity_season_reward(track, tier, choices):
     reward = tier['reward']
     stubs = tier.get('stubs', 0)
-    pack_id, quantity = AFFINITY_PACK_REWARDS.get(reward, 0), 5 if reward == 'box' else 1
+    pack_id = AFFINITY_PACK_REWARDS.get(reward, 0)
+    quantity = 5 if reward == 'box' else tier.get('quantity', 1)
+    item, substitute = None, False
     if reward == 'division':
         pack_id = 510010 + track.division
     elif reward in AFFINITY_ROLES:
@@ -2456,13 +2775,31 @@ def affinity_season_reward(track, tier, choices):
             pack_id = track.choices[reward]
         else:
             pack_id = 510010 + track.division
-    return pack_id, quantity, stubs, tier.get('xp', 0)
+    elif reward == 'unlock' and choices.get('unlock'):
+        pack_id = track.choices['unlock']
+        substitute = choices['unlock'] < len(AFFINITY_COSMETIC_ROUNDS[track.season])
+    elif reward == 'item':
+        uuid = tier['uuid']
+        item = affinity_inventory_items(tier['cosmetic'], {uuid}).get(uuid)
+        if item is None:
+            pack_id = AFFINITY_PACK_REWARDS['unlock']
+    return pack_id, quantity, stubs, tier.get('xp', 0), item, substitute
 
 
 def seasonal_affinity_goals(program, track, saved):
     stage = mini_node(ET.SubElement(program, 'stages'), 'stage', stage=0, is_unlocked=1)
     units = saved.get('units', {})
     for index, (name, rows) in enumerate(track.groups.items(), 1):
+        if name == 'Exchanges':
+            tier, progress, _ = affinity_exchange_position(mission_count(saved, 'exchange_points'), rows)
+            group = mini_node(stage, 'goals', id=index, name=name, type=2, type_tab=0, is_group=1,
+                              is_complete=0, tickets=0, mode_name='Exchanges',
+                              description=f'Exchange players from the {AFFINITY_DIVISIONS[track.division]} to earn '
+                                          f'TA in the {AFFINITY_DIVISIONS[track.division]} Season {track.season} Program.')
+            for number, task in enumerate(rows):
+                current = task.target if number < tier else progress if number == tier else 0
+                program_exchange_goal(group, task.id, task.name, task.description, task.target, current, task.ta)
+            continue
         modes = 'Mini Seasons' if rows[0].kind == 'voucher' else 'Play vs. CPU and Mini Seasons'
         group = mini_node(stage, 'goals', id=index, name=name, description='Earn repeatable Team Affinity.',
                           type=2, type_tab=0, is_group=1, is_complete=0, tickets=0, mode_name=modes)
@@ -2470,7 +2807,7 @@ def seasonal_affinity_goals(program, track, saved):
             progress = mission_count(units, str(task.id))
             if task.kind == 'PXP':
                 progress //= 3
-            label = 'GAME' if task.kind in ('moment', 'voucher') else task.kind
+            label = 'GAME' if task.kind in ('moment', 'voucher', 'voucher_total') else task.kind
             goal = mini_node(group, 'goal', id=task.id, type=2, type_tab=0, mode_name=modes,
                              name=task.name, description=task.description, is_complete=0, tickets=task.ta,
                              progress_current=progress, progress_max=task.target, mission_criteria_id=0,
@@ -2489,23 +2826,26 @@ def seasonal_affinity_view(track):
     program = mini_node(response, 'program', **fields)
     seasonal_affinity_goals(program, track, saved)
     rewards = ET.SubElement(program, 'rewards')
-    choices = affinity_available_choices(track, AFFINITY_ROLES)
+    choices = affinity_available_choices(track, track.choices)
     for level, tier in enumerate(track.tiers, 1):
-        pack_id, quantity, stubs, xp = affinity_season_reward(track, tier, choices)
-        paid = lap * AFFINITY_LAP_STOPS + level <= mission_count(saved, 'paid')
-        row = program_tier_row(rewards, PathTier(level, tier['ta'], stubs, pack_id), points, paid)
+        pack_id, quantity, stubs, xp, inventory, substitute = affinity_season_reward(track, tier, choices)
+        paid = lap * len(track.tiers) + level <= mission_count(saved, 'paid')
+        face = affinity_inventory_face(inventory) if inventory else None
+        path = PathTier(level, tier['ta'], stubs, pack_id, xp=xp, inventory_item=face)
+        row = program_tier_row(rewards, path, points, paid)
+        row.set('is_featured', str(int(tier.get('featured', False))))
+        if (pack_id or face is not None) and (stubs or xp):
+            row.set('display_index', '3')
         if pack_id:
             item = row.find('item')
             item.set('quantity', str(quantity))
+            if substitute:
+                item.set('description', reward_choice_description(choice_pack_products()[pack_id]))
             if tier['reward'] == 'box':
                 name = 'The Show 5 Pack Box'
                 row.set('name', name)
                 item.attrib.update(name=name, texture_name='BOX05_THESHOW',
                                    description='Contains 5 The Show Packs.', item_label_aaadeb49z9__=name)
-        if xp:
-            extras = row.find('extras')
-            extra = ET.SubElement(extras, 'extra') if stubs else extras.find('extra')
-            extra.attrib.update(amount=str(xp), type_index='1', label='XP')
     unlimited = ET.SubElement(program, 'unlimited_rewards')
     for _ in range(6):
         mini_node(unlimited, 'unlimited_reward', texture_name='')
@@ -2532,7 +2872,9 @@ def affinity_stat(line, stat):
 
 
 def affinity_task_units(task, appearances, voucher):
-    if task.kind == 'voucher':
+    if task.kind == 'exchange':
+        return 0
+    if task.kind in ('voucher', 'voucher_total'):
         return int(voucher)
     if task.kind == 'PXP':
         return sum(pxp for item, card, _, pxp in appearances
@@ -2553,27 +2895,42 @@ def affinity_task_units(task, appearances, voucher):
     return 0
 
 
-def seasonal_affinity_grant(state, track, saved):
-    effective = saved['points'] - mission_count(saved, 'lap_offset')
-    laps, points = divmod(effective, AFFINITY_LAP_TA)
-    settled = mission_count(saved, 'paid')
-    reached = laps * AFFINITY_LAP_STOPS + sum(tier['ta'] <= points for tier in track.tiers)
-    if settled >= reached:
-        return
-    tiers = [track.tiers[index % AFFINITY_LAP_STOPS] for index in range(settled, reached)]
-    choices = affinity_available_choices(track, {tier['reward'] for tier in tiers} & set(AFFINITY_ROLES))
+def affinity_pay_tiers(state, track, tiers):
+    choices = affinity_available_choices(track, {tier['reward'] for tier in tiers})
     for tier in tiers:
-        pack_id, quantity, stubs, xp = affinity_season_reward(track, tier, choices)
+        pack_id, quantity, stubs, xp, item, substitute = affinity_season_reward(track, tier, choices)
         if pack_id:
             shop = state.setdefault('pack_shop', {})
             for _ in range(quantity):
                 grant_owned_pack(shop, pack_id)
+            if substitute:
+                grant_owned_pack(shop, AFFINITY_PACK_REWARDS['unlock'])
+        if item:
+            grant_affinity_inventory(state, item, 1)
         if stubs or xp:
             profile = state.setdefault('profile', {})
             if stubs:
                 profile['stubs'] = profile.get('stubs', 0) + stubs
             if xp:
                 queue_profile_xp(profile, min(xp, max(0, 0xffffffff - profile.get('xp', 0))))
+
+
+def grant_affinity_inventory(state, item, count):
+    shop = state.setdefault('pack_shop', {})
+    gains = shop.setdefault('gained_items', {}).setdefault(item['inventory_kind'], {})
+    uuid = item['uuid']
+    gains[uuid] = gains.get(uuid, 0) + count
+
+
+def seasonal_affinity_grant(state, track, saved):
+    effective = max(0, mission_count(saved, 'points') - mission_count(saved, 'lap_offset'))
+    laps, points = divmod(effective, AFFINITY_LAP_TA)
+    settled = mission_count(saved, 'paid')
+    count = len(track.tiers)
+    reached = laps * count + sum(tier['ta'] <= points for tier in track.tiers)
+    if settled >= reached:
+        return
+    affinity_pay_tiers(state, track, [track.tiers[index % count] for index in range(settled, reached)])
     saved['paid'] = reached
 
 
@@ -2598,6 +2955,8 @@ def seasonal_affinity_record_game(state, receipt, record, awards, *, card_ids=No
     if not appearances and not voucher:
         return
     rows = affinity.setdefault('tracks', {})
+    if tracks[AFFINITY_PROGRAM_BASE].revised:
+        affinity['track_claim_revision'] = 21
     for track in tracks.values():
         saved = rows.get(str(track.id), {})
         points = 0
@@ -2614,7 +2973,8 @@ def seasonal_affinity_record_game(state, receipt, record, awards, *, card_ids=No
                     units[key] = remaining
                 else:
                     units.pop(key, None)
-                points += cycles * task.ta
+                if task.kind != 'voucher_total':
+                    points += cycles * task.ta
         if saved or points:
             saved['points'] = mission_count(saved, 'points') + points
             rows[str(track.id)] = saved
@@ -2665,9 +3025,39 @@ def mission_card_matches(card, filters):
         wanted = filters['series']
         if series not in (wanted if isinstance(wanted, list) else (wanted,)):
             return False
-    club = card.get('team_id')
-    return ('club' not in filters or type(club) is int and 0 <= club < len(MLB_TEAMS)
-            and MLB_TEAMS[club][0] == filters['club'])
+    if 'club' in filters:
+        club = card.get('team_id')
+        wanted = filters['club']
+        if (type(club) is not int or not 0 <= club < len(MLB_TEAMS)
+                or MLB_TEAMS[club][0] not in (wanted if isinstance(wanted, list) else (wanted,))):
+            return False
+    if 'bat_hand' in filters and card.get('bat_hand') != filters['bat_hand']:
+        return False
+    if 'min_height' in filters or 'max_height' in filters:
+        height = re.fullmatch(r"""(\d+)'\s*(\d+)"?""", str(card.get('height', '')).strip())
+        if not height:
+            return False
+        inches = int(height[1]) * 12 + int(height[2])
+        if not filters.get('min_height', 0) <= inches <= filters.get('max_height', 120):
+            return False
+    if 'power_below' in filters:
+        if any(type(card.get(key)) is not int or not 0 <= card[key] < filters['power_below']
+               for key in ('power_left', 'power_right')):
+            return False
+    if 'birthplace' in filters:
+        birth = filters['birthplace']
+        if region := card.get('born'):
+            return region in birth['regions']
+        if not card.get('name'):
+            return False
+        record = roster_record(card)
+        if not record:
+            return False
+        block = base64.b64decode(record['record'])
+        # The roster location index is serialized in the player's packed bio.
+        code = (int.from_bytes(block[172:176], 'little') >> 14) & 127
+        return code in birth['codes']
+    return True
 
 
 def stat_mission_units(mission, stats, margin, cards):
@@ -2684,10 +3074,12 @@ def stat_mission_units(mission, stats, margin, cards):
         return sum(stats['team'][field] for field in fields)
     total = 0
     for item, line in stats['cards'].items():
-        card = cards.get(item)
-        if not card or not mission_card_matches(card, filters):
+        units = sum(line['batting'].get(field, 0) + line['pitching'].get(field, 0) for field in fields)
+        if not units:
             continue
-        total += sum(line['batting'].get(field, 0) + line['pitching'].get(field, 0) for field in fields)
+        card = cards.get(item)
+        if card and mission_card_matches(card, filters):
+            total += units
     return total
 
 
@@ -2713,6 +3105,9 @@ def mission_game_credits(state, record, won, *, card_ids=None):
     for mission in missions:
         evaluator = mission['evaluator']
         if evaluator == 'cpu_game_finished':
+            amount = 1
+        elif evaluator == 'mini_season_voucher':
+            # This path runs after Mini Seasons validates the fixture and deduplicates its receipt.
             amount = 1
         elif evaluator == 'cpu_game_won':
             amount = int(won)
@@ -2778,13 +3173,9 @@ def grant_authored_tiers(state, program, saved, points, *, upgrades_only=False):
                 continue
         elif upgrades_only or points < tier['threshold']:
             continue
-        if product_id:
-            grant_owned_pack(state.setdefault('pack_shop', {}), product_id)
-            if replacement:
-                pack_claims[str(level)] = product_id
-        else:
-            profile = state['profile']
-            profile['stubs'] = profile.get('stubs', 0) + reward['amount']
+        grant_path_reward(state, state.setdefault('profile', {}), authored_reward_tier(level, tier))
+        if replacement:
+            pack_claims[str(level)] = product_id
         claimed.add(level)
         changed = True
     if changed:
@@ -2802,7 +3193,8 @@ def grant_authored_thresholds(state, program, saved, points):
         threshold, reward = definition['threshold'], definition['reward']
         if threshold > points or threshold in claimed:
             continue
-        tier = authored_reward_tier(level, definition)
+        products = authored_reward_products(reward) if reward['kind'] == 'pack' else None
+        tier = authored_reward_tier(level, definition, products=products)
         if tier.card is not None:
             grant_card_copies(state, tier.card, 1)
         elif tier.inventory_item is not None:
@@ -2811,7 +3203,6 @@ def grant_authored_thresholds(state, program, saved, points):
             gains[reward['uuid']] = gains.get(reward['uuid'], 0) + 1
         elif tier.pack_id:
             shop = state.setdefault('pack_shop', {})
-            products = reward['products']
             for _ in range(reward.get('quantity', 1)):
                 product = products[0] if len(products) == 1 else PACK_RANDOM.choice(products)
                 if product in SHOP_BUNDLES:
@@ -2862,7 +3253,9 @@ def settle_authored_programs(state, credits, *, program_id=None):
             mid = str(mission['id'])
             target = mission['target']
             before = mission_count(units, mid)
-            after = min(target, before + credits[mid])
+            after = before + credits[mid]
+            if not mission.get('repeatable'):
+                after = min(target, after)
             units[mid] = after
             xp = authored_goal_xp(mission)
             if xp and before < target == after:
@@ -3549,7 +3942,7 @@ def base_cards():
                     # the site writes WAS where the roster has WSH; free agents (FA) stay -1,
                     # which is also the site's own number for them
                     team_id=teams.get({'WAS': 'WSH'}.get(c.get('team_short_name', ''), c.get('team_short_name', '')), -1),
-                    quantity=(owned or {}).get(c['uuid'], 1))
+                    quantity=(owned or {}).get(c['uuid'], 1), simulated_ownership=owned is None)
         _all_cards.append(card)
         if owned is None or c['uuid'] in owned:
             _cards.append(card)
@@ -5885,7 +6278,7 @@ def inventory_data():
                     inv['stems'].add(f.read(0xa0).split(b'\0', 1)[0].decode('ascii', 'replace').upper())
     except Exception as e:
         print('inventory: disc indexes incomplete (%r)' % (e,))
-    if CARD_SOURCE == 'disc' or (LAYOUT.install and not os.path.isdir(CATALOGUE_DIR)):
+    if CARD_SOURCE == 'disc' or not os.path.isdir(CATALOGUE_DIR):
         inv['catalogue']['Perk'] = [
             dict(name=perk['name'], item_id=int(perk['id']), uuid=f"disc-perk-{perk['id']}",
                  quantity=1, rarity=rarity)
@@ -5893,15 +6286,17 @@ def inventory_data():
             for rarity, number in RARITY_ID.items()
             if perk.get('rarity_id') == str(number) and perk['id'].isdigit()
         ]
-        _inventory = inv
-        return inv
+        if not os.path.isdir(CATALOGUE_DIR):
+            _inventory = inv
+            return inv
     try:
         snap = CATALOGUE_DIR
         day = os.path.join(snap, sorted(os.listdir(snap))[-1])
         owned = {}
         ownfile = os.path.join(day, 'inventory-owned.json')
         if COLLECTION == 'mine' and os.path.exists(ownfile):
-            owned = json.load(open(ownfile, encoding='utf-8'))['items']
+            with open(ownfile, encoding='utf-8') as file:
+                owned = json.load(file)['items']
         inv['equip_ownership_known'] = COLLECTION != 'mine' or bool(owned)
         for kind, short in ITEM_FILE.items():
             have = {r['uuid']: r for r in owned.get(short, [])} if owned else None
@@ -5909,7 +6304,9 @@ def inventory_data():
             catalogue = []
             path = os.path.join(day, 'items-%s.json' % short)
             if os.path.exists(path):
-                for n, r in enumerate(sorted(json.load(open(path, encoding='utf-8')), key=lambda r: r['uuid'])):
+                with open(path, encoding='utf-8') as file:
+                    definitions = json.load(file)
+                for n, r in enumerate(sorted(definitions, key=lambda r: r['uuid'])):
                     item = dict(r, item_id=ITEM_ID_BASE[kind] + n, quantity=1, no_sell=0)
                     if kind == 'Equipment':
                         owned_record = have.get(r['uuid'], {}) if have is not None else {}
@@ -5927,7 +6324,8 @@ def inventory_data():
                         rows.append({'uuid': r['uuid'], 'name': cells[0], 'rarity': 'Common', 'item_id': ITEM_ID_BASE[kind] + n,
                                      'quantity': int(r.get('qty', 1)), 'no_sell': 1 if str(r.get('no_sell')) == 'True' else 0})
             inv['records'][kind] = rows
-            inv['catalogue'][kind] = catalogue or rows
+            if catalogue or rows or kind not in inv['catalogue']:
+                inv['catalogue'][kind] = catalogue or rows
     except Exception as e:
         print('inventory: catalogue records incomplete (%r)' % (e,))
     _inventory = inv
@@ -6969,7 +7367,8 @@ def roster_record(c):
         return _special_records.get(c['roster_player_id'])
     if _roster_records is None:
         try:
-            _roster_records = json.load(open(derived_roster_path('roster-records.json'), encoding='utf-8'))
+            with open(derived_roster_path('roster-records.json'), encoding='utf-8') as file:
+                _roster_records = json.load(file)
         except (OSError, ValueError):
             _roster_records = {}
     return _roster_records.get(c.get('roster_record_key', c['name'].strip()))
@@ -7246,7 +7645,13 @@ def valid_collection_selector(selector):
         return (content_record(selector, {'live_teams'})
                 and collection_values(selector['live_teams'], tuple(range(-1, len(MLB_TEAMS)))))
     if 'set' in selector:
-        return content_record(selector, {'set'}) and selector['set'] in COLLECTION_SET_NAMES
+        if not selector.keys() <= {'set', 'order'} or selector['set'] not in COLLECTION_SET_NAMES:
+            return False
+        if 'order' not in selector:
+            return True
+        order = selector['order']
+        return (selector['set'] in COLLECTION_SET_NAMES[1:] and isinstance(order, list) and bool(order)
+                and all(collection_uuid(uuid) for uuid in order) and len(order) == len(set(order)))
     if 'affinity' in selector:
         return (content_record(selector, {'affinity'}) and type(selector['affinity']) is int
                 and 1 <= selector['affinity'] <= AFFINITY_SEASON)
@@ -7416,14 +7821,21 @@ def collection_members(selector):
             if collection_inventory_match(selector, row) and collection_item_face(kind, row) is not None:
                 yield kind, row
         return
+    if 'set' in selector:
+        cards = [card for card in all_cards()
+                 if card.get('set_name') == selector['set']
+                 and card.get('series') not in ('Live', 'Live Series', 'Ballplayer')]
+        if 'order' in selector:
+            position = {uuid: i for i, uuid in enumerate(selector['order'])}
+            cards.sort(key=lambda card: (
+                -card['ovr'], position.get(card['uuid'], len(position)), card['uuid']))
+        yield from (('Player', card) for card in cards)
+        return
     affinity = collection_affinity_members(selector['affinity']) if 'affinity' in selector else set()
     for card in all_cards():
         live = card.get('series') in ('Live', 'Live Series')
         if 'live_teams' in selector:
             match = live and card['team_id'] in selector['live_teams']
-        elif 'set' in selector:
-            match = (not live and card.get('series') != 'Ballplayer'
-                     and card.get('set_name') == selector['set'])
         elif 'live_rarities' in selector:
             match = (live and card['rarity'] in selector['live_rarities']
                      and ('positions' not in selector or card['display_position'] in selector['positions']))
@@ -7452,17 +7864,25 @@ def collection_tiers(definition, count):
 
 def collection_progress(definition, members, saved):
     locked = set(saved.get('locked', ()))
-    count = sum(row['uuid'] in locked for _, row in members)
     total = definition['tiers'][-1]['threshold']
+    if total != 'all' and definition['selector'].get('set') in COLLECTION_SET_NAMES[1:]:
+        # A catalogue change can hide a saved edition. Its UUID still counts for settlement.
+        return len(locked), total
+    count = sum(row['uuid'] in locked for _, row in members)
     return min(count, total) if total != 'all' else count, len(members) if total == 'all' else total
 
 
 def collection_inventory(state, members):
     kinds = {kind for kind, _ in members}
-    return {(kind, row['uuid']): row
-            for kind in kinds
-            for row in (cards(state) if kind == 'Player' else equip_owned_rows(kind, state))
-            if row['quantity'] > 0}
+    inventory = {}
+    for kind in kinds:
+        rows = cards(state) if kind == 'Player' else equip_owned_rows(kind, state)
+        for row in rows:
+            if row.get('simulated_ownership'):
+                row = dict(row, quantity=row['quantity'] - 1)
+            if row['quantity'] > 0:
+                inventory[kind, row['uuid']] = row
+    return inventory
 
 
 class CollectionReward(NamedTuple):
@@ -7558,7 +7978,8 @@ def collection_detail(definition, members, state, gained=(), resolved=None):
         item.attrib.setdefault('slot_type_id', '0')
         item.attrib.setdefault('sub_category_id', '0')
         items.append(item)
-    rewards = mini_node(detail, 'rewards', progress_current=progress, progress_max=total)
+    # The client counts collected item rows for the grid counter. Reward progress tops out at the final tier.
+    rewards = mini_node(detail, 'rewards', progress_current=min(progress, total), progress_max=total)
     claimed = set(saved.get('paid', ()))
     for key, threshold, reward in reversed(list(collection_tiers(definition, len(members)))):
         tier = resolved[key] if resolved and key in resolved else collection_reward(reward)
@@ -7591,7 +8012,8 @@ def collection_advance(definition, members, state, item_ids):
     if not new:
         return collection_detail(definition, members, state)
     count, total = collection_progress(definition, members, saved)
-    if count + len(new) > total:
+    updated_count = count + len(new)
+    if updated_count > total and definition['selector'].get('set') not in COLLECTION_SET_NAMES[1:]:
         raise CollectionRefusal('The selection exceeds the remaining collection requirement.')
     saved = state.setdefault('collections', {}).setdefault(str(definition['id']), {})
     saved['locked'] = sorted(locked | new)
@@ -7599,7 +8021,7 @@ def collection_advance(definition, members, state, item_ids):
     profile = state.setdefault('profile', {})
     gained, resolved = [], {}
     for key, threshold, reward in collection_tiers(definition, len(members)):
-        if key in claimed or threshold > count + len(new):
+        if key in claimed or threshold > updated_count:
             continue
         tier = resolved[key] = collection_reward(reward)
         if tier.kind == 'Player':
@@ -9844,51 +10266,34 @@ CHOICE_IMPORT_REQUIRED = 'No cards from this program pool are installed. Import 
 
 def reward_choice_description(pack):
     description = pack['description']
-    if not pack.get('partial_pool'):
+    if 'inventory_rounds' in pack:
+        rounds, _ = affinity_inventory_offer(pack)
+        if len(rounds) < len(pack['inventory_rounds']):
+            return f'{description} Missing item kinds use the local Unlockables Pack.'
         return description
     options = choice_pack_options(pack)
     available = choice_card_catalogue(options)
-    if any(available.keys().isdisjoint(row['options']) for row in pack['rounds']):
+    if not available:
         return f'{description} {CHOICE_IMPORT_REQUIRED}'
     if options - available.keys():
-        if pack.get('exact_pool'):
-            return f'{description} This install offers the available program cards.'
-        return f'{description} This install offers fewer program cards. Live Series substitutes may be offered to fill the selection.'
+        return f'{description} This install offers the available named cards.'
     return description
 
 
-def resolve_reward_choice_rounds(pack, catalogue):
-    """Keep the authored program choices that work here, with playable Live fillers if needed."""
+def choice_pack_offer(pack):
+    if 'inventory_rounds' in pack:
+        rounds, catalogue = affinity_inventory_offer(pack)
+        if not rounds:
+            raise ShopRefusal('Install the item catalogue to open this choice pack. This pack remains owned.')
+        return rounds, catalogue
+    catalogue = choice_card_catalogue(choice_pack_options(pack))
     rounds = []
-    live = None
     for row in pack['rounds']:
         options = [item for item in row['options'] if item in catalogue]
-        if not options:
-            raise ShopRefusal(CHOICE_IMPORT_REQUIRED)
-        desired = min(len(row['options']), row['picks'] + 1)
-        if len(options) < desired and not pack.get('exact_pool'):
-            if live is None:
-                live_ids = {card['item_id'] for card in all_cards() if card.get('series') in ('Live', 'Live Series')}
-                live = choice_card_catalogue(live_ids, allow_live=True)
-            clubs = {catalogue[item]['team_id'] for item in options}
-            fillers = sorted(live.keys() - set(options),
-                             key=lambda item: (live[item]['team_id'] not in clubs, -live[item]['ovr'], item))
-            fillers = fillers[:desired - len(options)]
-            options.extend(fillers)
-            catalogue.update((item, live[item]) for item in fillers)
-        rounds.append({'picks': min(row['picks'], len(options)), 'options': options})
-    return rounds
-
-
-def choice_pack_offer(pack, *, require_complete=True):
-    options = choice_pack_options(pack)
-    catalogue = choice_card_catalogue(options)
-    if pack.get('partial_pool'):
-        rounds = resolve_reward_choice_rounds(pack, catalogue)
-    elif require_complete and not options <= catalogue.keys():
-        raise ShopRefusal('Install the required card catalogue and art to open this choice pack.')
-    else:
-        rounds = pack['rounds']
+        if options:
+            rounds.append({'picks': min(row['picks'], len(options)), 'options': options})
+    if not rounds:
+        raise ShopRefusal(CHOICE_IMPORT_REQUIRED)
     return rounds, catalogue
 
 
@@ -10299,14 +10704,22 @@ def choice_draft_xml(state, rounds, previous, catalogue, round_index):
                       picks_total=0 if complete else rounds[round_index]['picks'])
     current = ET.SubElement(draft, 'picks_current')
     awarded = ET.SubElement(draft, 'picks_previous')
-    quantities = {card['item_id']: card['quantity'] for card in cards(state)}
+    kinds = {row.get('inventory_kind') for row in catalogue.values()}
+    quantities = {card['uuid']: card['quantity'] for card in cards(state)} if None in kinds else {}
+    for kind in kinds - {None}:
+        quantities.update((row['uuid'], row['quantity']) for row in owned_inventory_rows(kind, state))
     pending = Counter(previous)
 
     def add(parent, item_id, n, selected):
-        quantity = quantities.get(item_id, 0)
-        row = ET.fromstring(shop_revealed_card(catalogue[item_id], quantity + n, is_new=not quantity))
+        entry = catalogue[item_id]
+        kind = entry.get('inventory_kind')
+        quantity = quantities.get(entry['uuid'], 0)
+        if kind:
+            row = affinity_inventory_face(entry, quantity=quantity + n, is_new=int(not quantity))
+        else:
+            row = ET.fromstring(shop_revealed_card(entry, quantity + n, is_new=not quantity))
         row.set('pick_index', str(int(selected)))
-        row.set('slot_type_name', 'Player')  # DP_DATA_PICK_CURRENT is the selected item at UI 0x6449d0.
+        row.set('slot_type_name', row.get('slot_type_name') or kind or 'Player')
         parent.append(row)
 
     if not complete:
@@ -10329,8 +10742,9 @@ def shop_choice_open(state, shop, query):
     rounds, catalogue = choice_pack_offer(product)
     reply = choice_draft_xml(state, rounds, [], catalogue, 0)
     draft = {'rounds': rounds, 'receipts': [], 'open_reply': reply}
-    if product.get('partial_pool', False):
-        draft['allow_live'] = True
+    if 'inventory_rounds' in product:
+        draft['inventory'] = {str(item): (row['inventory_kind'], row['uuid'])
+                              for item, row in catalogue.items()}
     shop.setdefault('choice_drafts', {})[item_id] = draft
     save_shop_state(state, shop)
     return reply
@@ -10368,7 +10782,21 @@ def shop_choice_submit(state, shop, query):
     complete = next_round == len(rounds)
     if not complete:
         required.update(rounds[next_round]['options'])
-    catalogue = choice_card_catalogue(required, allow_live=draft.get('allow_live', False))
+    if 'inventory' in draft:
+        catalogue = {}
+        entries = draft['inventory']
+        uuids = {(kind, uuid): item for item in required if str(item) in entries
+                 for kind, uuid in [entries[str(item)]]}
+        for kind in {kind for kind, _ in uuids}:
+            for entry in inventory_data()['catalogue'].get(kind, ()):
+                item = uuids.get((kind, entry['uuid']))
+                if item is not None:
+                    row = dict(entry, inventory_kind=kind, item_id=item)
+                    if affinity_inventory_face(row) is not None:
+                        catalogue[item] = row
+    else:
+        # Older drafts keep the Live cards already shown in their persisted offer.
+        catalogue = choice_card_catalogue(required, allow_live=draft.get('allow_live', False))
     if not required <= catalogue.keys():
         raise ShopRefusal('Install the required card catalogue and art to continue this choice pack.')
     # Both open and submit use 0xe5b0f0. At completion, 0xe5bd20 tests
@@ -10377,7 +10805,11 @@ def shop_choice_submit(state, shop, query):
     receipts.append({'picks': picked, 'selected': round_picks, 'reply': reply})
     if complete:
         for card_id, count in Counter(selected).items():
-            grant_card_copies(state, catalogue[card_id], count)
+            item = catalogue[card_id]
+            if item.get('inventory_kind'):
+                grant_affinity_inventory(state, item, count)
+            else:
+                grant_card_copies(state, item, count)
         del owned[item_id]
         shop['choice_drafts'][item_id] = {'receipts': receipts}
     else:
@@ -10457,6 +10889,106 @@ EXCHANGE_DESCRIPTION = 'description_aaaa819e____'  # script hash 0xf96c6a13
 EXCHANGE_SHOW_POINTS = 'show_feed_value_aaadajazg_x_'  # ItemCard visibility, script hash 0xc370616d
 EXCHANGE_LIMIT_TAB = 'repeat_limit_tab_aaaa6iaa__y8'  # script hash 0x80706642
 EXCHANGE_REPEAT_COUNT = 'repeats_afaaa8tty_98'  # script hash 0xea102f17
+EXCHANGE_OVR_VALUES = {
+    61: 106, 62: 128, 63: 156, 64: 191, 66: 285, 67: 349, 69: 528,
+    72: 997, 73: 1238, 76: 2404, 77: 3013, 79: 4775, 80: 6037,
+    83: 12425, 84: 15909, 90: 75926,
+}
+
+
+def exchange_value(ovr):
+    if ovr <= 60:
+        return 100
+    if ovr >= 92:
+        return 100000
+    if ovr in EXCHANGE_OVR_VALUES:
+        return EXCHANGE_OVR_VALUES[ovr]
+    t = ovr - 75
+    return min(100000, max(100, round(math.exp(7.55991802 + 0.222300533 * t
+                                             + 0.00129263993 * t**2 + 0.0000151926318 * t**3))))
+
+
+class ExchangeRefusal(ValueError):
+    pass
+
+
+class ProgramExchange(NamedTuple):
+    target: int
+    description: str
+    program: AffinityTrack | dict
+    tier: int = 0
+    set_name: str = ''
+
+    def matches(self, card):
+        if self.set_name:
+            return card.get('set_name') == self.set_name
+        return card.get('team_id') in affinity_division_clubs(self.program.division)
+
+
+def program_exchange_rule(mission_id):
+    content = active_title_content()
+    track_index, tier = divmod(mission_id - AFFINITY_EXCHANGE_BASE, len(AFFINITY_EXCHANGE_ROMANS))
+    if 0 <= track_index < AFFINITY_PROGRAM_COUNT:
+        track = (content.team_affinity or {}).get(AFFINITY_PROGRAM_BASE + track_index)
+        if track and (tasks := track.groups.get('Exchanges')):
+            task = tasks[tier]
+            return ProgramExchange(task.target, task.description, track, tier)
+    mission = content.missions.get(mission_id)
+    if mission and mission['evaluator'] == 'set_exchange':
+        program = next(program for program in content.programs.values()
+                       if any(goal['mission_id'] == mission_id
+                              for stage in program['stages'] for goal in stage['goals']))
+        return ProgramExchange(mission['target'], mission['description'], program, set_name=mission['set_name'])
+    return None
+
+
+def program_exchange_goal(group, mission_id, name, description, target, progress, tickets, *, complete=False):
+    row = mini_node(group, 'goal', id=mission_id, type=2, type_tab=0, mode_name='Exchanges',
+                    name=name, description=description, is_complete=int(complete or progress >= target),
+                    tickets=tickets, progress_current=progress, progress_max=target,
+                    mission_criteria_id=2, preview_count=0, stat='Exchange Value')
+    ET.SubElement(row, 'items')
+
+
+def add_set_exchange_goals(stage, program, saved, goals, missions):
+    points, _ = authored_program_status(program, saved, missions)
+    capped = points >= program['total_points']
+    group = mini_node(stage, 'goals', id=goals[0]['mission_id'], name='OPTIONAL: Exchange',
+                      description=missions[goals[0]['mission_id']]['description'],
+                      type=2, type_tab=0, is_group=1, is_complete=1, tickets=0, mode_name='Exchanges')
+    for goal in goals:
+        mid = goal['mission_id']
+        mission = missions[mid]
+        progress = min(mission['target'], mission_count(saved.get('units'), str(mid)))
+        complete = capped or progress >= mission['target']
+        if not complete:
+            group.set('is_complete', '0')
+        program_exchange_goal(group, mid, mission['name'], mission['description'], mission['target'],
+                              progress, goal['points'], complete=complete)
+
+
+def affinity_exchange_position(points, tasks):
+    laps, remainder = divmod(points, sum(task.target for task in tasks))
+    earned = laps * sum(task.ta for task in tasks)
+    for tier, task in enumerate(tasks):
+        if remainder < task.target:
+            return tier, remainder, earned
+        remainder -= task.target
+        earned += task.ta
+
+
+def program_exchange_progress(state, mission_id, rule):
+    if rule.set_name:
+        program = rule.program
+        saved = authored_program_state(state.get('profile', {}), program)
+        progress = min(rule.target, mission_count(saved.get('units'), str(mission_id)))
+        points, _ = authored_program_status(program, saved, active_title_content().missions)
+        return progress, progress < rule.target and points < program['total_points']
+    track = rule.program
+    saved = seasonal_affinity_saved(state, track)
+    tier, progress, _ = affinity_exchange_position(mission_count(saved, 'exchange_points'),
+                                                  track.groups['Exchanges'])
+    return (rule.target if rule.tier < tier else progress if rule.tier == tier else 0), rule.tier >= tier
 
 
 class ExchangeRule(NamedTuple):
@@ -10525,7 +11057,7 @@ def exchange_card_number(value):
     return int(text) if re.fullmatch(r'[0-9]{1,10}', text) else 0
 
 
-def exchange_protected_cards(state):
+def exchange_protected_cards(state, *, program=False):
     protected = set()
 
     def visit(node):
@@ -10546,7 +11078,11 @@ def exchange_protected_cards(state):
             for child in node:
                 visit(child)
 
-    visit(state.get('squad') or (default_squad(cards(state)) if unlock_all_cards_enabled() else default_squad()))
+    if program:
+        visit(active_saved_squad(state) or default_squad(playable_cards(state)))
+        visit(state.get('squad'))
+    else:
+        visit(state.get('squad') or (default_squad(cards(state)) if unlock_all_cards_enabled() else default_squad()))
     for key in ('mini_season', 'mini_season_archive', 'conquest', 'showdown'):
         visit(state.get(key))
     return protected
@@ -10618,6 +11154,113 @@ def exchange_selection(query):
     return rows
 
 
+def program_exchange_cards(rule):
+    return {card['item_id']: card for card in all_cards()
+            if card['display_position'] in FIELD_NUMBER and rule.matches(card)}
+
+
+def program_exchange_inventory(state):
+    # The development snapshot can supply a simulated copy of each card.
+    owned = {card['uuid']: card['quantity'] - int(card.get('simulated_ownership', False))
+             for card in cards(state)}
+    return owned, exchange_protected_cards(state, program=True), collection_locked_uuids(state)
+
+
+def program_exchange_feed(state, mission_id, rule, page):
+    progress, available = program_exchange_progress(state, mission_id, rule)
+    eligible = sorted(program_exchange_cards(rule).values(),
+                      key=lambda card: (exchange_value(card['ovr']), card['item_id']))
+    pages = max(1, -(-len(eligible) // EXCHANGE_PAGE_SIZE))
+    opening = page <= 1
+    page = min(pages, max(1, page))
+    start = (page - 1) * EXCHANGE_PAGE_SIZE
+    visible = eligible[start:start + EXCHANGE_PAGE_SIZE]
+    owned, protected, locked = program_exchange_inventory(state)
+    response = ET.Element('response')
+    feed = mini_node(response, 'feed', page=page, total_pages=pages)
+    mini_node(feed, 'mission', id=mission_id, display_type=0, max_progress=rule.target,
+              current_progress=progress, description=rule.description,
+              **{EXCHANGE_DESCRIPTION: rule.description})
+    items = mini_node(feed, 'items', count=len(visible), total=len(eligible))
+    for card in visible:
+        uuid, item = card['uuid'], card['item_id']
+        reserve = uuid in locked or item in protected
+        quantity = max(0, owned.get(uuid, 0) - reserve)
+        row = ET.fromstring(shop_revealed_card(card, quantity, is_new=False))
+        row.attrib.update(feed_value=str(exchange_value(card['ovr'])), is_feed='0',
+                          no_sell=str(int(uuid in locked)), set_name=card.get('set_name') or '',
+                          **{EXCHANGE_SHOW_POINTS: '1'})
+        items.append(row)
+    reply = mini_xml(response)
+    receipts = state.get('exchanges', {}).get('program_receipts', {})
+    key = str(mission_id)
+    if available and opening and key in receipts:
+        # A new first page is the same transaction boundary used by Collect's
+        # repeatable missions. Paging past page one and advancing another tier
+        # leave the original mission's receipt intact.
+        del receipts[key]
+        save_state(state)
+    return reply
+
+
+def program_exchange_advance(state, mission_id, rule, query):
+    selection = exchange_selection(query)
+    if selection is None:
+        raise ExchangeRefusal('Choose cards and valid quantities to exchange.')
+    key = str(mission_id)
+    receipt = state.get('exchanges', {}).get('program_receipts', {}).get(key)
+    if receipt is not None:
+        if receipt == selection:
+            return True
+        raise ExchangeRefusal('Reopen View Exchange to start another trade.')
+    _, available = program_exchange_progress(state, mission_id, rule)
+    if not available:
+        raise ExchangeRefusal('This exchange is already complete.')
+    eligible = program_exchange_cards(rule)
+    owned, protected, locked = program_exchange_inventory(state)
+    debits = Counter()
+    points = 0
+    for item, qty in selection:
+        card = eligible.get(item)
+        if card is None:
+            raise ExchangeRefusal('That card is not eligible for this exchange.')
+        uuid = card['uuid']
+        count = owned.get(uuid, 0) - debits[uuid]
+        if qty > count:
+            raise ExchangeRefusal('You can only exchange real owned copies of that card.')
+        if qty == count:
+            if item in protected:
+                raise ExchangeRefusal('You cannot exchange the last copy of a card in your squad.')
+            if uuid in locked:
+                raise ExchangeRefusal('That copy is locked in a collection.')
+        debits[uuid] += qty
+        points += qty * exchange_value(card['ovr'])
+    if rule.set_name:
+        settle_authored_programs(state, {key: points}, program_id=rule.program['id'])
+    else:
+        track = rule.program
+        migrate_seasonal_affinity(state, active_title_content().team_affinity)
+        affinity = state.setdefault('team_affinity', {})
+        if track.revised:
+            affinity['track_claim_revision'] = 21
+        saved = affinity.setdefault('tracks', {}).setdefault(str(track.id), {})
+        tasks = track.groups['Exchanges']
+        previous = mission_count(saved, 'exchange_points')
+        total = previous + points
+        _, _, prior_ta = affinity_exchange_position(previous, tasks)
+        _, _, total_ta = affinity_exchange_position(total, tasks)
+        saved['exchange_points'] = total
+        saved['points'] = mission_count(saved, 'points') + total_ta - prior_ta
+        seasonal_affinity_grant(state, track, saved)
+    exchange = state.setdefault('exchanges', {})
+    spent = exchange.setdefault('spent_cards', {})
+    for uuid, qty in debits.items():
+        spent[uuid] = spent.get(uuid, 0) + qty
+    exchange.setdefault('program_receipts', {})[key] = selection
+    save_state(state)
+    return True
+
+
 def exchange_advance(state, mission_id, query):
     selection = exchange_selection(query)
     if selection is None:
@@ -10663,9 +11306,20 @@ def exchange_reply(name, params):
             return exchange_missions(group_id)
     mission_id = exchange_card_number(q.get('mission_id'))
     if name == 'mission.view_exchange':
-        return exchange_feed(load_state(), mission_id, exchange_card_number(q.get('page')))
-    if name == 'mission.advance' and mission_id in EXCHANGE_RULES:
-        advanced = exchange_advance(load_state(), mission_id, q)
+        state = load_state()
+        page = exchange_card_number(q.get('page'))
+        rule = program_exchange_rule(mission_id)
+        if rule is not None:
+            return program_exchange_feed(state, mission_id, rule, page)
+        return exchange_feed(state, mission_id, page)
+    if name == 'mission.advance':
+        rule = program_exchange_rule(mission_id)
+        if rule is not None:
+            advanced = program_exchange_advance(load_state(), mission_id, rule, q)
+        elif mission_id in EXCHANGE_RULES:
+            advanced = exchange_advance(load_state(), mission_id, q)
+        else:
+            return None
         return '<response><advancement_results state_id="%d"/></response>' % int(advanced)
     return None
 
@@ -11873,7 +12527,11 @@ def reply_body(name, mode, params='', game_data=None):
         return captain
     if name in EMPTY_MARKET_REPLIES:
         return envelope(EMPTY_MARKET_REPLIES[name]), 'made'
-    exchange = exchange_reply(name, params)
+    try:
+        exchange = exchange_reply(name, params)
+    except ExchangeRefusal as error:
+        return envelope('<response><advancement_results state_id="0"/></response>',
+                        status=1, message=escape_mini_attr(error)), 'refused'
     if exchange is not None:
         return envelope(exchange), 'made'
     for prefix, message in DISABLED:          # parts the owner decided the local server will not offer

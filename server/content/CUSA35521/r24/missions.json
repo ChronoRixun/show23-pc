@@ -3370,6 +3370,20 @@
     "xp": 0
   },
   {
+    "id": 738120,
+    "name": "Exchange Set 3 Players",
+    "description": "Exchange Set 3 Players.",
+    "evaluator": "set_exchange",
+    "target": 500000,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [],
+    "xp": 0,
+    "set_name": "SET 3"
+  },
+  {
     "id": 739001,
     "name": "PXP with Kaiju Series Program players",
     "description": "Tally 2,000 Parallel XP with the player rewards from the Kaiju Series Program.",
@@ -4606,6 +4620,2668 @@
     "description": "Tally 2,000 PXP in Diamond Dynasty.",
     "evaluator": "parallel_xp",
     "target": 2000,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 739500,
+    "name": "Gleyber Day is Every Day",
+    "description": "Tally 1 home run in one game.",
+    "evaluator": "home_runs",
+    "target": 1,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739501,
+    "name": "YoYo Goes Yard",
+    "description": "Tally 1 home run in one game.",
+    "evaluator": "home_runs",
+    "target": 1,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739502,
+    "name": "Springer Sends it to Space City",
+    "description": "Tally 1 home run in one game.",
+    "evaluator": "home_runs",
+    "target": 1,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739503,
+    "name": "Unlimited Rizz and Homers",
+    "description": "Tally 1 home run in one game.",
+    "evaluator": "home_runs",
+    "target": 1,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739504,
+    "name": "Duvall's Dingers",
+    "description": "Tally 1 home run in one game.",
+    "evaluator": "home_runs",
+    "target": 1,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739505,
+    "name": "Big Baller Bregman",
+    "description": "Tally 1 home run in one game.",
+    "evaluator": "home_runs",
+    "target": 1,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739506,
+    "name": "The Bringer of Rain and Dingers",
+    "description": "Tally 1 home run in one game.",
+    "evaluator": "home_runs",
+    "target": 1,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739507,
+    "name": "A Heat Seeking Seager",
+    "description": "Tally 1 home run in one game.",
+    "evaluator": "home_runs",
+    "target": 1,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739508,
+    "name": "Moonshot Miggy",
+    "description": "Tally 1 home run in one game.",
+    "evaluator": "home_runs",
+    "target": 1,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739509,
+    "name": "Schwarbombs for Days",
+    "description": "Tally 1 home run in one game.",
+    "evaluator": "home_runs",
+    "target": 1,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739510,
+    "name": "HRs with Live Series",
+    "description": "Tally 20 home runs with Live Series players across eligible games.",
+    "evaluator": "home_runs",
+    "target": 20,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "series": "Live Series"
+    }
+  },
+  {
+    "id": 739511,
+    "name": "HRs with Captains",
+    "description": "Tally 20 home runs with Captain Series players across eligible games.",
+    "evaluator": "home_runs",
+    "target": 20,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "series": "Captain"
+    }
+  },
+  {
+    "id": 739512,
+    "name": "HRs with Switch Hitters",
+    "description": "Tally 20 home runs with switch hitters across eligible games.",
+    "evaluator": "home_runs",
+    "target": 20,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "bat_hand": "S"
+    }
+  },
+  {
+    "id": 739513,
+    "name": "HRs with \"M\" State/Country Origins",
+    "description": "Tally 20 home runs with players born in an M state or country across eligible games.",
+    "evaluator": "home_runs",
+    "target": 20,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "birthplace": {
+        "regions": [
+          "Maine",
+          "Maryland",
+          "Massachusetts",
+          "Mexico",
+          "Michigan",
+          "Minnesota",
+          "Mississippi",
+          "Missouri",
+          "Montana"
+        ],
+        "codes": [
+          6,
+          21,
+          22,
+          23,
+          24,
+          37,
+          38,
+          39,
+          86
+        ]
+      }
+    }
+  },
+  {
+    "id": 739514,
+    "name": "HRs with Short Kings",
+    "description": "Tally 20 home runs with players 5 ft 10 in or shorter across eligible games.",
+    "evaluator": "home_runs",
+    "target": 20,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "max_height": 70
+    }
+  },
+  {
+    "id": 739515,
+    "name": "HRs with Tall Kings",
+    "description": "Tally 20 home runs with players 6 ft 4 in or taller across eligible games.",
+    "evaluator": "home_runs",
+    "target": 20,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "min_height": 76
+    }
+  },
+  {
+    "id": 739516,
+    "name": "HRs with Low Power Hitters",
+    "description": "Tally 5 home runs with players with both base Power ratings below 75 across eligible games.",
+    "evaluator": "home_runs",
+    "target": 5,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "power_below": 75
+    }
+  },
+  {
+    "id": 739517,
+    "name": "HRs with Rizzo",
+    "description": "Tally 5 home runs with Home Run Derby Anthony Rizzo across eligible games.",
+    "evaluator": "home_runs",
+    "target": 5,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "item_ids": [
+        59783
+      ]
+    }
+  },
+  {
+    "id": 739518,
+    "name": "HRs with Duvall",
+    "description": "Tally 5 home runs with Home Run Derby Adam Duvall across eligible games.",
+    "evaluator": "home_runs",
+    "target": 5,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "item_ids": [
+        59784
+      ]
+    }
+  },
+  {
+    "id": 739519,
+    "name": "HRs with Bregman",
+    "description": "Tally 5 home runs with Home Run Derby Alex Bregman across eligible games.",
+    "evaluator": "home_runs",
+    "target": 5,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "item_ids": [
+        59785
+      ]
+    }
+  },
+  {
+    "id": 739520,
+    "name": "HRs with Donaldson",
+    "description": "Tally 5 home runs with Home Run Derby Josh Donaldson across eligible games.",
+    "evaluator": "home_runs",
+    "target": 5,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "item_ids": [
+        59788
+      ]
+    }
+  },
+  {
+    "id": 739521,
+    "name": "HRs with Seager",
+    "description": "Tally 5 home runs with Home Run Derby Corey Seager across eligible games.",
+    "evaluator": "home_runs",
+    "target": 5,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "item_ids": [
+        59786
+      ]
+    }
+  },
+  {
+    "id": 739522,
+    "name": "HRs with Cabrera",
+    "description": "Tally 5 home runs with Home Run Derby Miguel Cabrera across eligible games.",
+    "evaluator": "home_runs",
+    "target": 5,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "item_ids": [
+        59787
+      ]
+    }
+  },
+  {
+    "id": 739523,
+    "name": "Moonshot Showdown batting challenge",
+    "description": "Tally 2 home runs in one game.",
+    "evaluator": "home_runs",
+    "target": 2,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739524,
+    "name": "Moonshot Conquest batting challenge",
+    "description": "Tally 15 home runs across eligible games.",
+    "evaluator": "home_runs",
+    "target": 15,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 739540,
+    "name": "[PXP] with Father's Day Program players",
+    "description": "Tally 5,000 Parallel XP with Father's Day Program players across eligible games.",
+    "evaluator": "parallel_xp",
+    "target": 5000,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "item_ids": [
+        58301,
+        58302,
+        58304,
+        58303,
+        58299,
+        58300,
+        58297,
+        58298
+      ]
+    }
+  },
+  {
+    "id": 739541,
+    "name": "Tally Hits with Father's Day Program players",
+    "description": "Tally 60 hits with Father's Day Program players across eligible games.",
+    "evaluator": "hits",
+    "target": 60,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "item_ids": [
+        58301,
+        58302,
+        58304,
+        58303,
+        58299,
+        58300,
+        58297,
+        58298
+      ]
+    }
+  },
+  {
+    "id": 739542,
+    "name": "Tally XBH with Father's Day Program players",
+    "description": "Tally 40 extra-base hits with Father's Day Program players across eligible games.",
+    "evaluator": "extra_base_hits",
+    "target": 40,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "item_ids": [
+        58301,
+        58302,
+        58304,
+        58303,
+        58299,
+        58300,
+        58297,
+        58298
+      ]
+    }
+  },
+  {
+    "id": 739543,
+    "name": "Tally HR with Father's Day Program players",
+    "description": "Tally 20 home runs with Father's Day Program players across eligible games.",
+    "evaluator": "home_runs",
+    "target": 20,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "item_ids": [
+        58301,
+        58302,
+        58304,
+        58303,
+        58299,
+        58300,
+        58297,
+        58298
+      ]
+    }
+  },
+  {
+    "id": 739544,
+    "name": "Tally SB with Father's Day Program players",
+    "description": "Tally 10 stolen bases with Father's Day Program players across eligible games.",
+    "evaluator": "stolen_bases",
+    "target": 10,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "item_ids": [
+        58301,
+        58302,
+        58304,
+        58303,
+        58299,
+        58300,
+        58297,
+        58298
+      ]
+    }
+  },
+  {
+    "id": 739545,
+    "name": "[PXP] with Kaiju Craig Biggio",
+    "description": "Tally 200 Parallel XP with Kaiju Craig Biggio across eligible games.",
+    "evaluator": "parallel_xp",
+    "target": 200,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "item_ids": [
+        58301
+      ]
+    }
+  },
+  {
+    "id": 739546,
+    "name": "[PXP] with Kaiju Cavan Biggio",
+    "description": "Tally 200 Parallel XP with Kaiju Cavan Biggio across eligible games.",
+    "evaluator": "parallel_xp",
+    "target": 200,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "item_ids": [
+        58302
+      ]
+    }
+  },
+  {
+    "id": 739547,
+    "name": "[PXP] with Kaiju Dante Bichette",
+    "description": "Tally 200 Parallel XP with Kaiju Dante Bichette across eligible games.",
+    "evaluator": "parallel_xp",
+    "target": 200,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "item_ids": [
+        58304
+      ]
+    }
+  },
+  {
+    "id": 739548,
+    "name": "[PXP] with Incognito Bo Bichette",
+    "description": "Tally 200 Parallel XP with Incognito Bo Bichette across eligible games.",
+    "evaluator": "parallel_xp",
+    "target": 200,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "item_ids": [
+        58303
+      ]
+    }
+  },
+  {
+    "id": 739549,
+    "name": "[PXP] with Incognito Vladimir Guerrero",
+    "description": "Tally 200 Parallel XP with Incognito Vladimir Guerrero across eligible games.",
+    "evaluator": "parallel_xp",
+    "target": 200,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "item_ids": [
+        58299
+      ]
+    }
+  },
+  {
+    "id": 739550,
+    "name": "[PXP] with Kaiju Vladimir Guerrero Jr.",
+    "description": "Tally 200 Parallel XP with Kaiju Vladimir Guerrero Jr. across eligible games.",
+    "evaluator": "parallel_xp",
+    "target": 200,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "item_ids": [
+        58300
+      ]
+    }
+  },
+  {
+    "id": 739551,
+    "name": "[PXP] with Captain Ken Griffey Sr.",
+    "description": "Tally 200 Parallel XP with Captain Ken Griffey Sr. across eligible games.",
+    "evaluator": "parallel_xp",
+    "target": 200,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "item_ids": [
+        58297
+      ]
+    }
+  },
+  {
+    "id": 739552,
+    "name": "Magical Year for Matt",
+    "description": "Tally 1 home run in one game.",
+    "evaluator": "home_runs",
+    "target": 1,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739553,
+    "name": "Jackson Has Promising Future",
+    "description": "Tally 4 total bases in one game.",
+    "evaluator": "total_bases",
+    "target": 4,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739554,
+    "name": "Craig Leads Offensive Bash",
+    "description": "Tally 1 extra-base hit in one game.",
+    "evaluator": "extra_base_hits",
+    "target": 1,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739555,
+    "name": "Cavan Makes it to the Big Leagues",
+    "description": "Tally 4 total bases in one game.",
+    "evaluator": "total_bases",
+    "target": 4,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739556,
+    "name": "Dante Dominates in 1998",
+    "description": "Tally 2 hits in one game.",
+    "evaluator": "hits",
+    "target": 2,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739557,
+    "name": "Bo Pays Dividends Immediately",
+    "description": "Tally 1 hit in one game.",
+    "evaluator": "hits",
+    "target": 1,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739558,
+    "name": "Vladdy Loves the Long Ball",
+    "description": "Tally 6 total bases in one game.",
+    "evaluator": "total_bases",
+    "target": 6,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739559,
+    "name": "Guerrero Jr. is Just Getting Started",
+    "description": "Tally 1 extra-base hit in one game.",
+    "evaluator": "extra_base_hits",
+    "target": 1,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739560,
+    "name": "Like Father...",
+    "description": "Tally 1 home run in one game.",
+    "evaluator": "home_runs",
+    "target": 1,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739561,
+    "name": "...Like Son",
+    "description": "Tally 1 home run in one game.",
+    "evaluator": "home_runs",
+    "target": 1,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739562,
+    "name": "Father's Day Conquest batting challenge",
+    "description": "Tally 20 hits across eligible games.",
+    "evaluator": "hits",
+    "target": 20,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 739570,
+    "name": "Repeatable: [PXP] with Charisma Series players",
+    "description": "Tally 1,500 Parallel XP with Charisma Series players across eligible games. Repeat for 10 stars each time.",
+    "evaluator": "parallel_xp",
+    "target": 1500,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "repeatable": true,
+    "card_filter": {
+      "series": "Charisma"
+    }
+  },
+  {
+    "id": 739571,
+    "name": "[PXP] with Charisma Series players",
+    "description": "Tally 5,000 Parallel XP with Charisma Series players across eligible games.",
+    "evaluator": "parallel_xp",
+    "target": 5000,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "series": "Charisma"
+    }
+  },
+  {
+    "id": 739572,
+    "name": "[PXP] with Charisma Brett Phillips",
+    "description": "Tally 200 Parallel XP with Brett Phillips across eligible games.",
+    "evaluator": "parallel_xp",
+    "target": 200,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "item_ids": [
+        56945
+      ]
+    }
+  },
+  {
+    "id": 739573,
+    "name": "[PXP] with Charisma Joe Kelly",
+    "description": "Tally 600 Parallel XP with Joe Kelly across eligible games.",
+    "evaluator": "parallel_xp",
+    "target": 600,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "item_ids": [
+        56954
+      ]
+    }
+  },
+  {
+    "id": 739574,
+    "name": "[PXP] with Charisma Andrew Chafin",
+    "description": "Tally 600 Parallel XP with Andrew Chafin across eligible games.",
+    "evaluator": "parallel_xp",
+    "target": 600,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "item_ids": [
+        56953
+      ]
+    }
+  },
+  {
+    "id": 739575,
+    "name": "[PXP] with Charisma Josh Naylor",
+    "description": "Tally 200 Parallel XP with Josh Naylor across eligible games.",
+    "evaluator": "parallel_xp",
+    "target": 200,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "item_ids": [
+        56946
+      ]
+    }
+  },
+  {
+    "id": 739576,
+    "name": "[PXP] with Charisma Josh Harrison",
+    "description": "Tally 200 Parallel XP with Josh Harrison across eligible games.",
+    "evaluator": "parallel_xp",
+    "target": 200,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "item_ids": [
+        56947
+      ]
+    }
+  },
+  {
+    "id": 739577,
+    "name": "[PXP] with Charisma Daniel Vogelbach",
+    "description": "Tally 200 Parallel XP with Daniel Vogelbach across eligible games.",
+    "evaluator": "parallel_xp",
+    "target": 200,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "item_ids": [
+        56950
+      ]
+    }
+  },
+  {
+    "id": 739578,
+    "name": "[PXP] with Charisma Oneil Cruz",
+    "description": "Tally 200 Parallel XP with Oneil Cruz across eligible games.",
+    "evaluator": "parallel_xp",
+    "target": 200,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "item_ids": [
+        56948
+      ]
+    }
+  },
+  {
+    "id": 739579,
+    "name": "[PXP] with Charisma Ozzie Albies",
+    "description": "Tally 200 Parallel XP with Ozzie Albies across eligible games.",
+    "evaluator": "parallel_xp",
+    "target": 200,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "item_ids": [
+        56951
+      ]
+    }
+  },
+  {
+    "id": 739580,
+    "name": "[PXP] with Charisma Marcus Semien",
+    "description": "Tally 200 Parallel XP with Marcus Semien across eligible games.",
+    "evaluator": "parallel_xp",
+    "target": 200,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "item_ids": [
+        56949
+      ]
+    }
+  },
+  {
+    "id": 739581,
+    "name": "Harrison is Always Happy",
+    "description": "Tally 1 hit in one game.",
+    "evaluator": "hits",
+    "target": 1,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739582,
+    "name": "Phillips Puts an End to Game 4",
+    "description": "Tally 2 RBI in one game.",
+    "evaluator": "rbi",
+    "target": 2,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739583,
+    "name": "Kelly Tells Cardinals to Grab Some Pine",
+    "description": "Tally 3 strikeouts in one game.",
+    "evaluator": "pitching_strikeouts",
+    "target": 3,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739584,
+    "name": "The Sheriff Lays Down the Law",
+    "description": "Tally 2 strikeouts in one game.",
+    "evaluator": "pitching_strikeouts",
+    "target": 2,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739585,
+    "name": "Albies Holds it Down for The A",
+    "description": "Tally 1 extra-base hit in one game.",
+    "evaluator": "extra_base_hits",
+    "target": 1,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739586,
+    "name": "Naylor's Epic Season",
+    "description": "Tally 1 home run in one game.",
+    "evaluator": "home_runs",
+    "target": 1,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739587,
+    "name": "Don't Pitch to Daniel",
+    "description": "Tally 1 extra-base hit in one game.",
+    "evaluator": "extra_base_hits",
+    "target": 1,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739588,
+    "name": "Statcast That!",
+    "description": "Tally 1 hit in one game.",
+    "evaluator": "hits",
+    "target": 1,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739589,
+    "name": "Castillo's Change of Scenery",
+    "description": "Tally 6 strikeouts in one game.",
+    "evaluator": "pitching_strikeouts",
+    "target": 6,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739590,
+    "name": "Semien Stays Steady",
+    "description": "Tally 4 total bases in one game.",
+    "evaluator": "total_bases",
+    "target": 4,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739591,
+    "name": "Charisma Series Showdown batting challenge",
+    "description": "Tally 3 runs in one game.",
+    "evaluator": "runs",
+    "target": 3,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739600,
+    "name": "October 27: Seager Sends Texas to Extras",
+    "description": "Tally 1 home run in one game.",
+    "evaluator": "home_runs",
+    "target": 1,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739601,
+    "name": "October 27: García Announces Game Over",
+    "description": "Tally 1 home run in one game.",
+    "evaluator": "home_runs",
+    "target": 1,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739602,
+    "name": "October 28: Kelly's Complete Mastery",
+    "description": "Tally 2 strikeouts in one game.",
+    "evaluator": "pitching_strikeouts",
+    "target": 2,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739603,
+    "name": "October 28: Pham's Perfection",
+    "description": "Tally 1 extra-base hit in one game.",
+    "evaluator": "extra_base_hits",
+    "target": 1,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739604,
+    "name": "October 30: Semien Sparks Rangers Offense",
+    "description": "Tally 1 RBI in one game.",
+    "evaluator": "rbi",
+    "target": 1,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739605,
+    "name": "October 30: Gray Gathers Outs",
+    "description": "Tally 1 strikeout in one game.",
+    "evaluator": "pitching_strikeouts",
+    "target": 1,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739606,
+    "name": "October 31: Semien's Stellar Show",
+    "description": "Tally 2 extra-base hits in one game.",
+    "evaluator": "extra_base_hits",
+    "target": 2,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739607,
+    "name": "November 1: Gallen Gives His All",
+    "description": "Tally 2 strikeouts in one game.",
+    "evaluator": "pitching_strikeouts",
+    "target": 2,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739608,
+    "name": "November 1: Eovaldi Energizes Texas",
+    "description": "Tally 2 strikeouts in one game.",
+    "evaluator": "pitching_strikeouts",
+    "target": 2,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739609,
+    "name": "November 1: Game 5 Garver",
+    "description": "Tally 1 RBI in one game.",
+    "evaluator": "rbi",
+    "target": 1,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739610,
+    "name": "November 1: World Series MVP",
+    "description": "Tally 6 total bases in one game.",
+    "evaluator": "total_bases",
+    "target": 6,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739611,
+    "name": "Repeatable: [PXP] with Postseason: World Series Program players",
+    "description": "Tally 2,000 Parallel XP with World Series Program players across eligible games. Repeat for 5 stars each time.",
+    "evaluator": "parallel_xp",
+    "target": 2000,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "repeatable": true,
+    "card_filter": {
+      "item_ids": [
+        60767,
+        60764,
+        60765,
+        60766,
+        60768,
+        60762,
+        60769,
+        60770,
+        60759,
+        60782,
+        60761,
+        60763,
+        60760
+      ]
+    }
+  },
+  {
+    "id": 739612,
+    "name": "[PXP] with 2023 Postseason Series",
+    "description": "Tally 1,500 Parallel XP with 2023 Postseason Series players across eligible games.",
+    "evaluator": "parallel_xp",
+    "target": 1500,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "series": "2023 Postseason"
+    }
+  },
+  {
+    "id": 739613,
+    "name": "[PXP] with Texas Rangers",
+    "description": "Tally 500 Parallel XP with Texas Rangers players across eligible games.",
+    "evaluator": "parallel_xp",
+    "target": 500,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "club": "TEX"
+    }
+  },
+  {
+    "id": 739614,
+    "name": "[PXP] with Arizona Diamondbacks",
+    "description": "Tally 500 Parallel XP with Arizona Diamondbacks players across eligible games.",
+    "evaluator": "parallel_xp",
+    "target": 500,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "club": "ARI"
+    }
+  },
+  {
+    "id": 739615,
+    "name": "XBH with Rangers and Diamondbacks",
+    "description": "Tally 15 extra-base hits with Texas Rangers and Arizona Diamondbacks players across eligible games.",
+    "evaluator": "extra_base_hits",
+    "target": 15,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "club": [
+        "TEX",
+        "ARI"
+      ]
+    }
+  },
+  {
+    "id": 739616,
+    "name": "HR with Texas Rangers",
+    "description": "Tally 10 home runs with Texas Rangers players across eligible games.",
+    "evaluator": "home_runs",
+    "target": 10,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "club": "TEX"
+    }
+  },
+  {
+    "id": 739617,
+    "name": "TB with Arizona Diamondbacks",
+    "description": "Tally 25 total bases with Arizona Diamondbacks players across eligible games.",
+    "evaluator": "total_bases",
+    "target": 25,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "club": "ARI"
+    }
+  },
+  {
+    "id": 739618,
+    "name": "IP with World Series pitchers",
+    "description": "Tally 18 innings pitched with World Series pitchers across eligible games.",
+    "evaluator": "pitching_outs",
+    "target": 54,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "item_ids": [
+        60767,
+        60764,
+        60765,
+        60766,
+        60768,
+        60762
+      ]
+    }
+  },
+  {
+    "id": 739619,
+    "name": "Ks with World Series pitchers",
+    "description": "Tally 15 strikeouts with World Series pitchers across eligible games.",
+    "evaluator": "pitching_strikeouts",
+    "target": 15,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "item_ids": [
+        60767,
+        60764,
+        60765,
+        60766,
+        60768,
+        60762
+      ]
+    }
+  },
+  {
+    "id": 739620,
+    "name": "Saves with World Series relievers",
+    "description": "Tally 5 saves with World Series relievers across eligible games.",
+    "evaluator": "saves",
+    "target": 5,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "item_ids": [
+        60767,
+        60764,
+        60765,
+        60766
+      ]
+    }
+  },
+  {
+    "id": 739621,
+    "name": "Get on base with World Series players",
+    "description": "Tally 20 times on base (hits and walks) with World Series batters across eligible games.",
+    "evaluator": "on_base",
+    "target": 20,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "item_ids": [
+        60769,
+        60770,
+        60759,
+        60782,
+        60761,
+        60763
+      ]
+    }
+  },
+  {
+    "id": 739622,
+    "name": "Hits with World Series players",
+    "description": "Tally 15 hits with World Series batters across eligible games.",
+    "evaluator": "hits",
+    "target": 15,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "item_ids": [
+        60769,
+        60770,
+        60759,
+        60782,
+        60761,
+        60763
+      ]
+    }
+  },
+  {
+    "id": 739623,
+    "name": "Runs with World Series players",
+    "description": "Tally 10 runs with World Series batters across eligible games.",
+    "evaluator": "runs",
+    "target": 10,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "item_ids": [
+        60769,
+        60770,
+        60759,
+        60782,
+        60761,
+        60763
+      ]
+    }
+  },
+  {
+    "id": 739624,
+    "name": "IP with Postseason players",
+    "description": "Tally 18 innings pitched with 2023 Postseason and Postseason Series players across eligible games.",
+    "evaluator": "pitching_outs",
+    "target": 54,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "series": [
+        "2023 Postseason",
+        "Postseason"
+      ]
+    }
+  },
+  {
+    "id": 739625,
+    "name": "Ks with Postseason players",
+    "description": "Tally 15 strikeouts with 2023 Postseason and Postseason Series players across eligible games.",
+    "evaluator": "pitching_strikeouts",
+    "target": 15,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "series": [
+        "2023 Postseason",
+        "Postseason"
+      ]
+    }
+  },
+  {
+    "id": 739626,
+    "name": "Saves with Postseason players",
+    "description": "Tally 5 saves with 2023 Postseason and Postseason Series players across eligible games.",
+    "evaluator": "saves",
+    "target": 5,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "series": [
+        "2023 Postseason",
+        "Postseason"
+      ]
+    }
+  },
+  {
+    "id": 739627,
+    "name": "Hits with Postseason players",
+    "description": "Tally 20 hits with 2023 Postseason and Postseason Series players across eligible games.",
+    "evaluator": "hits",
+    "target": 20,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "series": [
+        "2023 Postseason",
+        "Postseason"
+      ]
+    }
+  },
+  {
+    "id": 739628,
+    "name": "TB with Postseason players",
+    "description": "Tally 25 total bases with 2023 Postseason and Postseason Series players across eligible games.",
+    "evaluator": "total_bases",
+    "target": 25,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "series": [
+        "2023 Postseason",
+        "Postseason"
+      ]
+    }
+  },
+  {
+    "id": 739629,
+    "name": "XBH with Postseason players",
+    "description": "Tally 15 extra-base hits with 2023 Postseason and Postseason Series players across eligible games.",
+    "evaluator": "extra_base_hits",
+    "target": 15,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "series": [
+        "2023 Postseason",
+        "Postseason"
+      ]
+    }
+  },
+  {
+    "id": 739630,
+    "name": "RBI with Postseason players",
+    "description": "Tally 10 RBI with 2023 Postseason and Postseason Series players across eligible games.",
+    "evaluator": "rbi",
+    "target": 10,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "series": [
+        "2023 Postseason",
+        "Postseason"
+      ]
+    }
+  },
+  {
+    "id": 739631,
+    "name": "Exchange 1 Mini Seasons 2023 Postseason Voucher",
+    "description": "Finish a Mini Seasons game to redeem one 2023 Postseason voucher automatically for 3 stars.",
+    "evaluator": "mini_season_voucher",
+    "target": 1,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      6
+    ],
+    "xp": 0,
+    "repeatable": true,
+    "voucher_batch": {
+      "id": 739639,
+      "count": 5
+    }
+  },
+  {
+    "id": 739632,
+    "name": "World Series Conquest batting challenge",
+    "description": "Tally 20 RBI across eligible games.",
+    "evaluator": "rbi",
+    "target": 20,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 739650,
+    "name": "Clemente Collects First Hit",
+    "description": "Tally 1 hit in one game.",
+    "evaluator": "hits",
+    "target": 1,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739651,
+    "name": "Roberto Runs the Bases with Ease",
+    "description": "Tally 1 stolen base in one game.",
+    "evaluator": "stolen_bases",
+    "target": 1,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739652,
+    "name": "Clemente Sets Career-High in Hits",
+    "description": "Tally 3 hits in one game.",
+    "evaluator": "hits",
+    "target": 3,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739653,
+    "name": "MVP! MVP! MVP!",
+    "description": "Tally 8 total bases in one game.",
+    "evaluator": "total_bases",
+    "target": 8,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739654,
+    "name": "Clemente's Clutch Gene",
+    "description": "Tally 1 home run in one game.",
+    "evaluator": "home_runs",
+    "target": 1,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739655,
+    "name": "Kaline Wins Roberto Clemente Award",
+    "description": "Tally 2 hits in one game.",
+    "evaluator": "hits",
+    "target": 2,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739656,
+    "name": "Carter Nabs Clemente Award",
+    "description": "Tally 1 extra-base hit in one game.",
+    "evaluator": "extra_base_hits",
+    "target": 1,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739657,
+    "name": "Ortiz Named Clemente Award Recipient",
+    "description": "Tally 4 total bases in one game.",
+    "evaluator": "total_bases",
+    "target": 4,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739658,
+    "name": "Carrasco Chosen for Clemente Award",
+    "description": "Tally 2 strikeouts in one game.",
+    "evaluator": "pitching_strikeouts",
+    "target": 2,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739659,
+    "name": "Vázquez Shows Off his Puerto Rican Prowess",
+    "description": "Tally 1 home run in one game.",
+    "evaluator": "home_runs",
+    "target": 1,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739660,
+    "name": "Berríos Tosses a Gem",
+    "description": "Tally 3 strikeouts in one game.",
+    "evaluator": "pitching_strikeouts",
+    "target": 3,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739661,
+    "name": "Miranda Mashes Two Homers",
+    "description": "Tally 1 extra-base hit in one game.",
+    "evaluator": "extra_base_hits",
+    "target": 1,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739662,
+    "name": "Hernández is Back in L.A.",
+    "description": "Tally 1 home run in one game.",
+    "evaluator": "home_runs",
+    "target": 1,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739663,
+    "name": "Lindor Showcases his Wheels",
+    "description": "Tally 1 stolen base in one game.",
+    "evaluator": "stolen_bases",
+    "target": 1,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739664,
+    "name": "OPTIONAL Extreme: Big Fly at Forbes",
+    "description": "Tally 2 home runs in one game.",
+    "evaluator": "home_runs",
+    "target": 2,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739665,
+    "name": "Repeatable: 3,000 PXP with Roberto Clemente Program players",
+    "description": "Tally 3,000 Parallel XP with Roberto Clemente Program players across eligible games. Repeat for 5 stars each time.",
+    "evaluator": "parallel_xp",
+    "target": 3000,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "repeatable": true,
+    "card_filter": {
+      "item_ids": [
+        59995,
+        60001,
+        60002,
+        59998,
+        60003,
+        60005,
+        60004,
+        60007,
+        59996,
+        60000
+      ]
+    }
+  },
+  {
+    "id": 739666,
+    "name": "Innings with Pirates players",
+    "description": "Tally 18 innings pitched with Pittsburgh Pirates pitchers across eligible games.",
+    "evaluator": "pitching_outs",
+    "target": 54,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "club": "PIT"
+    }
+  },
+  {
+    "id": 739667,
+    "name": "Tally 66 total bases",
+    "description": "Tally 66 total bases across eligible games.",
+    "evaluator": "total_bases",
+    "target": 66,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 739668,
+    "name": "Tally 12 stolen bases",
+    "description": "Tally 12 stolen bases across eligible games.",
+    "evaluator": "stolen_bases",
+    "target": 12,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 739669,
+    "name": "Tally 21 home runs",
+    "description": "Tally 21 home runs across eligible games.",
+    "evaluator": "home_runs",
+    "target": 21,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 739670,
+    "name": "Tally 29 extra-base hits",
+    "description": "Tally 29 extra-base hits across eligible games.",
+    "evaluator": "extra_base_hits",
+    "target": 29,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0
+  },
+  {
+    "id": 739671,
+    "name": "Get on base with Roberto Clemente Program and Event batters",
+    "description": "Tally 20 times on base (hits and walks) with Roberto Clemente Program and Event batters across eligible games.",
+    "evaluator": "on_base",
+    "target": 20,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "item_ids": [
+        59995,
+        60001,
+        60002,
+        59998,
+        60003,
+        60005,
+        60004,
+        60007,
+        60011,
+        60013
+      ]
+    }
+  },
+  {
+    "id": 739672,
+    "name": "Tally Ks with Roberto Clemente Program and Event pitchers",
+    "description": "Tally 41 strikeouts with Roberto Clemente Program and Event pitchers across eligible games.",
+    "evaluator": "pitching_strikeouts",
+    "target": 41,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "item_ids": [
+        59996,
+        60000,
+        60009
+      ]
+    }
+  },
+  {
+    "id": 739673,
+    "name": "5,200 PXP with Roberto Clemente Award winners",
+    "description": "Tally 5,200 Parallel XP with Roberto Clemente Award winners featured in the program across eligible games.",
+    "evaluator": "parallel_xp",
+    "target": 5200,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "card_filter": {
+      "item_ids": [
+        60003,
+        60000,
+        60005,
+        60004
+      ]
+    }
+  },
+  {
+    "id": 739674,
+    "name": "Roberto Clemente Day Showdown batting challenge",
+    "description": "Tally 2 extra-base hits in one game.",
+    "evaluator": "extra_base_hits",
+    "target": 2,
+    "cadence": "permanent",
+    "shows_in": [
+      "program"
+    ],
+    "modes": [
+      3,
+      6,
+      8
+    ],
+    "xp": 0,
+    "single_game": true
+  },
+  {
+    "id": 739675,
+    "name": "Roberto Clemente Day Conquest batting challenge",
+    "description": "Tally 20 runs across eligible games.",
+    "evaluator": "runs",
+    "target": 20,
     "cadence": "permanent",
     "shows_in": [
       "program"

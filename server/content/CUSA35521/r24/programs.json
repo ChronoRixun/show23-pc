@@ -3283,6 +3283,10 @@
           {
             "mission_id": 738119,
             "points": 10
+          },
+          {
+            "mission_id": 738120,
+            "points": 10
           }
         ]
       }
@@ -3704,12 +3708,142 @@
       10005
     ],
     "name": "Moonshot",
-    "subtitle": "Find the gaps and then swing for the seats.",
+    "subtitle": "Hit home runs and collect Home Run Derby players.",
     "texture_name": "PRO_MOONSHOT",
     "texture_name_bkg": "MOM_PRO_MOONSHOT_BKG",
     "repeat": "next_game",
-    "total_points": 30,
+    "total_points": 100,
+    "parallel_goals": true,
+    "legacy_thresholds": [
+      10,
+      20,
+      30
+    ],
     "stages": [
+      {
+        "id": 7360083,
+        "name": "Moments",
+        "goals": [
+          {
+            "mission_id": 739500,
+            "points": 2
+          },
+          {
+            "mission_id": 739501,
+            "points": 2
+          },
+          {
+            "mission_id": 739502,
+            "points": 2
+          },
+          {
+            "mission_id": 739503,
+            "points": 2
+          },
+          {
+            "mission_id": 739504,
+            "points": 2
+          },
+          {
+            "mission_id": 739505,
+            "points": 2
+          },
+          {
+            "mission_id": 739506,
+            "points": 2
+          },
+          {
+            "mission_id": 739507,
+            "points": 2
+          },
+          {
+            "mission_id": 739508,
+            "points": 2
+          },
+          {
+            "mission_id": 739509,
+            "points": 2
+          }
+        ]
+      },
+      {
+        "id": 7360084,
+        "name": "Missions",
+        "goals": [
+          {
+            "mission_id": 739510,
+            "points": 5
+          },
+          {
+            "mission_id": 739511,
+            "points": 5
+          },
+          {
+            "mission_id": 739512,
+            "points": 5
+          },
+          {
+            "mission_id": 739513,
+            "points": 5
+          },
+          {
+            "mission_id": 739514,
+            "points": 5
+          },
+          {
+            "mission_id": 739515,
+            "points": 5
+          },
+          {
+            "mission_id": 739516,
+            "points": 5
+          },
+          {
+            "mission_id": 739517,
+            "points": 5
+          },
+          {
+            "mission_id": 739518,
+            "points": 5
+          },
+          {
+            "mission_id": 739519,
+            "points": 5
+          },
+          {
+            "mission_id": 739520,
+            "points": 5
+          },
+          {
+            "mission_id": 739521,
+            "points": 5
+          },
+          {
+            "mission_id": 739522,
+            "points": 5
+          }
+        ]
+      },
+      {
+        "id": 7360085,
+        "name": "Moonshot Showdown",
+        "goals": [
+          {
+            "mission_id": 739523,
+            "points": 15
+          }
+        ]
+      },
+      {
+        "id": 7360086,
+        "name": "Moonshot Conquest",
+        "goals": [
+          {
+            "mission_id": 739524,
+            "points": 20
+          }
+        ]
+      },
       {
         "id": 7360081,
         "name": "Find the Barrel",
@@ -3742,24 +3876,1588 @@
     ],
     "tiers": [
       {
+        "threshold": 1,
+        "reward": {
+          "kind": "Unlockable",
+          "uuid": "2926a056ab7387e08459497d7e416017"
+        }
+      },
+      {
+        "threshold": 3,
+        "reward": {
+          "kind": "Unlockable",
+          "uuid": "884c4ee37b41108cd277f475cf775b4a"
+        }
+      },
+      {
+        "threshold": 5,
+        "reward": {
+          "kind": "currency",
+          "stubs": 1000
+        }
+      },
+      {
         "threshold": 10,
         "reward": {
-          "kind": "stubs",
-          "amount": 150
+          "kind": "card",
+          "item_id": 59783,
+          "uuid": "6b175bb0e4c9635bddddedfbeb4f8c38",
+          "xp": 2500
+        }
+      },
+      {
+        "threshold": 15,
+        "reward": {
+          "kind": "pack",
+          "products": [
+            510001
+          ],
+          "quantity": 5,
+          "name": "The Show 5-Pack Box"
         }
       },
       {
         "threshold": 20,
         "reward": {
           "kind": "pack",
-          "product_id": 510002
+          "products": [
+            510005
+          ],
+          "name": "Ballin' is a Habit Pack"
+        }
+      },
+      {
+        "threshold": 25,
+        "reward": {
+          "kind": "card",
+          "item_id": 59784,
+          "uuid": "7ef23fd1ad0dc25fcf0f9a0e0da93655",
+          "stubs": 1000
         }
       },
       {
         "threshold": 30,
         "reward": {
           "kind": "pack",
-          "product_id": 517008
+          "products": [
+            512001,
+            512002,
+            512003,
+            512004,
+            512005,
+            512006,
+            512007,
+            512008,
+            512009,
+            512010,
+            512011,
+            512012,
+            512013,
+            512014,
+            512015,
+            512016,
+            512017,
+            512018,
+            512019,
+            512020,
+            512021,
+            512022,
+            512023,
+            512024,
+            512025,
+            512026,
+            512027,
+            512028,
+            512029,
+            512030,
+            512031,
+            512032,
+            512033,
+            512034,
+            512035,
+            512036,
+            512037,
+            512038,
+            512039,
+            512040
+          ],
+          "name": "Random Diamond Duos Pack"
+        }
+      },
+      {
+        "threshold": 35,
+        "reward": {
+          "kind": "pack",
+          "products": [
+            510001
+          ],
+          "quantity": 5,
+          "name": "The Show 5-Pack Box"
+        }
+      },
+      {
+        "threshold": 40,
+        "reward": {
+          "kind": "card",
+          "item_id": 59785,
+          "uuid": "9034146523cfa1359cca6c36b80151fb",
+          "xp": 2500
+        }
+      },
+      {
+        "threshold": 45,
+        "reward": {
+          "kind": "pack",
+          "products": [
+            512031
+          ]
+        }
+      },
+      {
+        "threshold": 50,
+        "reward": {
+          "kind": "Unlockable",
+          "uuid": "f44ea3289d6cc6b6870fbd84a0f1b2d9"
+        }
+      },
+      {
+        "threshold": 55,
+        "reward": {
+          "kind": "card",
+          "item_id": 59788,
+          "uuid": "df9906c4b2ac52948b61693a66ac63de",
+          "stubs": 1000
+        }
+      },
+      {
+        "threshold": 60,
+        "reward": {
+          "kind": "pack",
+          "products": [
+            512032
+          ]
+        }
+      },
+      {
+        "threshold": 65,
+        "reward": {
+          "kind": "pack",
+          "products": [
+            517006
+          ]
+        }
+      },
+      {
+        "threshold": 70,
+        "reward": {
+          "kind": "card",
+          "item_id": 59786,
+          "uuid": "9673ed352d35974c9920242edac18fa3",
+          "xp": 2500
+        }
+      },
+      {
+        "threshold": 75,
+        "reward": {
+          "kind": "pack",
+          "products": [
+            512001,
+            512002,
+            512003,
+            512004,
+            512005,
+            512006,
+            512007,
+            512008,
+            512009,
+            512010,
+            512011,
+            512012,
+            512013,
+            512014,
+            512015,
+            512016,
+            512017,
+            512018,
+            512019,
+            512020,
+            512021,
+            512022,
+            512023,
+            512024,
+            512025,
+            512026,
+            512027,
+            512028,
+            512029,
+            512030,
+            512031,
+            512032,
+            512033,
+            512034,
+            512035,
+            512036,
+            512037,
+            512038,
+            512039,
+            512040
+          ],
+          "name": "Random Diamond Duos Pack"
+        }
+      },
+      {
+        "threshold": 80,
+        "reward": {
+          "kind": "pack",
+          "products": [
+            517008
+          ]
+        }
+      },
+      {
+        "threshold": 85,
+        "reward": {
+          "kind": "card",
+          "item_id": 59787,
+          "uuid": "fe8fe4dbc59e7d3cf3741fc2d85e3590",
+          "xp": 2500
+        }
+      },
+      {
+        "threshold": 90,
+        "reward": {
+          "kind": "pack",
+          "products": [
+            510044
+          ],
+          "name": "The Jumbo Show Pack"
+        }
+      },
+      {
+        "threshold": 95,
+        "reward": {
+          "kind": "Equipment",
+          "uuid": "505a3a2a32575c1ae4f592fce92e7ba3"
+        }
+      },
+      {
+        "threshold": 100,
+        "reward": {
+          "kind": "card",
+          "item_id": 59789,
+          "uuid": "e27b52177233258bf2d28a36319e6466",
+          "xp": 5000
+        }
+      }
+    ]
+  },
+  {
+    "id": 736013,
+    "list_groups": [
+      10005
+    ],
+    "name": "Father's Day",
+    "subtitle": "Celebrate baseball families with batting and Parallel XP goals.",
+    "texture_name": "PRO_FATHERSDAY",
+    "texture_name_bkg": "MOM_PRO_FATHERSDAY_BKG",
+    "repeat": "next_game",
+    "total_points": 70,
+    "parallel_goals": true,
+    "stages": [
+      {
+        "id": 7360131,
+        "name": "Missions",
+        "goals": [
+          {
+            "mission_id": 739540,
+            "points": 7
+          },
+          {
+            "mission_id": 739541,
+            "points": 3
+          },
+          {
+            "mission_id": 739542,
+            "points": 3
+          },
+          {
+            "mission_id": 739543,
+            "points": 3
+          },
+          {
+            "mission_id": 739544,
+            "points": 3
+          },
+          {
+            "mission_id": 739545,
+            "points": 3
+          },
+          {
+            "mission_id": 739546,
+            "points": 3
+          },
+          {
+            "mission_id": 739547,
+            "points": 3
+          },
+          {
+            "mission_id": 739548,
+            "points": 3
+          },
+          {
+            "mission_id": 739549,
+            "points": 3
+          },
+          {
+            "mission_id": 739550,
+            "points": 3
+          },
+          {
+            "mission_id": 739551,
+            "points": 3
+          }
+        ]
+      },
+      {
+        "id": 7360132,
+        "name": "Moments",
+        "goals": [
+          {
+            "mission_id": 739552,
+            "points": 2
+          },
+          {
+            "mission_id": 739553,
+            "points": 2
+          },
+          {
+            "mission_id": 739554,
+            "points": 2
+          },
+          {
+            "mission_id": 739555,
+            "points": 2
+          },
+          {
+            "mission_id": 739556,
+            "points": 2
+          },
+          {
+            "mission_id": 739557,
+            "points": 2
+          },
+          {
+            "mission_id": 739558,
+            "points": 2
+          },
+          {
+            "mission_id": 739559,
+            "points": 2
+          },
+          {
+            "mission_id": 739560,
+            "points": 2
+          },
+          {
+            "mission_id": 739561,
+            "points": 2
+          }
+        ]
+      },
+      {
+        "id": 7360133,
+        "name": "Father's Day Conquest",
+        "goals": [
+          {
+            "mission_id": 739562,
+            "points": 10
+          }
+        ]
+      }
+    ],
+    "tiers": [
+      {
+        "threshold": 1,
+        "reward": {
+          "kind": "Unlockable",
+          "uuid": "ab1a40d752a0a40d2ecbec2965acfe3d"
+        }
+      },
+      {
+        "threshold": 3,
+        "reward": {
+          "kind": "card",
+          "item_id": 58301,
+          "uuid": "2b93226186a26399f98c5370a523b91b"
+        }
+      },
+      {
+        "threshold": 5,
+        "reward": {
+          "kind": "Unlockable",
+          "uuid": "5a628fa66251ccace84659b5a1128f97"
+        }
+      },
+      {
+        "threshold": 10,
+        "reward": {
+          "kind": "card",
+          "item_id": 58302,
+          "uuid": "8ee614c45c942ee01df45850ab77ee31",
+          "stubs": 1500
+        }
+      },
+      {
+        "threshold": 15,
+        "reward": {
+          "kind": "Equipment",
+          "uuid": "092dff5b934f87c1176766e1cddd6327"
+        }
+      },
+      {
+        "threshold": 20,
+        "reward": {
+          "kind": "card",
+          "item_id": 58304,
+          "uuid": "4cac3d8380cd8c357716f88e94e32c67",
+          "xp": 2500
+        }
+      },
+      {
+        "threshold": 25,
+        "reward": {
+          "kind": "Equipment",
+          "uuid": "489372f0439ac55b19292faf48ae2784"
+        }
+      },
+      {
+        "threshold": 30,
+        "reward": {
+          "kind": "card",
+          "item_id": 58303,
+          "uuid": "03d95b3e995a531f3fbfeaa827cb7efd"
+        }
+      },
+      {
+        "threshold": 35,
+        "reward": {
+          "kind": "Equipment",
+          "uuid": "7012bb2fc19d52536cc90552cdbc080e",
+          "stubs": 1500
+        }
+      },
+      {
+        "threshold": 40,
+        "reward": {
+          "kind": "card",
+          "item_id": 58299,
+          "uuid": "2910f32041330002e2a1c04319be235c"
+        }
+      },
+      {
+        "threshold": 45,
+        "reward": {
+          "kind": "currency",
+          "xp": 2500
+        }
+      },
+      {
+        "threshold": 50,
+        "reward": {
+          "kind": "card",
+          "item_id": 58300,
+          "uuid": "870e58651fc32e55b11a2743d685b505"
+        }
+      },
+      {
+        "threshold": 55,
+        "reward": {
+          "kind": "pack",
+          "products": [
+            510005
+          ],
+          "stubs": 1500,
+          "name": "Ballin' is a Habit Pack"
+        }
+      },
+      {
+        "threshold": 60,
+        "reward": {
+          "kind": "card",
+          "item_id": 58297,
+          "uuid": "182a44d6a3e1d6a41fa520d4f3721479"
+        }
+      },
+      {
+        "threshold": 65,
+        "reward": {
+          "kind": "pack",
+          "products": [
+            520022
+          ]
+        }
+      },
+      {
+        "threshold": 70,
+        "reward": {
+          "kind": "card",
+          "item_id": 58298,
+          "uuid": "d0004880712e8b0cd245ceb629bb4a4d",
+          "xp": 5000
+        }
+      }
+    ]
+  },
+  {
+    "id": 736010,
+    "list_groups": [
+      10005
+    ],
+    "name": "Charisma Series",
+    "subtitle": "Earn Set 1 Charisma Series player rewards.",
+    "texture_name": "PRO_CHARISMA",
+    "texture_name_bkg": "MOM_PRO_CHARISMA_BKG",
+    "repeat": "next_game",
+    "total_points": 100,
+    "parallel_goals": true,
+    "stages": [
+      {
+        "id": 7360101,
+        "name": "Missions",
+        "goals": [
+          {
+            "mission_id": 739570,
+            "points": 10
+          },
+          {
+            "mission_id": 739571,
+            "points": 4
+          },
+          {
+            "mission_id": 739572,
+            "points": 4
+          },
+          {
+            "mission_id": 739573,
+            "points": 4
+          },
+          {
+            "mission_id": 739574,
+            "points": 4
+          },
+          {
+            "mission_id": 739575,
+            "points": 4
+          },
+          {
+            "mission_id": 739576,
+            "points": 4
+          },
+          {
+            "mission_id": 739577,
+            "points": 4
+          },
+          {
+            "mission_id": 739578,
+            "points": 4
+          },
+          {
+            "mission_id": 739579,
+            "points": 4
+          },
+          {
+            "mission_id": 739580,
+            "points": 4
+          }
+        ]
+      },
+      {
+        "id": 7360102,
+        "name": "Moments",
+        "goals": [
+          {
+            "mission_id": 739581,
+            "points": 3
+          },
+          {
+            "mission_id": 739582,
+            "points": 3
+          },
+          {
+            "mission_id": 739583,
+            "points": 3
+          },
+          {
+            "mission_id": 739584,
+            "points": 3
+          },
+          {
+            "mission_id": 739585,
+            "points": 3
+          },
+          {
+            "mission_id": 739586,
+            "points": 3
+          },
+          {
+            "mission_id": 739587,
+            "points": 3
+          },
+          {
+            "mission_id": 739588,
+            "points": 3
+          },
+          {
+            "mission_id": 739589,
+            "points": 3
+          },
+          {
+            "mission_id": 739590,
+            "points": 3
+          }
+        ]
+      },
+      {
+        "id": 7360103,
+        "name": "Charisma Series Showdown",
+        "goals": [
+          {
+            "mission_id": 739591,
+            "points": 30
+          }
+        ]
+      }
+    ],
+    "tiers": [
+      {
+        "threshold": 5,
+        "reward": {
+          "kind": "pack",
+          "products": [
+            510001
+          ],
+          "name": "The Show Pack"
+        }
+      },
+      {
+        "threshold": 10,
+        "reward": {
+          "kind": "card",
+          "item_id": 56945,
+          "uuid": "2e7d5d661198a9ad9bbecafe542ba61f"
+        }
+      },
+      {
+        "threshold": 15,
+        "reward": {
+          "kind": "pack",
+          "products": [
+            510001
+          ],
+          "quantity": 3,
+          "name": "The Show 3-Pack Box"
+        }
+      },
+      {
+        "threshold": 20,
+        "reward": {
+          "kind": "card",
+          "item_id": 56954,
+          "uuid": "831e681259c01a1dff3ebd47b86ed57f"
+        }
+      },
+      {
+        "threshold": 25,
+        "reward": {
+          "kind": "pack",
+          "products": [
+            512002
+          ]
+        }
+      },
+      {
+        "threshold": 30,
+        "reward": {
+          "kind": "card",
+          "item_id": 56953,
+          "uuid": "f9824361cad00166c0fa68104184d253"
+        }
+      },
+      {
+        "threshold": 35,
+        "reward": {
+          "kind": "pack",
+          "products": [
+            512003
+          ]
+        }
+      },
+      {
+        "threshold": 40,
+        "reward": {
+          "kind": "card",
+          "item_id": 56946,
+          "uuid": "2ea667a5830b59ba21bcd2315ddc2014"
+        }
+      },
+      {
+        "threshold": 45,
+        "reward": {
+          "kind": "pack",
+          "products": [
+            512004
+          ]
+        }
+      },
+      {
+        "threshold": 50,
+        "reward": {
+          "kind": "card",
+          "item_id": 56947,
+          "uuid": "66768e0e15536977dee85c79af296f69",
+          "xp": 2500
+        }
+      },
+      {
+        "threshold": 55,
+        "reward": {
+          "kind": "pack",
+          "products": [
+            512005
+          ]
+        }
+      },
+      {
+        "threshold": 60,
+        "reward": {
+          "kind": "card",
+          "item_id": 56950,
+          "uuid": "a51d72b873f07fa2316c1da1c3b47ce1",
+          "stubs": 1000
+        }
+      },
+      {
+        "threshold": 65,
+        "reward": {
+          "kind": "pack",
+          "products": [
+            512006
+          ]
+        }
+      },
+      {
+        "threshold": 70,
+        "reward": {
+          "kind": "card",
+          "item_id": 56948,
+          "uuid": "b40109b3b20950d3626ee3455217fead"
+        }
+      },
+      {
+        "threshold": 75,
+        "reward": {
+          "kind": "pack",
+          "products": [
+            512007
+          ]
+        }
+      },
+      {
+        "threshold": 80,
+        "reward": {
+          "kind": "card",
+          "item_id": 56951,
+          "uuid": "c15195a2b05a7c71389302876168bc05",
+          "xp": 2500
+        }
+      },
+      {
+        "threshold": 85,
+        "reward": {
+          "kind": "pack",
+          "products": [
+            512008
+          ],
+          "stubs": 1000
+        }
+      },
+      {
+        "threshold": 90,
+        "reward": {
+          "kind": "card",
+          "item_id": 56949,
+          "uuid": "b7aa273257d5c1f8fd232f709ba63a0b",
+          "xp": 2500
+        }
+      },
+      {
+        "threshold": 95,
+        "reward": {
+          "kind": "pack",
+          "products": [
+            512009
+          ],
+          "stubs": 1500
+        }
+      },
+      {
+        "threshold": 100,
+        "reward": {
+          "kind": "card",
+          "item_id": 56952,
+          "uuid": "bfbd6bf20e9b1e2429ee021f958e23a2",
+          "xp": 7500
+        }
+      }
+    ]
+  },
+  {
+    "id": 736011,
+    "list_groups": [
+      10005
+    ],
+    "name": "Postseason: World Series",
+    "subtitle": "Replay World Series feats and earn Postseason editions.",
+    "texture_name": "PRO_POSTSEASON",
+    "texture_name_bkg": "MOM_PRO_POSTSEASONWORLDSERIES_BKG",
+    "repeat": "next_game",
+    "total_points": 100,
+    "parallel_goals": true,
+    "stages": [
+      {
+        "id": 7360111,
+        "name": "Moments",
+        "goals": [
+          {
+            "mission_id": 739600,
+            "points": 2
+          },
+          {
+            "mission_id": 739601,
+            "points": 2
+          },
+          {
+            "mission_id": 739602,
+            "points": 2
+          },
+          {
+            "mission_id": 739603,
+            "points": 2
+          },
+          {
+            "mission_id": 739604,
+            "points": 2
+          },
+          {
+            "mission_id": 739605,
+            "points": 2
+          },
+          {
+            "mission_id": 739606,
+            "points": 2
+          },
+          {
+            "mission_id": 739607,
+            "points": 2
+          },
+          {
+            "mission_id": 739608,
+            "points": 2
+          },
+          {
+            "mission_id": 739609,
+            "points": 2
+          },
+          {
+            "mission_id": 739610,
+            "points": 2
+          }
+        ]
+      },
+      {
+        "id": 7360112,
+        "name": "[PXP] Missions",
+        "goals": [
+          {
+            "mission_id": 739611,
+            "points": 5
+          },
+          {
+            "mission_id": 739612,
+            "points": 5
+          },
+          {
+            "mission_id": 739613,
+            "points": 5
+          },
+          {
+            "mission_id": 739614,
+            "points": 5
+          }
+        ]
+      },
+      {
+        "id": 7360113,
+        "name": "Single Player Stat Missions",
+        "goals": [
+          {
+            "mission_id": 739615,
+            "points": 5
+          },
+          {
+            "mission_id": 739616,
+            "points": 5
+          },
+          {
+            "mission_id": 739617,
+            "points": 5
+          },
+          {
+            "mission_id": 739618,
+            "points": 5
+          },
+          {
+            "mission_id": 739619,
+            "points": 5
+          },
+          {
+            "mission_id": 739620,
+            "points": 5
+          },
+          {
+            "mission_id": 739621,
+            "points": 5
+          },
+          {
+            "mission_id": 739622,
+            "points": 5
+          },
+          {
+            "mission_id": 739623,
+            "points": 5
+          }
+        ]
+      },
+      {
+        "id": 7360114,
+        "name": "Postseason Series Stat Missions",
+        "goals": [
+          {
+            "mission_id": 739624,
+            "points": 5
+          },
+          {
+            "mission_id": 739625,
+            "points": 5
+          },
+          {
+            "mission_id": 739626,
+            "points": 5
+          },
+          {
+            "mission_id": 739627,
+            "points": 5
+          },
+          {
+            "mission_id": 739628,
+            "points": 5
+          },
+          {
+            "mission_id": 739629,
+            "points": 5
+          },
+          {
+            "mission_id": 739630,
+            "points": 5
+          }
+        ]
+      },
+      {
+        "id": 7360115,
+        "name": "Mini Seasons 2023 Postseason Voucher Exchange",
+        "goals": [
+          {
+            "mission_id": 739631,
+            "points": 3
+          }
+        ]
+      },
+      {
+        "id": 7360116,
+        "name": "World Series Conquest",
+        "goals": [
+          {
+            "mission_id": 739632,
+            "points": 15
+          }
+        ]
+      }
+    ],
+    "tiers": [
+      {
+        "threshold": 1,
+        "reward": {
+          "kind": "currency",
+          "stubs": 300
+        }
+      },
+      {
+        "threshold": 2,
+        "reward": {
+          "kind": "Equipment",
+          "uuid": "8843fd390986d3bb3917f6f2916053f3"
+        }
+      },
+      {
+        "threshold": 3,
+        "reward": {
+          "kind": "currency",
+          "stubs": 300
+        }
+      },
+      {
+        "threshold": 5,
+        "reward": {
+          "kind": "card",
+          "item_id": 60767,
+          "uuid": "b6c2c3e5f0cd2fc39c03b7ecccb98af0"
+        }
+      },
+      {
+        "threshold": 10,
+        "reward": {
+          "kind": "card",
+          "item_id": 60769,
+          "uuid": "197a0b64d684496573f15540d8647b9c",
+          "xp": 3000
+        }
+      },
+      {
+        "threshold": 20,
+        "reward": {
+          "kind": "card",
+          "item_id": 60764,
+          "uuid": "09b529f6658b0309f8d28297612670f4"
+        }
+      },
+      {
+        "threshold": 30,
+        "reward": {
+          "kind": "card",
+          "item_id": 60770,
+          "uuid": "da7c080888249aca83dab19e7484cf89",
+          "xp": 3000
+        }
+      },
+      {
+        "threshold": 40,
+        "reward": {
+          "kind": "card",
+          "item_id": 60765,
+          "uuid": "bb32d67faa3b1d750edc26f11d9959d9"
+        }
+      },
+      {
+        "threshold": 50,
+        "reward": {
+          "kind": "pack",
+          "products": [
+            510005
+          ],
+          "quantity": 5,
+          "name": "Ballin' is a Habit 5-Pack Box"
+        }
+      },
+      {
+        "threshold": 60,
+        "reward": {
+          "kind": "card",
+          "item_id": 60759,
+          "uuid": "59acde6971d98aae75f793722db098a2",
+          "xp": 3000
+        }
+      },
+      {
+        "threshold": 70,
+        "reward": {
+          "kind": "card",
+          "item_id": 60768,
+          "uuid": "f7dd249151308eb026199ff3457dee88"
+        }
+      },
+      {
+        "threshold": 80,
+        "reward": {
+          "kind": "card",
+          "item_id": 60762,
+          "uuid": "d7d5dde44ecb79dba84f409e6fe8f58a"
+        }
+      },
+      {
+        "threshold": 90,
+        "reward": {
+          "kind": "card",
+          "item_id": 60782,
+          "uuid": "28011f4919fe6a160af6dc06f4961e95"
+        }
+      },
+      {
+        "threshold": 95,
+        "reward": {
+          "kind": "Equipment",
+          "uuid": "0dc6f051811680f413d297f331ed7857"
+        }
+      },
+      {
+        "threshold": 100,
+        "reward": {
+          "kind": "card",
+          "item_id": 60760,
+          "uuid": "88eb513f8f12239c82ae075d08404578",
+          "xp": 5000
+        }
+      }
+    ]
+  },
+  {
+    "id": 736012,
+    "list_groups": [
+      10005
+    ],
+    "name": "Roberto Clemente Day",
+    "subtitle": "Honor Roberto Clemente and collect his program cards.",
+    "texture_name": "PRO_ROBERTOCLEMENTEDAY",
+    "texture_name_bkg": "MOM_PRO_ROBERTOCLEMENTEDAY_BKG",
+    "repeat": "next_game",
+    "total_points": 100,
+    "parallel_goals": true,
+    "stages": [
+      {
+        "id": 7360121,
+        "name": "Moments",
+        "goals": [
+          {
+            "mission_id": 739650,
+            "points": 1
+          },
+          {
+            "mission_id": 739651,
+            "points": 1
+          },
+          {
+            "mission_id": 739652,
+            "points": 1
+          },
+          {
+            "mission_id": 739653,
+            "points": 1
+          },
+          {
+            "mission_id": 739654,
+            "points": 1
+          },
+          {
+            "mission_id": 739655,
+            "points": 1
+          },
+          {
+            "mission_id": 739656,
+            "points": 1
+          },
+          {
+            "mission_id": 739657,
+            "points": 1
+          },
+          {
+            "mission_id": 739658,
+            "points": 1
+          },
+          {
+            "mission_id": 739659,
+            "points": 1
+          },
+          {
+            "mission_id": 739660,
+            "points": 1
+          },
+          {
+            "mission_id": 739661,
+            "points": 1
+          },
+          {
+            "mission_id": 739662,
+            "points": 1
+          },
+          {
+            "mission_id": 739663,
+            "points": 1
+          },
+          {
+            "mission_id": 739664,
+            "points": 10
+          }
+        ]
+      },
+      {
+        "id": 7360122,
+        "name": "Missions",
+        "goals": [
+          {
+            "mission_id": 739665,
+            "points": 5
+          },
+          {
+            "mission_id": 739666,
+            "points": 5
+          },
+          {
+            "mission_id": 739667,
+            "points": 5
+          },
+          {
+            "mission_id": 739668,
+            "points": 5
+          },
+          {
+            "mission_id": 739669,
+            "points": 5
+          },
+          {
+            "mission_id": 739670,
+            "points": 7
+          },
+          {
+            "mission_id": 739671,
+            "points": 7
+          },
+          {
+            "mission_id": 739672,
+            "points": 7
+          },
+          {
+            "mission_id": 739673,
+            "points": 5
+          }
+        ]
+      },
+      {
+        "id": 7360123,
+        "name": "Roberto Clemente Day Showdown",
+        "goals": [
+          {
+            "mission_id": 739674,
+            "points": 15
+          }
+        ]
+      },
+      {
+        "id": 7360124,
+        "name": "Roberto Clemente Day Conquest",
+        "goals": [
+          {
+            "mission_id": 739675,
+            "points": 20
+          }
+        ]
+      }
+    ],
+    "tiers": [
+      {
+        "threshold": 1,
+        "reward": {
+          "kind": "Unlockable",
+          "uuid": "39e492b84d4ffcb5bb0fd3552851953f",
+          "stubs": 500
+        }
+      },
+      {
+        "threshold": 3,
+        "reward": {
+          "kind": "Unlockable",
+          "uuid": "6c51a282e7638cb68990e1fa61f90f6a"
+        }
+      },
+      {
+        "threshold": 5,
+        "reward": {
+          "kind": "pack",
+          "products": [
+            510001
+          ],
+          "quantity": 5,
+          "name": "The Show 5-Pack Box"
+        }
+      },
+      {
+        "threshold": 7,
+        "reward": {
+          "kind": "Equipment",
+          "uuid": "907cd7a980711f95864de7e532cf1cec",
+          "stubs": 500
+        }
+      },
+      {
+        "threshold": 10,
+        "reward": {
+          "kind": "card",
+          "item_id": 59995,
+          "uuid": "ac585c754b9b6425008aadccdecbad73",
+          "xp": 2500
+        }
+      },
+      {
+        "threshold": 14,
+        "reward": {
+          "kind": "card",
+          "item_id": 59996,
+          "uuid": "023fcbb6cc093f6f06e0cfcb02565a48",
+          "stubs": 1000
+        }
+      },
+      {
+        "threshold": 20,
+        "reward": {
+          "kind": "pack",
+          "products": [
+            512036
+          ]
+        }
+      },
+      {
+        "threshold": 25,
+        "reward": {
+          "kind": "pack",
+          "products": [
+            510005
+          ],
+          "name": "Ballin' is a Habit Pack"
+        }
+      },
+      {
+        "threshold": 30,
+        "reward": {
+          "kind": "card",
+          "item_id": 60001,
+          "uuid": "8ecdbbf4ca2a3715337c02cb8d2ea4cc",
+          "xp": 2500
+        }
+      },
+      {
+        "threshold": 35,
+        "reward": {
+          "kind": "pack",
+          "products": [
+            512001,
+            512002,
+            512003,
+            512004,
+            512005,
+            512006,
+            512007,
+            512008,
+            512009,
+            512010,
+            512011,
+            512012,
+            512013,
+            512014,
+            512015,
+            512016,
+            512017,
+            512018,
+            512019,
+            512020,
+            512021,
+            512022,
+            512023,
+            512024,
+            512025,
+            512026,
+            512027,
+            512028,
+            512029,
+            512030,
+            512031,
+            512032,
+            512033,
+            512034,
+            512035,
+            512036,
+            512037,
+            512038,
+            512039,
+            512040
+          ],
+          "name": "Random Diamond Duos Pack"
+        }
+      },
+      {
+        "threshold": 40,
+        "reward": {
+          "kind": "card",
+          "item_id": 60002,
+          "uuid": "cac029e0ca8add40d4d2aebd45308572",
+          "stubs": 1000
+        }
+      },
+      {
+        "threshold": 45,
+        "reward": {
+          "kind": "pack",
+          "products": [
+            510001
+          ],
+          "quantity": 10,
+          "name": "The Show 10-Pack Box"
+        }
+      },
+      {
+        "threshold": 50,
+        "reward": {
+          "kind": "card",
+          "item_id": 59998,
+          "uuid": "1e599c79cf57016dbbb270df25ce85b3",
+          "stubs": 1000
+        }
+      },
+      {
+        "threshold": 55,
+        "reward": {
+          "kind": "pack",
+          "products": [
+            514136
+          ]
+        }
+      },
+      {
+        "threshold": 60,
+        "reward": {
+          "kind": "card",
+          "item_id": 60003,
+          "uuid": "c0e66e73942528d716318d371f451d65",
+          "xp": 2500
+        }
+      },
+      {
+        "threshold": 65,
+        "reward": {
+          "kind": "pack",
+          "products": [
+            510044
+          ],
+          "name": "The Jumbo Show Pack"
+        }
+      },
+      {
+        "threshold": 70,
+        "reward": {
+          "kind": "card",
+          "item_id": 60000,
+          "uuid": "2b4226dd7ed6eb2d419b881f3ae9c97c",
+          "xp": 2500
+        }
+      },
+      {
+        "threshold": 75,
+        "reward": {
+          "kind": "pack",
+          "products": [
+            512001,
+            512002,
+            512003,
+            512004,
+            512005,
+            512006,
+            512007,
+            512008,
+            512009,
+            512010,
+            512011,
+            512012,
+            512013,
+            512014,
+            512015,
+            512016,
+            512017,
+            512018,
+            512019,
+            512020,
+            512021,
+            512022,
+            512023,
+            512024,
+            512025,
+            512026,
+            512027,
+            512028,
+            512029,
+            512030,
+            512031,
+            512032,
+            512033,
+            512034,
+            512035,
+            512036,
+            512037,
+            512038,
+            512039,
+            512040
+          ],
+          "name": "Random Diamond Duos Pack"
+        }
+      },
+      {
+        "threshold": 80,
+        "reward": {
+          "kind": "card",
+          "item_id": 60005,
+          "uuid": "64d5353fd192c4b2546f10881e832cb9",
+          "xp": 2500
+        }
+      },
+      {
+        "threshold": 85,
+        "reward": {
+          "kind": "pack",
+          "products": [
+            514018
+          ]
+        }
+      },
+      {
+        "threshold": 90,
+        "reward": {
+          "kind": "card",
+          "item_id": 60004,
+          "uuid": "0f575f79f610cfa057a51cd284e4b827",
+          "xp": 2500
+        }
+      },
+      {
+        "threshold": 95,
+        "reward": {
+          "kind": "pack",
+          "products": [
+            510005
+          ],
+          "quantity": 5,
+          "name": "Ballin' is a Habit 5-Pack Box"
+        }
+      },
+      {
+        "threshold": 99,
+        "reward": {
+          "kind": "Equipment",
+          "uuid": "5f93dde11e9b74fe5e943eb74bb1d480"
+        }
+      },
+      {
+        "threshold": 100,
+        "reward": {
+          "kind": "card",
+          "item_id": 60007,
+          "uuid": "1feab119ba02cd171a68bd67a746da39",
+          "xp": 5000
         }
       }
     ]
