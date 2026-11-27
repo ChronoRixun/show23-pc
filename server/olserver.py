@@ -8107,8 +8107,10 @@ def home_panels(params):
     # The season never expires locally: it rolls over every 30 days from a fixed start.
     period = 30 * 86400
     remaining = period - int(time.time() - 1679961600) % period  # 2023-03-28 00:00 UTC
-    season = ('<curr_season><season name="Season 1" short_name="1" time_remaining="%d" all_sets_eligible="1"><sets/></season>'
-              '</curr_season>' % remaining)
+    # The Collect screen's season box prints curr_season time_remaining as a plain count
+    # ("N Remaining"), so it stays 0; only the program panel below carries the countdown.
+    season = ('<curr_season><season name="Season 1" short_name="1" time_remaining="0" all_sets_eligible="1"><sets/></season>'
+              '</curr_season>')
     # The hub reads ARENA_PANELS.program.id / remaining_time for the Programs menu's "Ends In"
     # (EXPIRED when the panel is missing; found by the Show 24 session).
     season += '<program id="%d" remaining_time="%d"/>' % (PROGRAM_ID, remaining)
